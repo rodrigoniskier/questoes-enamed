@@ -1,0 +1,39 @@
+# Segredos e variáveis de ambiente
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Ambientes virtuais
+venv/
+env/
+.venv/
+virtualenv/
+
+# Django
+*.sqlite3
+db.sqlite3
+media/
+staticfiles/
+local_settings.py
+
+# Logs e arquivos temporários
+*.log
+*.tmp
+*.swp
+*.bak
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

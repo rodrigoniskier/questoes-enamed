@@ -1,0 +1,240 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submeter Nova Questão - Seleção</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE', secondary: '#0056b3', accent: '#28a745'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .glass-effect { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.9); }
+        .dark .glass-effect { background: rgba(31, 41, 55, 0.9); }
+        #tipo-questao-container div { display: flex; flex-wrap: wrap; gap: 1rem; }
+        #tipo-questao-container label { display: inline-flex; align-items: center; padding: 0.75rem 1.5rem; background-color: #fff; border: 2px solid #ddd; border-radius: 9999px; cursor: pointer; transition: all 0.2s ease-in-out; }
+        #tipo-questao-container input[type="radio"] { opacity: 0; width: 0; height: 0; position: absolute; }
+        #tipo-questao-container input[type="radio"]:checked + label {
+            background-color: #5D5CDE; color: white; border-color: #4338ca;
+            box-shadow: 0 4px 14px 0 rgba(93, 92, 222, 0.39); transform: scale(1.05);
+        }
+        .dark #tipo-questao-container label { background-color: #374151; border-color: #4b5563; color: #d1d5db; }
+        .dark #tipo-questao-container input[type="radio"]:checked + label { background-color: #5D5CDE; border-color: #a5b4fc; }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <div class="min-h-screen gradient-bg">
+        <div class="container mx-auto px-4 py-8">
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex-shrink-0">
+                    <img src="{% static 'images/logo.jpg' %}" alt="Logo Institucional" class="h-16 w-auto object-contain">
+                </div>
+                <div class="text-center flex-1 mx-8">
+                    <h1 class="text-4xl font-bold text-white mb-4">Submissão de Questões</h1>
+                    <p class="text-white/80 text-lg">Sistema Acadêmico de Gestão de Questões</p>
+                </div>
+                <div class="flex-shrink-0">
+                    <img src="{% static 'images/naped.jpg' %}" alt="Logo NAPED" class="h-16 w-auto object-contain">
+                </div>
+            </div>
+
+            <div class="max-w-4xl mx-auto">
+                <div class="glass-effect rounded-2xl p-8 shadow-xl border border-white/20 space-y-8">
+
+                    <div>
+                        <h2 class="text-2xl font-semibold text-center text-gray-900 dark:text-white mb-2">Olá, Professor(a)!</h2>
+                        <p class="text-sm text-center text-gray-500 dark:text-gray-400 mb-6">Esta aplicação foi elaborada pelo Núcleo de Apoio Pedagógico e Experiência Docente (NAPED) do curso de Medicina do UNIPÊ.</p>
+                        <p class="text-center text-gray-700 dark:text-gray-300">Siga os passos abaixo para iniciar a submissão de uma nova questão. As opções aparecerão em sequência.</p>
+                        <hr class="my-6 border-gray-300 dark:border-gray-600">
+                    </div>
+
+                    <div>
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">1</div>
+                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Selecione o Período</h2>
+                        </div>
+                        <select id="id_periodo_selector" class="w-full text-base px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-primary bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                            <option value="">--- Selecione um Período ---</option>
+                            {% for periodo in periodos %}
+                                <option value="{{ periodo.id }}">{{ periodo.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div id="bloco-componente" class="hidden">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">2</div>
+                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Selecione o Componente Curricular</h2>
+                        </div>
+                        <select id="id_componente_selector" class="w-full text-base px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-primary bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                            <option value="">---------</option>
+                        </select>
+                    </div>
+
+                    <div id="bloco-visualizar" class="hidden">
+                        <div class="p-6 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800 text-center mb-8">
+                            <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-2">Gestão do Banco de Questões</h3>
+                            <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Deseja rever ou alterar o destino (Integrada/Reposição) das questões já enviadas?</p>
+
+                            <a id="btn-visualizar" href="#" class="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                Visualizar e Gerir Questões Enviadas
+                            </a>
+                        </div>
+                        <hr class="my-6 border-gray-300 dark:border-gray-600">
+                    </div>
+
+                    <div id="bloco-tipo-questao" class="hidden">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">3</div>
+                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Selecione o Tipo de Nova Questão</h2>
+                        </div>
+                        <div id="tipo-questao-container" class="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                            <div>
+                                <input type="radio" name="tipo_questao_selector" value="RESPOSTA_UNICA" id="tipo-ru"><label for="tipo-ru">Resposta Única</label>
+                                <input type="radio" name="tipo_questao_selector" value="MULTIPLA_ESCOLHA" id="tipo-me"><label for="tipo-me">Resposta Múltipla</label>
+                                <input type="radio" name="tipo_questao_selector" value="ASSERCAO_RAZAO" id="tipo-ar"><label for="tipo-ar">Asserção-Razão</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="bloco-botao" class="hidden text-center pt-8 border-t border-gray-200 dark:border-gray-700">
+                        <button id="btn-avancar" class="px-8 py-4 bg-gradient-to-r from-accent to-green-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+                            Avançar para o Formulário
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Seletores dos elementos principais
+            const seletorPeriodo = document.getElementById('id_periodo_selector');
+            const seletorComponente = document.getElementById('id_componente_selector');
+            const tipoQuestaoRadios = document.querySelectorAll('input[name="tipo_questao_selector"]');
+
+            const blocoComponente = document.getElementById('bloco-componente');
+            const blocoVisualizar = document.getElementById('bloco-visualizar');
+            const blocoTipoQuestao = document.getElementById('bloco-tipo-questao');
+            const blocoBotao = document.getElementById('bloco-botao');
+
+            const btnAvancar = document.getElementById('btn-avancar');
+            const btnVisualizar = document.getElementById('btn-visualizar');
+
+            // Seletores dos LABELS que funcionam como botões
+            const labelRespostaUnica = document.querySelector('label[for="tipo-ru"]');
+            const labelRespostaMultipla = document.querySelector('label[for="tipo-me"]');
+            const labelAssercaoRazao = document.querySelector('label[for="tipo-ar"]');
+
+            const baseUrlVisualizar = "{% url 'submeter_visualizar_questoes' %}";
+
+            function showBlock(el) { if(el) { el.classList.remove('hidden'); } }
+            function hideBlock(el) { if(el) { el.classList.add('hidden'); } }
+
+            // Evento para quando o PERÍODO é alterado
+            seletorPeriodo.addEventListener('change', function() {
+                const periodoId = this.value;
+                hideBlock(blocoComponente);
+                hideBlock(blocoVisualizar);
+                hideBlock(blocoTipoQuestao);
+                hideBlock(blocoBotao);
+                seletorComponente.innerHTML = '<option value="">---------</option>';
+
+                if (periodoId) {
+                    fetch(`/app/api/get-componentes/?periodo_id=${periodoId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            data.forEach(componente => seletorComponente.add(new Option(componente.nome, componente.id)));
+                            showBlock(blocoComponente);
+                        });
+                }
+            });
+
+            // Evento para quando o COMPONENTE é alterado
+            seletorComponente.addEventListener('change', function() {
+                hideBlock(blocoVisualizar);
+                hideBlock(blocoTipoQuestao);
+                hideBlock(blocoBotao);
+                tipoQuestaoRadios.forEach(radio => radio.checked = false);
+
+                if (this.value) {
+                    const componenteId = this.value;
+                    const nomePeriodoSelecionado = seletorPeriodo.options[seletorPeriodo.selectedIndex].text;
+
+                    // 1. Configura botão de Visualizar
+                    btnVisualizar.href = `${baseUrlVisualizar}?componente=${componenteId}`;
+                    showBlock(blocoVisualizar);
+
+                    // 2. Configura os botões de tipo de questão (Estágio E Residência)
+                    labelRespostaUnica.style.display = 'inline-flex';
+                    labelRespostaMultipla.style.display = 'inline-flex';
+                    labelAssercaoRazao.style.display = 'inline-flex';
+
+                    // --- ALTERAÇÃO AQUI: Regra para Estágio OU Residência Médica ---
+                    if (nomePeriodoSelecionado === "Estágio Curricular Obrigatório" ||
+                        nomePeriodoSelecionado === "RESIDÊNCIA MÉDICA" ||
+                        nomePeriodoSelecionado.toUpperCase().includes("SIMULADO")) {
+                        labelRespostaMultipla.style.display = 'none';
+                        labelAssercaoRazao.style.display = 'none';
+                    }
+                    // --- FIM DA ALTERAÇÃO ---
+
+                    showBlock(blocoTipoQuestao);
+                }
+            });
+
+            // Evento para quando um TIPO de questão é selecionado
+            tipoQuestaoRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    if (this.checked) {
+                        showBlock(blocoBotao);
+                    }
+                });
+            });
+
+            // Evento para o botão de AVANÇAR
+            btnAvancar.addEventListener('click', function() {
+                const componenteId = seletorComponente.value;
+                const tipoSelecionadoRadio = document.querySelector('input[name="tipo_questao_selector"]:checked');
+
+                if (!componenteId || !tipoSelecionadoRadio) {
+                    alert('Por favor, complete todas as seleções.');
+                    return;
+                }
+                const tipoSelecionado = tipoSelecionadoRadio.value;
+
+                let url_base = '';
+                if (tipoSelecionado === 'RESPOSTA_UNICA') {
+                    url_base = "{% url 'submeter_resposta_unica' %}";
+                } else if (tipoSelecionado === 'MULTIPLA_ESCOLHA') {
+                    url_base = "{% url 'submeter_resposta_multipla' %}";
+                } else if (tipoSelecionado === 'ASSERCAO_RAZAO') {
+                    url_base = "{% url 'submeter_assercao_razao' %}";
+                }
+
+                window.location.href = `${url_base}?componente=${componenteId}`;
+            });
+        });
+    </script>
+</body>
+</html>

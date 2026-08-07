@@ -1,139 +1,375 @@
 {% load static %}
+{% load questao_filters %}
+
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Prova de {% for c in componentes %}{{ c.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</title>
+    <title>Prova Integrada</title>
     <style>
+        /* --- ESTILOS GERAIS E DE IMPRESSÃO --- */
         @media print {
-            body {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            .no-print { 
-                display: none; 
-            }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none; }
+            .page-break-after { page-break-after: always; }
+            .page-break-before { page-break-before: always; }
         }
-        body { 
-            font-family: 'Times New Roman', Times, serif; 
-            font-size: 12pt; 
-            line-height: 1.5; 
-            margin: 0;
-            padding: 0;
+        body {
+            font-family: Verdana, sans-serif;
+            font-size: 11pt;
+            line-height: 1.3;
+            margin: 0; padding: 0; background-color: #f0f0f0;
         }
-        .container { 
-            width: 21cm; 
-            min-height: 29.7cm;
-            padding: 2cm;
-            margin: 1cm auto; 
-            box-sizing: border-box;
-        }
-        .cabecalho { 
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            text-align: center; 
-            border-bottom: 1px solid black; 
-            padding-bottom: 10px; 
-        }
-        .cabecalho .logos {
-            height: 60px;
-        }
-        .cabecalho .titulo {
-            flex-grow: 1;
-        }
-        .info-prova { margin: 20px 0; }
-        .info-prova p { margin: 5px 0; }
-        
-        /* --- NOVO ESTILO PARA O TÍTULO DO COMPONENTE --- */
-        .componente-titulo {
-            background-color: #e0e0e0;
-            padding: 5px 10px;
-            margin-top: 2em;
-            margin-bottom: 1.5em;
-            font-size: 14pt;
-            text-align: center;
-            border: 1px solid #000;
+        .pagina {
+            width: 21cm; min-height: 29.7cm; margin: 1cm auto;
+            padding: 2cm; box-sizing: border-box; background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            position: relative;
         }
 
-        .questao { margin-bottom: 2em; page-break-inside: avoid; }
-        .questao-enunciado { font-weight: bold; }
-        .alternativas { list-style-type: upper-alpha; padding-left: 20px; margin: 0; }
-        img { max-width: 80%; height: auto; display: block; margin: 1em auto; }
-        hr { border: 0; border-top: 1px solid #ccc; margin: 2em 0; }
-        .button-link {
-            display: inline-block;
-            margin-top: 2em;
-            padding: 10px 20px;
-            font-size: 14pt;
-            font-family: sans-serif;
-            text-decoration: none;
-            border: 1px solid black;
-            border-radius: 5px;
+        /* --- ESTILOS DA CAPA (Inalterado) --- */
+        .capa-container { display: flex; flex-direction: column; padding: 0; box-sizing: border-box;}
+        .capa-superior {
+            height: 14.85cm; width: 100%; position: relative;
+            background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url("{% static 'images/capa_background.jpg' %}");
+            background-size: cover; background-position: center; color: white;
+            display: flex; flex-direction: column; padding: 1.5cm; box-sizing: border-box;
+            font-family: 'Times New Roman', Times, serif;
         }
+        .capa-periodo {
+            text-align: center; font-weight: bold; font-size: 2.2rem;
+            border: 2px solid white; padding: 0.25rem; max-width: 500px;
+            margin: 0 auto 1.5rem auto; text-transform: uppercase;
+        }
+        .capa-titulo-bloco { text-align: left; margin-left: 1cm; margin-top: 0.5rem; }
+        .capa-titulo-bloco h1, .capa-titulo-bloco .titulo-grande { font-size: 4.5rem; margin: 0; line-height: 1.0; }
+        .capa-titulo-bloco h1 { font-weight: 900; text-transform: capitalize; display: flex; align-items: center; }
+        .capa-titulo-bloco .titulo-grande { font-weight: 900; text-transform: lowercase; padding-left: 5px; }
+        .capa-titulo-bloco .titulo-pequeno { font-size: 2.2rem; font-weight: normal; margin: 0 0 0 5px; text-transform: lowercase; }
+        .check-circle { display: inline-block; width: 0.8em; height: 0.8em; margin: 0 0.05em; }
+        .capa-footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .capa-footer .boa-prova { font-size: 2.5rem; font-weight: bold; }
+        .capa-footer img { height: 70px; width: auto; margin-bottom: 70px; }
+
+        .capa-inferior {
+            height: 14.85cm;
+            padding: 1.0cm 2cm;
+            box-sizing: border-box;
+            display: flex; flex-direction: column; justify-content: center;
+            background-color: white;
+            font-family: 'Times New Roman', Times, serif;
+        }
+        .capa-identificacao {
+            border: 2px solid #000; border-radius: 20px;
+            padding: 0.5rem 1.2rem; font-size: 1.0rem;
+            background-color: white; box-sizing: border-box;
+        }
+        .capa-identificacao h3 { font-weight: bold; text-align: center; text-transform: uppercase; margin-bottom: 0.5rem; }
+        .capa-identificacao-linha { display: flex; justify-content: space-between; gap: 1.5rem; margin: 0.5rem 0; }
+        .capa-disciplinas p { margin: 0.1rem 0; display: flex; justify-content: space-between; }
+        .capa-disciplinas strong { margin-bottom: 0.3rem; display: block;}
+
+
+        /* --- ESTILOS DAS QUESTÕES E ANEXO DE IMAGENS --- */
+        .componente-header { text-align: center; font-weight: bold; text-transform: uppercase; padding: 0.5rem; border-top: 1px solid black; border-bottom: 1px solid black; margin: 2rem 0; page-break-after: avoid; }
+
+        .questao {
+            margin-bottom: 1.5em; /* Reduzido de 2em para 1.5em */
+            page-break-inside: avoid;
+        }
+
+        .questao-numero { font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 1em; }
+
+        /* Regra de texto justificado */
+        .texto-base, .enunciado, .alternativas p, .proposicao { text-align: justify; overflow-wrap: break-word; word-wrap: break-word; -webkit-hyphens: auto; -ms-hyphens: auto; hyphens: auto; }
+
+        .enunciado {
+            font-weight: bold;
+        }
+
+        .texto-base, .enunciado, .proposicao { margin-bottom: 1em; }
+        .alternativas p { margin: 0.5em 0; padding-left: 1.5em; text-indent: -1.5em; }
+        .alternativas span { font-weight: bold; margin-right: 0.5em; }
+        .afirmativas { margin-left: 2em; margin-bottom: 1.5em; }
+        .referencia-imagem { font-style: italic; font-weight: bold; text-align: center; margin: 1em 0; padding: 0.5em; background-color: #f0f0f0; border-radius: 5px; }
+        .anexo-imagem-container { text-align: center; margin-bottom: 3em; page-break-inside: avoid; }
+        .anexo-imagem-container img { max-width: 90%; height: auto; display: block; margin: 1em auto; border: 1px solid #ccc; }
+        .anexo-imagem-container p { font-weight: bold; }
+
+        /* --- ESTILOS PARA CARTÃO DE RESPOSTAS (MODELO DOCX) --- */
+        .cartao-respostas { font-family: 'Times New Roman', Times, serif; font-size: 10pt; line-height: 1.2; padding: 1cm 0.5cm; }
+        .cartao-id-header { text-align: center; font-weight: bold; font-size: 11pt; margin-bottom: 0.5cm; border-bottom: 1px solid black; padding-bottom: 5px;}
+        .cartao-id-linhas { font-size: 10pt; margin-bottom: 1cm; }
+        .cartao-id-linhas p { margin: 2px 0; }
+        .cartao-id-linhas span { display: inline-block; width: 60px; font-weight: bold;}
+        .cartao-id-linhas .linha { border-bottom: 1px solid black; display: inline-block; width: calc(100% - 70px); }
+        .cartao-titulo { text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 1cm; text-decoration: underline;}
+        .cartao-grid { display: flex; justify-content: space-around; border: 2px solid black; padding: 0.5cm 0; }
+        .cartao-coluna { display: flex; flex-direction: column; }
+        .cartao-linha-resposta { display: flex; align-items: center; margin-bottom: 4px; }
+        .cartao-numero-questao { font-weight: bold; width: 25px; text-align: right; margin-right: 10px; font-size: 9pt; }
+        .cartao-bolhas { display: flex; }
+        .cartao-bolha { width: 18px; height: 18px; border: 1px solid black; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 4px; font-size: 8pt; }
+        .cartao-letra { margin-top: -1px; }
+        .cartao-footer-logo { text-align: center; margin-top: 1.5cm; }
+        .img-reduzida {
+    width: 75px;
+    height: auto;
+}
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="cabecalho">
-            <img src="{% static 'images/logo.jpg' %}" alt="Logo Institucional" class="logos">
-            <div class="titulo">
-                <h2>AVALIAÇÃO INSTITUCIONAL</h2>
-                <h3>CURSO DE MEDICINA - UNIPÊ</h3>
+    <div class="no-print" style="text-align: center; padding: 1rem; background: #333;">
+        <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">Imprimir Prova</button>
+        <a href="{% url 'prova_gabarito' %}?ids={{ questao_ids|join:',' }}" target="_blank" style="padding: 10px 20px; font-size: 16px; background-color: #0056b3; color: white; text-decoration: none; margin-left: 1rem; border-radius: 5px;">
+            Ver Gabarito
+        </a>
+    </div>
+
+    <div class="pagina page-break-after capa-container">
+        <div class="capa-superior">
+            <div class="capa-periodo">{{ titulo_topo }}</div>
+            <div class="capa-titulo-bloco">
+                <h1>
+                    <span>Pr</span>
+                    <svg class="check-circle" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="white" stroke-width="2.5"/><path d="M7.5 12L10.5 15L16.5 9" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>va</span>
+                </h1>
+                <h2 class="titulo-grande">integrada</h2>
+                <h2 class="titulo-pequeno">medicina</h2>
             </div>
-            <img src="{% static 'images/naped.jpg' %}" alt="Logo NAPED" class="logos">
+            <div class="capa-footer">
+                <span class="boa-prova">Boa Prova!</span>
+                <img src="{% static 'images/logo.jpg' %}" alt="Logo UNIPÊ">
+            </div>
         </div>
-
-        <div class="info-prova">
-            <p><strong>Componente(s) Curricular(es):</strong> 
-                {% for c in componentes %}
-                    {{ c.nome }}{% if not forloop.last %}, {% endif %}
-                {% endfor %}
-            </p>
-            <p><strong>Docente:</strong> _________________________________________________________</p>
-            <p><strong>Discente:</strong> _________________________________________________________</p>
+        <div class="capa-inferior">
+            <div class="capa-identificacao">
+                <h3>Informações do Estudante</h3>
+                <div class="capa-identificacao-linha">
+                    <span><strong>NOME:</strong> _________________________________________</span>
+                    <span><strong>TURMA:</strong> _____________</span>
+                </div>
+                <div class="capa-disciplinas">
+                    <p><strong>Assinalar as disciplinas em curso:</strong></p>
+                    {% for c in componentes %}
+                        <p>{{ c.nome }} <span>( &nbsp; )</span></p>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
+    </div>
 
-        <hr>
-
+    <div class="pagina">
         {% for questao in questoes_selecionadas %}
-            
             {% ifchanged questao.componente %}
-                <h3 class="componente-titulo">COMPONENTE CURRICULAR: {{ questao.componente.nome }}</h3>
+                <div class="componente-header">{{ questao.componente.nome }}</div>
             {% endifchanged %}
-
             <div class="questao">
-                <p><strong>QUESTÃO {{ forloop.counter }}:</strong></p>
-                
-                {% if questao.texto_base %}
-                    <div class="texto-base">
-                        {{ questao.texto_base|linebreaksbr }}
+                <p class="questao-numero">Questão {{ forloop.counter }}</p>
+                {% if questao.texto_base %}<div class="texto-base">{{ questao.texto_base|linebreaksbr }}</div>{% endif %}
+                {% if questao.numero_imagem_anexo %}
+                    <div class="referencia-imagem">
+                        (Ver Imagem {{ questao.numero_imagem_anexo }} no anexo de imagens ao final da prova)
                     </div>
                 {% endif %}
 
-                {% if questao.imagem %}
-                    <img src="{{ questao.imagem.url }}" alt="Imagem da questão {{ forloop.counter }}">
-                {% endif %}
-                
-                <p class="questao-enunciado">{{ questao.enunciado|linebreaksbr }}</p>
 
-                <ol class="alternativas">
-                    {% for alternativa in questao.alternativas.all %}
-                        <li>{{ alternativa.texto }}</li>
-                    {% endfor %}
-                </ol>
+                {% if questao.tipo_questao == 'RESPOSTA_UNICA' %}
+                    <div class="enunciado">{{ questao.enunciado|linebreaksbr }}</div>
+                    <div class="alternativas">
+                        {% for alternativa in questao.alternativas_finais %}
+                            <p>
+                                <span>{% if forloop.counter == 1 %}A{% elif forloop.counter == 2 %}B{% elif forloop.counter == 3 %}C{% elif forloop.counter == 4 %}D{% else %}E{% endif %})</span>
+                                {{ alternativa.texto | limpar_prefixo }}
+                            </p>
+                        {% endfor %}
+                    </div>
+                {% elif questao.tipo_questao == 'MULTIPLA_ESCOLHA' %}
+                    <div class="enunciado">Considerando o texto apresentado, avalie as afirmações a seguir.</div>
+                    <div class="afirmativas">
+                        {% for afirmativa in questao.alternativas.all %}
+                            <p><strong>{% if forloop.counter == 1 %}I{% elif forloop.counter == 2 %}II{% elif forloop.counter == 3 %}III{% elif forloop.counter == 4 %}IV{% else %}V{% endif %}.</strong> {{ afirmativa.texto | limpar_prefixo }}</p>
+                        {% endfor %}
+                    </div>
+                    <div class="alternativas">
+                        {% for alternativa_final in questao.alternativas_finais %}
+                             <p>
+                                <span>{% if forloop.counter == 1 %}A{% elif forloop.counter == 2 %}B{% elif forloop.counter == 3 %}C{% elif forloop.counter == 4 %}D{% else %}E{% endif %})</span>
+                                {{ alternativa_final.texto | limpar_prefixo }}
+                            </p>
+                        {% endfor %}
+                    </div>
+                {% elif questao.tipo_questao == 'ASSERCAO_RAZAO' %}
+                    <div class="enunciado">Acerca do tema apresentado, avalie as asserções a seguir e a relação proposta entre elas.</div>
+                    <div class="proposicao">
+                        <p><strong>I.</strong> {{ questao.enunciado | limpar_prefixo | linebreaksbr }}</p>
+                        <p style="text-align: center;"><strong>PORQUE</strong></p>
+                        <p><strong>II.</strong> {{ questao.proposicao_dois | limpar_prefixo | linebreaksbr }}</p>
+                    </div>
+                    <div class="alternativas">
+                        {% for alternativa in questao.alternativas_finais %}
+                            <p>{{ alternativa.texto }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
             </div>
-            {% if not forloop.last %}
-                <hr style="border-top: 1px dashed #ccc;">
-            {% endif %}
         {% endfor %}
-        
-        <div class="no-print" style="text-align: center; display: flex; gap: 1em; justify-content: center;">
-            <button onclick="window.print()" class="button-link" style="background-color: #f0f0f0; cursor: pointer;">Imprimir Prova</button>
-            <a href="{% url 'prova_gabarito' %}?ids={{ questao_ids|join:',' }}" target="_blank" class="button-link" style="background-color: #0056b3; color: white;">
-                Ver Gabarito
-            </a>
-        </div>
     </div>
-</body>
+
+    {% if anexo_imagens %}
+        <div class="pagina page-break-before">
+             <h1 style="text-align: center; border-bottom: 2px solid black; padding-bottom: 10px;">ANEXO DE IMAGENS</h1>
+            <div style="margin-top: 3em;">
+                {% for anexo in anexo_imagens %}
+                    <div class="anexo-imagem-container">
+                        <p>Imagem {{ anexo.numero_imagem }} (Referente à Questão {{ anexo.numero_questao }})</p>
+                        <img src="{{ anexo.url }}" alt="Imagem da questão {{ anexo.numero_questao }}">
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="pagina page-break-before cartao-respostas">
+        <div class="cartao-id-header">IDENTIFICAÇÃO DO ESTUDANTE</div>
+        <div class="cartao-id-linhas">
+            <p><span>NOME:</span><span class="linha"></span></p>
+            <p><span>PERÍODO:</span><span class="linha"></span></p>
+            <p><span>TURMA:</span><span class="linha"></span></p>
+            <p><span>CPF:</span><span class="linha"></span></p>
+        </div>
+
+        <div class="cartao-titulo">Gabarito Definitivo</div>
+
+        <div class="cartao-grid">
+            <div class="cartao-coluna">
+                <div class="cartao-linha-resposta" style="margin-bottom: 8px;">
+                    <span class="cartao-numero-questao"></span>
+                    <div class="cartao-bolhas">
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">A</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">B</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">C</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">D</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">E</div>
+                    </div>
+                </div>
+                {% for questao in questoes_selecionadas %}
+                    {% if forloop.counter <= 25 %}
+                        <div class="cartao-linha-resposta">
+                            <span class="cartao-numero-questao">{{ forloop.counter }}</span>
+                            <div class="cartao-bolhas">
+                                <div class="cartao-bolha"><span class="cartao-letra">A</span></div>
+                                <div class="cartao-bolha"><span class="cartao-letra">B</span></div>
+                                <div class="cartao-bolha"><span class="cartao-letra">C</span></div>
+                                <div class="cartao-bolha"><span class="cartao-letra">D</span></div>
+                                {% if questao.componente.periodo.nome != "Estágio Curricular Obrigatório" %}
+                                    <div class="cartao-bolha"><span class="cartao-letra">E</span></div>
+                                {% else %}
+                                     <div class="cartao-bolha" style="border-color: transparent;"></div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="cartao-coluna">
+                 <div class="cartao-linha-resposta" style="margin-bottom: 8px;">
+                    <span class="cartao-numero-questao"></span>
+                    <div class="cartao-bolhas">
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">A</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">B</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">C</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">D</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">E</div>
+                    </div>
+                </div>
+                {% for questao in questoes_selecionadas %}
+                    {% if forloop.counter > 25 and forloop.counter <= 50 %}
+                        <div class="cartao-linha-resposta">
+                            <span class="cartao-numero-questao">{{ forloop.counter }}</span>
+                            <div class="cartao-bolhas">
+                                <div class="cartao-bolha"><span class="cartao-letra">A</span></div>
+                                <div class="cartao-bolha"><span class="cartao-letra">B</span></div>
+                                <div class="cartao-bolha"><span class="cartao-letra">C</span></div>
+                                <div class="cartao-bolha"><span class="cartao-letra">D</span></div>
+                                {% if questao.componente.periodo.nome != "Estágio Curricular Obrigatório" %}
+                                    <div class="cartao-bolha"><span class="cartao-letra">E</span></div>
+                                {% else %}
+                                     <div class="cartao-bolha" style="border-color: transparent;"></div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="cartao-coluna">
+                <div class="cartao-linha-resposta" style="margin-bottom: 8px;">
+                    <span class="cartao-numero-questao"></span>
+                    <div class="cartao-bolhas">
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">A</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">B</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">C</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">D</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">E</div>
+                    </div>
+                </div>
+                {% for questao in questoes_selecionadas %}
+                    {% if forloop.counter > 50 and forloop.counter <= 75 %}
+                        <div class="cartao-linha-resposta">
+                            <span class="cartao-numero-questao">{{ forloop.counter }}</span>
+                            <div class="cartao-bolhas">
+                                <div class="cartao-bolha"><span class="cartao-letra">A</span></div>
+                                <div class="cartao-bolha"><span class="cartao-letra">B</span></div>
+                                <div class="cartao-bolha"><span class="cartao-letra">C</span></div>
+                                <div class="cartao-bolha"><span class="cartao-letra">D</span></div>
+                                {% if questao.componente.periodo.nome != "Estágio Curricular Obrigatório" %}
+                                    <div class="cartao-bolha"><span class="cartao-letra">E</span></div>
+                                {% else %}
+                                    <div class="cartao-bolha" style="border-color: transparent;"></div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="cartao-coluna">
+                <div class="cartao-linha-resposta" style="margin-bottom: 8px;">
+                    <span class="cartao-numero-questao"></span>
+                    <div class="cartao-bolhas">
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">A</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">B</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">C</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">D</div>
+                        <div class="cartao-bolha" style="border: none; font-weight: bold;">E</div>
+                    </div>
+                </div>
+                {% for questao in questoes_selecionadas %}
+                    {% if forloop.counter > 75 %}
+                        <div class="cartao-linha-resposta">
+                            <span class="cartao-numero-questao">{{ forloop.counter }}</span>
+                            <div class="cartao-bolhas">
+                                <div class="cartao-bolha"><span class="cartao-letra">A</span></div>
+                                <div class="cartao-bolha"><span class="cartao-letra">B</span></div>
+                                <div class="cartao-bolha"><span class="cartao-letra">C</span></div>
+                                <div class="cartao-bolha"><span class="cartao-letra">D</span></div>
+                                {% if questao.componente.periodo.nome != "Estágio Curricular Obrigatório" %}
+                                    <div class="cartao-bolha"><span class="cartao-letra">E</span></div>
+                                {% else %}
+                                    <div class="cartao-bolha" style="border-color: transparent;"></div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+        </div> <div class="cartao-footer-logo">
+<img src="{% static 'images/logo-prova-integrada.png' %}" alt="Prova Integrada" class="img-reduzida">
+        </div>
+
+    </div> </body>
 </html>

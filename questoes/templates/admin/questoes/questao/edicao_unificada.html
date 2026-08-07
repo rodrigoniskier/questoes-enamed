@@ -1,0 +1,205 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8" />
+    <title>Edição da Questão</title>
+    <style>
+        /* Ajuste Global para evitar overflow lateral */
+        * { box-sizing: border-box; }
+
+        body {
+            background: #2c3035;
+            color: #fff;
+            font-family: 'Inter', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px; /* Aumentado para aproveitar telas grandes */
+            margin: 0 auto;
+            background: #23262a;
+            border-radius: 12px;
+            box-shadow: 0 2px 16px #0005;
+            padding: 40px;
+            display: flex;
+            gap: 40px;
+            flex-wrap: wrap; /* Permite que a lateral desça em telas pequenas */
+        }
+
+        .principal {
+            flex: 3;
+            min-width: 300px;
+        }
+
+        .lateral {
+            flex: 1;
+            min-width: 250px;
+            background: #1e2124;
+            padding: 20px;
+            border-radius: 8px;
+            height: fit-content;
+        }
+
+        label {
+            display: block;
+            margin: 20px 0 8px 0;
+            color: #74beff;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 1px;
+        }
+
+        /* Estilização das caixas de texto com quebra de linha automática */
+        textarea, input {
+            width: 100%;
+            border-radius: 6px;
+            border: 1px solid #3e444b;
+            padding: 15px;
+            margin-bottom: 8px;
+            background: #18191d;
+            color: #fff;
+            font-size: 1.1em;
+            line-height: 1.5;
+            white-space: pre-wrap; /* Força quebra de linha */
+            overflow-wrap: break-word;
+            resize: vertical; /* Permite aumentar a altura manualmente */
+        }
+
+        textarea:focus {
+            outline: 2px solid #74beff;
+            background: #1c1d22;
+        }
+
+        select {
+            width: 100%;
+            border-radius: 6px;
+            padding: 12px;
+            background: #24262b;
+            color: #fff;
+            font-size: 1em;
+            border: 1px solid #3e444b;
+        }
+
+        .alternativa {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #1c1d22;
+            border-radius: 8px;
+            border-left: 4px solid #3e444b;
+        }
+
+        .correta {
+            display: inline-block;
+            margin-top: 5px;
+            font-weight: bold;
+            color: #4ef06f;
+            font-size: 0.9em;
+        }
+
+        .btn-salvar {
+            background: #4ef06f;
+            color: #18191d;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            font-size: 1.1em;
+            margin-top: 20px;
+            transition: background 0.2s;
+        }
+
+        .btn-salvar:hover { background: #3dd65d; }
+
+        img {
+            max-width: 100%;
+            height: auto;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+
+        .header-info {
+            border-bottom: 1px solid #3e444b;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+  <form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="container">
+      <div class="principal">
+        <div class="header-info">
+            <h1 style="margin:0; color:#fff;">Edição de Item</h1>
+            <p style="color:#93a3b6; margin:5px 0 0 0;">Professor: {{ questao.professor_nome }} | Componente: {{ questao.componente.nome }}</p>
+        </div>
+
+        {% if mensagem %}
+          <div style="background: #4ef06f33; color: #4ef06f; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #4ef06f66;">
+            {{ mensagem }}
+          </div>
+        {% endif %}
+
+        <label for="id_texto_base">Texto Base (Cenário Clínico)</label>
+        <textarea name="texto_base" id="id_texto_base" rows="12">{% autoescape off %}{{ questao.texto_base }}{% endautoescape %}</textarea>
+
+        <label for="id_enunciado">Enunciado / Comando</label>
+        <textarea name="enunciado" id="id_enunciado" rows="6">{% autoescape off %}{{ questao.enunciado }}{% endautoescape %}</textarea>
+
+        {% if questao.proposicao_dois %}
+            <label for="id_proposicao_dois">Proposição II (Asserção e Razão)</label>
+            <textarea name="proposicao_dois" id="id_proposicao_dois" rows="6">{% autoescape off %}{{ questao.proposicao_dois }}{% endautoescape %}</textarea>
+        {% endif %}
+
+        <label>Alternativas</label>
+        {% for alternativa in questao.alternativas.all %}
+          <div class="alternativa">
+            <label style="margin-top:0; font-size: 0.75em; color: #aaa;">Alternativa {{ forloop.counter }}</label>
+            <textarea name="alternativa_{{ forloop.counter }}" rows="4">{% autoescape off %}{{ alternativa.texto }}{% endautoescape %}</textarea>
+            {% if alternativa.eh_correta %}
+                <span class="correta">● GABARITO OFICIAL</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+
+        <label for="id_justificativa">Justificativa / Comentário Técnico</label>
+        <textarea name="justificativa" id="id_justificativa" rows="8">{% autoescape off %}{{ questao.justificativa }}{% endautoescape %}</textarea>
+
+        <label>Imagem da Questão</label>
+        {% if questao.imagem %}
+          <div style="background: #18191d; padding: 10px; border-radius: 8px; text-align: center;">
+            <img src="{{ questao.imagem.url }}">
+          </div>
+        {% else %}
+          <p style="color:#999; font-style: italic;">Nenhuma imagem anexada a esta questão.</p>
+        {% endif %}
+        <input type="file" name="imagem" style="margin-top: 10px; background: transparent; padding: 0;">
+      </div>
+
+      <div class="lateral">
+        <label>Status do Fluxo</label>
+        <select name="status">
+            <option value="pendente" {% if questao.status == "pendente" %}selected{% endif %}>🟡 Pendente</option>
+            <option value="aprovada" {% if questao.status == "aprovada" %}selected{% endif %}>🟢 Aprovada</option>
+            <option value="reprovada" {% if questao.status == "reprovada" %}selected{% endif %}>🔴 Reprovada</option>
+        </select>
+
+        <label for="id_comentario_avaliador">Feedback para o Professor</label>
+        <textarea name="comentario_avaliador" id="id_comentario_avaliador" rows="10" placeholder="Escreva aqui os motivos da aprovação ou reprovação...">{{ questao.comentario_avaliador }}</textarea>
+
+        <button type="submit" class="btn-salvar">SALVAR E NOTIFICAR</button>
+
+        <div style="margin-top: 30px; border-top: 1px solid #3e444b; padding-top: 20px;">
+            <a href="/admin/questoes/questao/" style="color: #93a3b6; text-decoration: none; font-size: 0.9em;">← Voltar para a lista</a>
+        </div>
+      </div>
+    </div>
+  </form>
+</body>
+</html>

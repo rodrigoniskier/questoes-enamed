@@ -1,0 +1,166 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submissão em Massa de Questões</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        secondary: '#4B4ACD',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #555; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans antialiased text-gray-900">
+
+    <div class="max-w-4xl mx-auto px-4 py-12">
+        <div class="mb-8 text-center">
+            <h1 class="text-4xl font-extrabold text-gray-900 mb-2">Central de Submissão em Massa</h1>
+            <p class="text-lg text-gray-600 mb-6">Alimente seu banco de questões rapidamente usando IA ou arquivos de backup.</p>
+
+            <div class="flex justify-center">
+                <a href="{% url 'upload_grade_csv' %}" class="inline-flex items-center gap-2 bg-white border-2 border-primary text-primary hover:bg-primary hover:text-white font-bold py-2 px-6 rounded-full shadow-sm hover:shadow transition-all duration-300">
+                    <i class="fas fa-file-csv text-lg"></i>
+                    Configurar Nova Grade Curricular (Semestre)
+                </a>
+            </div>
+        </div>
+
+        {% if messages %}
+            <div class="mb-8 space-y-2">
+                {% for message in messages %}
+                    <div class="p-4 rounded-xl shadow-sm border {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800{% elif message.tags == 'warning' %}bg-yellow-50 border-yellow-200 text-yellow-800{% else %}bg-red-50 border-red-200 text-red-800{% endif %} flex items-center gap-3">
+                        <i class="fas {% if message.tags == 'success' %}fa-check-circle{% elif message.tags == 'warning' %}fa-exclamation-triangle{% else %}fa-times-circle{% endif %}"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
+            <div class="bg-primary p-6 text-white">
+                <div class="flex items-center gap-4">
+                    <div class="bg-white/20 p-3 rounded-lg">
+                        <i class="fas fa-upload text-2xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold">Configurações de Envio</h2>
+                        <p class="text-blue-100 text-sm">Identifique-se e selecione o destino das questões.</p>
+                    </div>
+                </div>
+            </div>
+
+            <form method="post" enctype="multipart/form-data" class="p-8 space-y-8">
+                {% csrf_token %}
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-gray-700">Nome do Professor</label>
+                        {{ form.professor_nome }}
+                    </div>
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-gray-700">E-mail para Notificação</label>
+                        {{ form.professor_email }}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-gray-700">Período</label>
+                        {{ form.periodo }}
+                    </div>
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-gray-700">Componente Curricular</label>
+                        {{ form.componente }}
+                    </div>
+                </div>
+
+                <hr class="border-gray-100">
+
+                <div class="bg-blue-50 border border-blue-100 rounded-2xl p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">OPÇÃO 1</span>
+                        <h3 class="text-lg font-bold text-blue-900">Restaurar de um Backup JSON</h3>
+                    </div>
+                    <div class="space-y-3">
+                        {{ form.arquivo_backup }}
+                        <p class="text-xs text-blue-700">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            {{ form.arquivo_backup.help_text }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 border border-gray-100 rounded-2xl p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="bg-gray-600 text-white text-xs font-bold px-2 py-1 rounded">OPÇÃO 2</span>
+                        <h3 class="text-lg font-bold text-gray-900">Processar Texto via IA</h3>
+                    </div>
+                    <div class="space-y-3">
+                        <label class="block text-sm font-medium text-gray-700">Conteúdo das Questões</label>
+                        {{ form.texto_questoes }}
+                        <p class="text-xs text-gray-500">
+                            {{ form.texto_questoes.help_text }}
+                        </p>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-primary hover:bg-secondary text-white font-bold py-4 px-6 rounded-2xl shadow-lg transform transition active:scale-[0.98] flex items-center justify-center gap-3 text-lg">
+                    <i class="fas fa-magic"></i>
+                    Processar e Salvar Questões
+                </button>
+            </form>
+        </div>
+
+        <div class="mt-8 text-center">
+            <a href="/" class="text-gray-500 hover:text-primary transition font-medium flex items-center justify-center gap-2">
+                <i class="fas fa-arrow-left text-xs"></i> Voltar para a página inicial
+            </a>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('id_periodo_selector_bulk').addEventListener('change', function() {
+            const periodoId = this.value;
+            const componenteSelect = document.getElementById('id_componente_selector_bulk');
+
+            // Limpa as opções atuais
+            componenteSelect.innerHTML = '<option value="">Carregando componentes...</option>';
+
+            if (periodoId) {
+                // Chama a API de componentes existente no seu projeto
+                fetch(`/app/api/get-componentes/?periodo_id=${periodoId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        componenteSelect.innerHTML = '<option value="">--- Selecione um Componente ---</option>';
+                        data.forEach(function(item) {
+                            const option = new Option(item.nome, item.id);
+                            componenteSelect.add(option);
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                        componenteSelect.innerHTML = '<option value="">Erro ao carregar componentes</option>';
+                    });
+            } else {
+                componenteSelect.innerHTML = '<option value="">--- Selecione um Período primeiro ---</option>';
+            }
+        });
+    </script>
+</body>
+</html>

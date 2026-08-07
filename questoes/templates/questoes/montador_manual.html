@@ -1,0 +1,187 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Montador Manual de Gabarito</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE', secondary: '#0056b3', accent: '#28a745'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .glass-effect { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.9); }
+        .dark .glass-effect { background: rgba(31, 41, 55, 0.9); }
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236B7280%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-13%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2013l128%20127.9c3.6%203.6%207.8%205.4%2013%205.4s9.4-1.8%2013-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-13%200-5-1.8-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E');
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 0.65em auto;
+            padding-right: 2.5rem;
+        }
+        /* Limita o texto-base a 2 linhas */
+        .texto-limitado {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.5;
+            height: 3em; /* 1.5 (line-height) * 2 (linhas) */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900">
+    <div class="min-h-screen gradient-bg">
+        <div class="container mx-auto px-4 py-8">
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex-shrink-0">
+                    <img src="{% static 'images/logo.jpg' %}" alt="Logo Institucional" class="h-16 w-auto object-contain">
+                </div>
+                <div class="text-center flex-1 mx-8">
+                    <h1 class="text-4xl font-bold text-white mb-4">Montador Manual de Gabarito</h1>
+                    <p class="text-white/80 text-lg">Área do Administrador</p>
+                </div>
+                <div class="flex-shrink-0">
+                    <img src="{% static 'images/naped.jpg' %}" alt="Logo NAPED" class="h-16 w-auto object-contain">
+                </div>
+            </div>
+
+            {% if not questoes and periodos %}
+            <div class="max-w-lg mx-auto">
+                <form method="GET" class="space-y-8">
+                    <div class="glass-effect rounded-2xl p-8 shadow-xl border border-white/20">
+                        <div class="text-center mb-8">
+                            <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">Passo 1: Selecione o Período</h2>
+                            <p class="text-gray-600 dark:text-gray-300 mt-2">Escolha o período para visualizar as questões.</p>
+                        </div>
+                        <div class="space-y-2">
+                            <label for="periodo_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Período:</label>
+                            <select id="periodo_id" name="periodo_id" class="w-full text-base px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-all duration-200">
+                                <option value="" disabled selected>--- Escolha um período ---</option>
+                                {% for p in periodos %}
+                                    <option value="{{ p.id }}">{{ p.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="flex justify-center items-center gap-8 pt-8 mt-4 border-t border-gray-200 dark:border-gray-700">
+                            <button type="submit" class="px-8 py-4 bg-gradient-to-r from-accent to-green-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 flex items-center space-x-2">
+                                <span>Visualizar Questões</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+
+
+            {% if questoes %}
+            <div class="max-w-4xl mx-auto">
+                <div class="glass-effect rounded-2xl p-8 shadow-xl border border-white/20">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">Passo 2: Selecione as Questões</h2>
+                            <p class="text-gray-600 dark:text-gray-300 mt-2">Visualizando questões para: <strong>{{ periodo_selecionado.nome }}</strong></p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Clique nas caixas na ordem em que devem aparecer no gabarito.</p>
+                        </div>
+                        <div class="mt-4 md:mt-0">
+                            <a href="{% url 'montador_manual' %}" class="text-sm font-medium text-primary hover:text-opacity-80">Trocar Período</a>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        {% for questao in questoes %}
+                        <div class="flex items-center space-x-4 p-4 bg-white/80 dark:bg-gray-800/80 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <input type="checkbox" data-id="{{ questao.id }}" class="seletor-questao h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer flex-shrink-0">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400">{{ questao.componente.nome }}</p>
+                                <p class="texto-limitado text-sm text-gray-700 dark:text-gray-300">{{ questao.texto_base|default:"(Sem texto-base)" }}</p>
+                            </div>
+                            <div class="flex-shrink-0 text-center">
+                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Gabarito</span>
+                                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ questao.letra_correta_calculada }}</p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="flex justify-center items-center gap-8 pt-8 mt-8 border-t border-gray-200 dark:border-gray-700">
+                        <button type="button" id="gerar-gabarito-btn"
+                                data-url-base="{% url 'prova_gabarito' %}"
+                                class="px-8 py-4 bg-gradient-to-r from-primary to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 flex items-center space-x-2 disabled:opacity-50"
+                                disabled>
+                            <span>Gerar Gabarito Comentado</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const ordemSelecionada = [];
+            const checkboxes = document.querySelectorAll('.seletor-questao');
+            const gerarBtn = document.getElementById('gerar-gabarito-btn');
+
+            // 1. Lógica para rastrear a ordem dos cliques
+            checkboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const questaoId = this.dataset.id;
+
+                    if (this.checked) {
+                        // Adiciona ao array se for marcado
+                        ordemSelecionada.push(questaoId);
+                    } else {
+                        // Remove do array se for desmarcado
+                        const index = ordemSelecionada.indexOf(questaoId);
+                        if (index > -1) {
+                            ordemSelecionada.splice(index, 1);
+                        }
+                    }
+
+                    // Ativa/Desativa o botão de gerar
+                    if (gerarBtn) {
+                        gerarBtn.disabled = ordemSelecionada.length === 0;
+                    }
+                });
+            });
+
+            // 2. Lógica para o botão de Gerar Gabarito
+            if (gerarBtn) {
+                gerarBtn.addEventListener('click', function() {
+                    if (ordemSelecionada.length === 0) {
+                        alert('Por favor, selecione pelo menos uma questão.');
+                        return;
+                    }
+
+                    const idsString = ordemSelecionada.join(',');
+                    const urlBase = this.dataset.urlBase;
+                    const urlFinal = `${urlBase}?ids=${idsString}`;
+
+                    // Abre a tua view de gabarito existente numa nova aba
+                    window.open(urlFinal, '_blank');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

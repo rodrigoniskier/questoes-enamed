@@ -1,0 +1,486 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submeter Questão - {{ componente.nome }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE', secondary: '#0056b3', accent: '#28a745'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .glass-effect { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.9); }
+        .dark .glass-effect { background: rgba(31, 41, 55, 0.9); }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-track { background: #374151; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #6b7280; }
+        .assercao-gabarito-container input[type="radio"]:checked + span {
+            outline: 2px solid #5D5CDE;
+            border-radius: 0.25rem;
+            background-color: #e0e7ff;
+        }
+        .dark .assercao-gabarito-container input[type="radio"]:checked + span {
+            background-color: #312e81;
+        }
+        #ia-loading-spinner svg {
+            width: 1.5rem; height: 1.5rem;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        /* Estilo elegante para os novos selects da IA */
+        .ia-select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="%236b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l3-3 3 3m0 6l-3 3-3-3"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1.2em 1.2em;
+            padding-right: 2rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <div class="min-h-screen gradient-bg">
+        <div class="container mx-auto px-4 py-8">
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex-shrink-0">
+                    <img src="{% static 'images/logo.jpg' %}" alt="Logo Institucional" class="h-16 w-auto object-contain">
+                </div>
+                <div class="text-center flex-1 mx-8">
+                    <h1 class="text-4xl font-bold text-white mb-4">Submissão de Questão</h1>
+                    <p class="text-white/80 text-lg">{{ componente.nome }}</p>
+                </div>
+                <div class="flex-shrink-0">
+                    <img src="{% static 'images/naped.jpg' %}" alt="Logo NAPED" class="h-16 w-auto object-contain">
+                </div>
+            </div>
+
+            <div class="max-w-7xl mx-auto">
+                <form method="post" id="form-questao" enctype="multipart/form-data" class="space-y-8">
+                    {% csrf_token %}
+
+                    {{ questao_form.componente.as_hidden }}
+                    {{ questao_form.tipo_questao.as_hidden }}
+
+                    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+                        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Identificação e Uso da Questão</h2>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label for="{{ questao_form.professor_nome.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome Completo</label>
+                                {{ questao_form.professor_nome }}
+                            </div>
+                            <div>
+                                <label for="{{ questao_form.professor_email.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">E-mail para Notificação</label>
+                                {{ questao_form.professor_email }}
+                            </div>
+
+                            <div>
+                                <label for="{{ questao_form.uso_prova.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Destino da Questão</label>
+                                {{ questao_form.uso_prova }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Meta de Contribuição</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                                <div class="bg-blue-100 dark:bg-blue-900/30 p-4 rounded-lg">
+                                    <p class="text-sm font-medium text-blue-800 dark:text-blue-200">META</p>
+                                    <p id="meta-questoes" class="text-3xl font-bold text-blue-900 dark:text-blue-100">...</p>
+                                </div>
+                                <div class="bg-green-100 dark:bg-green-900/30 p-4 rounded-lg">
+                                    <p class="text-sm font-medium text-green-800 dark:text-green-200">ENVIADAS</p>
+                                    <p id="enviadas-questoes" class="text-3xl font-bold text-green-900 dark:text-green-100">...</p>
+                                </div>
+                                <div class="bg-orange-100 dark:bg-orange-900/30 p-4 rounded-lg">
+                                    <p class="text-sm font-medium text-orange-800 dark:text-orange-200">RESTANTES</p>
+                                    <p id="restantes-questoes" class="text-3xl font-bold text-orange-900 dark:text-orange-100">...</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Histórico de Questões</h2>
+                            <div id="historico-container" class="space-y-3 max-h-48 overflow-y-auto custom-scrollbar pr-4">
+                                <p class="text-gray-500 dark:text-gray-400">Carregando histórico...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ASSISTENTE DE IA ATUALIZADO -->
+                    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20 space-y-4">
+                        <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Assistente de IA para Geração de Rascunho</h2>
+                            <span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-300">PARAMETRIZADO</span>
+                        </div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Selecione os parâmetros pedagógicos abaixo e forneça um comando. A IA irá gerar um rascunho de questão perfeitamente alinhado às diretrizes do ENAMED.
+                        </p>
+
+                        <!-- NOVOS PARÂMETROS DA IA (Dropdowns) -->
+                        <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 mb-6">
+                            <h3 class="text-sm font-bold text-gray-800 dark:text-gray-200 mb-3 uppercase tracking-wider">Diretrizes do ENAMED</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Área Principal</label>
+                                    <select id="ia-area-primaria" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Área Secundária</label>
+                                    <select id="ia-area-secundaria" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Taxonomia de Bloom</label>
+                                    <select id="ia-bloom" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Nível de Dificuldade</label>
+                                    <select id="ia-dificuldade" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
+                                </div>
+
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Perfil do Avaliado (Art. 5º)</label>
+                                    <select id="ia-perfil" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
+                                </div>
+
+                                <div class="md:col-span-3">
+                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Competências (Art. 6º)</label>
+                                    <select id="ia-competencias" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
+                                </div>
+
+                                <div class="md:col-span-3">
+                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Domínios de Conteúdo (Art. 8º)</label>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                        <select id="ia-dc1" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
+                                        <select id="ia-dc2" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
+                                        <select id="ia-dc3" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="ia-prompt-text" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Comando Adicional / Tema da Questão:</label>
+                            <textarea id="ia-prompt-text" rows="3" class="w-full text-sm px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-primary bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-all duration-200 custom-scrollbar" placeholder="Ex: Crie um cenário sobre o tratamento de pneumonia comunitária, focando nos critérios de internamento..."></textarea>
+                        </div>
+                        <div class="flex items-center justify-end space-x-4 mt-4">
+                            <div id="ia-loading-spinner" style="display: none;" role="status">
+                                <svg aria-hidden="true" class="w-6 h-6 text-gray-400 animate-spin dark:text-gray-600 fill-primary" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67228 50 9.67228C27.4013 9.67228 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/><path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0492C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/></svg>
+                                <span class="sr-only">A gerar...</span>
+                            </div>
+                            <button type="button" id="ia-generate-button"
+                                    data-api-url="{% url 'api_gerar_questao' %}"
+                                    class="px-6 py-2 bg-primary text-white font-bold rounded-lg shadow-md hover:bg-opacity-90 transition-all duration-200 disabled:opacity-50">
+                                <i class="fas fa-magic mr-2"></i> Gerar Rascunho parametrizado
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-8">
+    {% if tipo_questao == 'RESPOSTA_UNICA' %}
+        {% include 'questoes/partials/form_resposta_unica.html' %}
+
+    {% elif tipo_questao == 'MULTIPLA_ESCOLHA' %}
+        <!-- INÍCIO DO NOVO AVISO PARA RESPOSTA MÚLTIPLA -->
+        <div class="bg-amber-50 border-l-4 border-amber-500 p-5 rounded-r-lg shadow-sm">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <svg class="h-6 w-6 text-amber-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-sm font-bold text-amber-800 uppercase tracking-wide">Aviso Importante sobre Resposta Múltipla</h3>
+                    <div class="mt-2 text-sm text-amber-700 leading-relaxed">
+                        <p>Por padrão, o assistente de IA e o sistema elaboram este tipo de questão com <strong>apenas uma afirmativa correta</strong> no gabarito.</p>
+                        <p class="mt-1">Caso o professor deseje que o gabarito englobe duas ou mais afirmativas (exemplo: <em>"As afirmativas I e II estão corretas"</em>), é necessário fazer o <strong>ajuste manualmente</strong> nas opções geradas e atualizar a justificativa correspondente abaixo.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- FIM DO NOVO AVISO -->
+
+        {% include 'questoes/partials/form_resposta_multipla.html' %}
+
+    {% elif tipo_questao == 'ASSERCAO_RAZAO' %}
+        {% include 'questoes/partials/form_assercao_razao.html' %}
+    {% endif %}
+</div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // ==========================================
+            // POPULAR OS DROPDOWNS DO ASSISTENTE IA
+            // ==========================================
+            const taxonomiaBloom = ["Lembrar", "Compreender", "Aplicar", "Analisar", "Avaliar", "Criar"];
+            const niveisDificuldade = ["Fácil", "Médio", "Difícil"];
+            const areasDeFormacao = ["Clínica Médica", "Cirurgia Geral", "Ginecologia e Obstetrícia", "Pediatria", "Medicina da Família e Comunidade", "Saúde Mental", "Saúde Coletiva"];
+            const secondaryAreas = ["Nenhuma", ...areasDeFormacao];
+            const perfis = [
+                "I. Comprometido com o respeito à singularidade de cada pessoa e grupo social...",
+                "II. Defensor da cidadania e da dignidade humana...",
+                "III. Crítico e reflexivo em relação ao seu fazer profissional...",
+                "IV. Orientado pelos princípios da ética e da bioética...",
+                "V. Embasado em uma formação geral, atuando na prevenção, promoção, recuperação e reabilitação...",
+                "VI. Comprometido com a sua formação continuada...",
+                "VII. Orientado para uma clínica centrada na pessoa..."
+            ];
+            const competencias = [
+                "I. Respeitar a singularidade de cada pessoa e grupo social...",
+                "II. Formular hipóteses diagnósticas plausíveis...",
+                "III. Solicitar e interpretar exames complementares...",
+                "IV. Elaborar, pactuar e acompanhar o plano terapêutico individual...",
+                "V. Reconhecer, diagnosticar e tratar as urgências e as emergências...",
+                "VI. Indicar e realizar procedimentos médicos...",
+                "VII. Identificar as necessidades de saúde de grupos de pessoas ou de comunidades...",
+                "VIII. Planejar, implementar, gerenciar e avaliar planos e projetos de intervenção coletiva...",
+                "IX. Identificar e promover os princípios, as diretrizes e as políticas dos sistemas de saúde...",
+                "X. Comunicar-se, por meio de linguagem adequada...",
+                "XI. Aplicar os princípios do trabalho em equipe...",
+                "XII. Registrar no prontuário, de forma clara e objetiva...",
+                "XIII. Respeitar as normas éticas e deontológicas do exercício profissional...",
+                "XIV. Ter atitude autorreflexiva...",
+                "XV. Utilizar as novas tecnologias da informação e comunicação..."
+            ];
+            const dominiosDeConteudo = [
+                "I. Bases moleculares e celulares dos processos normais e alterados...",
+                "II. Processos fisiológicos dos seres humanos nas diferentes fases do ciclo de vida.",
+                "III. Determinantes sociais, culturais, comportamentais, psicológicos e ecológicos...",
+                "IV. Ética, bioética, relação médico-paciente e segurança de dados.",
+                "V. Direitos humanos e inclusão...",
+                "VI. Semiologia médica (anamnese e exame físico)...",
+                "VII. Habilidades de comunicação com o paciente...",
+                "VIII. Registro e documentação médica.",
+                "IX. Propedêutica e diagnóstico dos problemas de saúde...",
+                "X. Terapêutica dos problemas de saúde...",
+                "XI. Prognóstico e prevenção...",
+                "XII. Reabilitação física e psicossocial...",
+                "XIII. Promoção e educação em saúde.",
+                "XIV. Políticas de saúde e Sistema Único de Saúde (SUS).",
+                "XV. Planejamento e gestão de serviços de saúde.",
+                "XVI. Epidemiologia, indicadores de saúde e sistemas de informação.",
+                "XVII. Vigilância em saúde e controle de doenças e agravos...",
+                "XVIII. Saúde ambiental e ocupacional.",
+                "XIX. Liderança colaborativa, decisão compartilhada e trabalho em equipe...",
+                "XX. Metodologia científica, medicina baseada em evidências...",
+                "XXI. Uso de tecnologias de comunicação e informação..."
+            ];
+
+            function populateSelect(selectId, options) {
+                const select = document.getElementById(selectId);
+                if (!select) return;
+                select.innerHTML = '';
+                options.forEach(optionText => {
+                    const option = document.createElement('option');
+                    option.value = optionText; // A IA recebe o texto completo
+                    // O ecrã mostra apenas os primeiros 70 caracteres
+                    option.textContent = optionText.length > 70 ? optionText.substring(0, 70) + '...' : optionText;
+                    select.appendChild(option);
+                });
+            }
+
+            populateSelect('ia-area-primaria', areasDeFormacao);
+            populateSelect('ia-area-secundaria', secondaryAreas);
+            populateSelect('ia-bloom', taxonomiaBloom);
+            populateSelect('ia-dificuldade', niveisDificuldade);
+            populateSelect('ia-perfil', perfis);
+            populateSelect('ia-competencias', competencias);
+            populateSelect('ia-dc1', dominiosDeConteudo);
+            populateSelect('ia-dc2', dominiosDeConteudo);
+            populateSelect('ia-dc3', dominiosDeConteudo);
+
+            // ==========================================
+            // LÓGICA DE HISTÓRICO E VALIDAÇÃO (MANTIDA)
+            // ==========================================
+            const componenteId = "{{ componente.id }}";
+            const historicoContainer = document.getElementById('historico-container');
+            const metaQuestoesEl = document.getElementById('meta-questoes');
+            const enviadasQuestoesEl = document.getElementById('enviadas-questoes');
+            const restantesQuestoesEl = document.getElementById('restantes-questoes');
+            const form = document.getElementById('form-questao');
+            const botaoSubmit = document.getElementById('botao-submit');
+
+            const tipoSelecionado = "{{ tipo_questao }}";
+            const numAlternativas = {{ num_alternativas }};
+            const csrfToken = document.querySelector('[name="csrfmiddlewaretoken"]').value;
+
+            // Busca os dados do histórico
+            if (componenteId) {
+                fetch(`/app/api/get-historico/?componente_id=${componenteId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const contagem = data.contagem;
+                        metaQuestoesEl.textContent = contagem.necessario;
+                        enviadasQuestoesEl.textContent = contagem.enviado;
+                        restantesQuestoesEl.textContent = contagem.restantes;
+
+                        const questoes = data.questoes;
+                        historicoContainer.innerHTML = '';
+                        if (questoes.length === 0) {
+                            historicoContainer.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Nenhuma questão foi submetida ainda.</p>';
+                        } else {
+                            questoes.forEach(function(questao) {
+                                let statusBadge;
+                                switch (questao.status) {
+                                    case 'APROVADA': statusBadge = '<span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Aprovada</span>'; break;
+                                    case 'REPROVADA': statusBadge = '<span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">Reprovada</span>'; break;
+                                    default: statusBadge = '<span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">Pendente</span>';
+                                }
+                                const questaoCard = `<div class="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex justify-between items-center"><p class="text-sm text-gray-700 dark:text-gray-300 truncate pr-4">${questao.enunciado}</p>${statusBadge}</div>`;
+                                historicoContainer.innerHTML += questaoCard;
+                            });
+                        }
+                    });
+            }
+
+            function verificarFormulario() {
+                let camposObrigatorios = ['professor_nome', 'professor_email'];
+
+                if (tipoSelecionado === 'RESPOSTA_UNICA') {
+                    camposObrigatorios = camposObrigatorios.concat(['texto_base', 'enunciado', 'justificativa']);
+                } else if (tipoSelecionado === 'MULTIPLA_ESCOLHA') {
+                    camposObrigatorios = camposObrigatorios.concat(['texto_base', 'justificativa']);
+                } else if (tipoSelecionado === 'ASSERCAO_RAZAO') {
+                    camposObrigatorios = camposObrigatorios.concat(['texto_base', 'enunciado', 'proposicao_dois', 'justificativa']);
+                }
+
+                const seletorCampos = camposObrigatorios.map(name => `[name="${name}"]`).join(',');
+                const camposVisiveis = document.querySelectorAll(seletorCampos);
+                const checklists = document.querySelectorAll('.checklist-item');
+
+                const todosCamposPreenchidos = Array.from(camposVisiveis).every(campo => campo && campo.value.trim() !== '');
+                const todosChecklistsMarcados = Array.from(checklists).every(check => check.checked);
+
+                if (botaoSubmit) {
+                    botaoSubmit.disabled = !(todosCamposPreenchidos && todosChecklistsMarcados);
+                }
+            }
+
+            if(form) {
+                form.addEventListener('input', verificarFormulario);
+                form.addEventListener('change', verificarFormulario);
+            }
+            verificarFormulario();
+
+            // ==========================================
+            // NOVO ENVIO DE DADOS PARA A API DA IA
+            // ==========================================
+            const iaPromptText = document.getElementById('ia-prompt-text');
+            const iaGenerateButton = document.getElementById('ia-generate-button');
+            const iaLoadingSpinner = document.getElementById('ia-loading-spinner');
+
+            iaGenerateButton.addEventListener('click', function() {
+                const promptDoProfessor = iaPromptText.value;
+                const apiUrl = this.dataset.apiUrl;
+
+                iaLoadingSpinner.style.display = 'inline-block';
+                iaGenerateButton.disabled = true;
+
+                // Captura todos os novos valores do Dropdown
+                const payload = {
+                    'prompt_professor': promptDoProfessor,
+                    'componente_id': componenteId,
+                    'tipo_questao': tipoSelecionado,
+                    'num_alternativas': numAlternativas,
+                    // Novos Parâmetros ENAMED:
+                    'area_primaria': document.getElementById('ia-area-primaria').value,
+                    'area_secundaria': document.getElementById('ia-area-secundaria').value,
+                    'bloom': document.getElementById('ia-bloom').value,
+                    'dificuldade': document.getElementById('ia-dificuldade').value,
+                    'perfil': document.getElementById('ia-perfil').value,
+                    'competencia': document.getElementById('ia-competencias').value,
+                    'dc1': document.getElementById('ia-dc1').value,
+                    'dc2': document.getElementById('ia-dc2').value,
+                    'dc3': document.getElementById('ia-dc3').value
+                };
+
+                fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.erro || 'A resposta da rede não foi OK.')});
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.erro) {
+                        throw new Error('Erro da IA: ' + data.erro);
+                    }
+
+                    // Preenche os campos do formulário com a resposta da IA
+                    document.querySelector('[name="texto_base"]').value = data.texto_base || '';
+                    document.querySelector('[name="enunciado"]').value = data.enunciado || '';
+                    document.querySelector('[name="justificativa"]').value = data.justificativa || '';
+
+                    if (data.proposicao_dois) {
+                        const propDoisField = document.querySelector('[name="proposicao_dois"]');
+                        if (propDoisField) {
+                            propDoisField.value = data.proposicao_dois;
+                        }
+                    }
+
+                    if (data.alternativas && Array.isArray(data.alternativas)) {
+                        data.alternativas.forEach((alt, index) => {
+                            const textoField = document.querySelector(`#id_alternativas-${index}-texto`);
+                            const corretaField = document.querySelector(`#id_alternativas-${index}-eh_correta`);
+
+                            if (textoField) {
+                                textoField.value = alt.texto || '';
+                            }
+                            if (corretaField) {
+                                corretaField.checked = alt.eh_correta || false;
+                            }
+                        });
+                    }
+
+                    alert('Rascunho parametrizado gerado com sucesso! Por favor, revise todos os campos.');
+                    verificarFormulario();
+                })
+                .catch(error => {
+                    console.error('Erro ao gerar questão com IA:', error);
+                    alert('Ocorreu um erro ao tentar gerar a questão: ' + error.message);
+                })
+                .finally(() => {
+                    iaLoadingSpinner.style.display = 'none';
+                    iaGenerateButton.disabled = false;
+                });
+            });
+        });
+    </script>
+</body>
+</html>

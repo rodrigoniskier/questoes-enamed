@@ -1,0 +1,86 @@
+<div class="space-y-8">
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">A</div>Texto-base</h3>
+                {{ questao_form.texto_base }}
+            </div>
+            <div class="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-6 border border-purple-200 dark:border-purple-800">
+                <h4 class="font-semibold text-purple-900 dark:text-purple-100 mb-4">Diretrizes (Texto-base)</h4>
+                <ul class="list-disc list-inside text-sm space-y-2 text-purple-800 dark:text-purple-200">
+                    <li>Deve fornecer o cenário ou o caso clínico para as afirmativas que virão a seguir.</li>
+                     <li>Deve ser claro e indispensável para a análise das afirmativas.</li>
+                </ul>
+                <label class="flex items-start space-x-3 text-sm cursor-pointer mt-4"><input type="checkbox" class="checklist-item mt-1 rounded border-purple-300 text-purple-600 focus:ring-purple-500"><span>O texto-base é claro e indispensável.</span></label>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-pink-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">B</div>Afirmativas (I, II, III...)</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Preencha as afirmativas abaixo e marque as que forem corretas. O enunciado padrão ("Avalie as afirmações...") e as alternativas finais (A, B, C...) serão gerados automaticamente.</p>
+                <input type="hidden" name="enunciado" value="Considerando o texto apresentado, avalie as afirmações a seguir.">
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                    {{ alternativa_formset.management_form }}
+                    <div class="space-y-4">
+                        {% for form in alternativa_formset %}
+                            <div class="flex items-center space-x-4 p-4 bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
+                                <div class="flex-1">{{ form.texto }}</div>
+                                <label class="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    {{ form.eh_correta }}
+                                    <span>Afirmativa Correta?</span>
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="bg-pink-50 dark:bg-pink-900/20 rounded-xl p-6 border border-pink-200 dark:border-pink-800">
+                <h4 class="font-semibold text-pink-900 dark:text-pink-100 mb-4">Diretrizes (Afirmativas)</h4>
+                <ul class="list-disc list-inside text-sm space-y-2 text-pink-800 dark:text-pink-200">
+                    <li>Crie de 3 a 5 afirmativas.</li>
+                    <li>As afirmativas devem ter estrutura sintática completa e ser independentes umas das outras.</li>
+                    <li>A redação deve ser objetiva, evitando frases muito longas.</li>
+                    <li>Evite o uso da palavra "não" ou similares.</li>
+                </ul>
+                <label class="flex items-start space-x-3 text-sm cursor-pointer mt-4"><input type="checkbox" class="checklist-item mt-1 rounded border-pink-300 text-pink-600 focus:ring-pink-500"><span>Há pelo menos uma afirmativa correta e uma incorreta.</span></label>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">C</div>Imagem (Opcional)</h3>
+                {{ questao_form.imagem }}
+            </div>
+            <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-6 border border-indigo-200 dark:border-indigo-800">
+                <h4 class="font-semibold text-indigo-900 dark:text-indigo-100 mb-4">Diretrizes para Imagem</h4>
+                <p class="text-sm text-indigo-800 dark:text-indigo-200">A imagem pode ser usada para ilustrar o texto-base e deve ser de boa qualidade e legível.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">D</div>Justificativa</h3>
+                {{ questao_form.justificativa }}
+            </div>
+            <div class="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-6 border border-teal-200 dark:border-teal-800">
+                <h4 class="font-semibold text-teal-900 dark:text-teal-100 mb-4">Diretrizes (Justificativa)</h4>
+                <p class="text-sm text-teal-800 dark:text-teal-200">Justifique cada uma das AFIRMATIVAS (I, II, III...), indicando se são "CERTA" ou "ERRADA" e o porquê, com base no referencial teórico.</p>
+                 <label class="flex items-start space-x-3 text-sm cursor-pointer mt-2"><input type="checkbox" class="checklist-item mt-1 rounded border-teal-300 text-teal-600 focus:ring-teal-500"><span>Todas as afirmativas preenchidas foram justificadas.</span></label>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex justify-center pt-8">
+        <button type="submit" id="botao-submit" disabled class="px-8 py-4 bg-gradient-to-r from-accent to-green-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center space-x-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+            <span>Enviar Questão de Resposta Múltipla</span>
+        </button>
+    </div>
+</div>

@@ -1,57 +1,164 @@
-# Endereço do arquivo: questoes/models.py
+# questoes/models.py
 
+from io import BytesIO
+from PIL import Image
+from django.core.files.uploadedfile import InMemoryUploadedFile
+import sys
 from django.db import models
 
-# Documentação:
-# Este modelo representa os períodos do curso (ex: 1º Período, 2º Período).
-class Periodo(models.Model):
-    nome = models.CharField(max_length=100, unique=True, help_text="Ex: 1º Período")
+# ==========================================
+# NOVA HIERARQUIA: SEMESTRE -> PERÍODO
+# ==========================================
+
+class Semestre(models.Model):
+    nome = models.CharField(max_length=20, unique=True, help_text="Ex: 2025.1, 2025.2")
+    ativo = models.BooleanField(default=True, help_text="Marque como ativo para o semestre corrente.")
+
+    class Meta:
+        verbose_name = "Semestre"
+        verbose_name_plural = "Semestres"
+        ordering = ['-nome']
 
     def __str__(self):
         return self.nome
 
-# Documentação:
-# Este modelo representa os componentes curriculares (disciplinas).
-# Cada componente está associado a um período.
+class Periodo(models.Model):
+    nome = models.CharField(max_length=100, unique=True, help_text="Ex: 1º Período")
+    # Novo campo para vincular ao Semestre
+    semestre = models.ForeignKey(
+        Semestre,
+        on_delete=models.CASCADE,
+        related_name="periodos",
+        null=True,
+        blank=True
+    )
+
+    def __str__(self):
+        if self.semestre:
+            return f"{self.nome} ({self.semestre.nome})"
+        return self.nome
+
 class ComponenteCurricular(models.Model):
     nome = models.CharField(max_length=200, help_text="Ex: Anatomia Humana")
     periodo = models.ForeignKey(Periodo, on_delete=models.CASCADE, related_name="componentes")
-    # O administrador definirá o número de questões para este componente na prova.
     numero_questoes_prova = models.PositiveIntegerField(default=5, help_text="Número de questões a serem selecionadas para a prova.")
 
     def __str__(self):
         return f"{self.nome} ({self.periodo.nome})"
 
-# Documentação:
-# Este é o modelo principal, que armazena cada questão enviada.
+# ==========================================
+# MODELO PRINCIPAL DE QUESTÃO
+# ==========================================
+
 class Questao(models.Model):
-    # Enum para o status de validação da questão.
     STATUS_CHOICES = [
         ('PENDENTE', 'Pendente de Validação'),
         ('APROVADA', 'Aprovada'),
         ('REPROVADA', 'Reprovada'),
     ]
 
-    componente = models.ForeignKey(ComponenteCurricular, on_delete=models.CASCADE, related_name="questoes")
-    texto_base = models.TextField(blank=True, null=True, help_text="Texto ou contexto que serve de base para a questão.")
-    imagem = models.ImageField(upload_to='imagens_questoes/', blank=True, null=True, help_text="Imagem opcional para a questão.")
-    enunciado = models.TextField(help_text="O enunciado ou pergunta principal da questão.")
-    justificativa = models.TextField(help_text="Explicação detalhada sobre o gabarito e as alternativas.")
-    
-    # Campo para controle do administrador.
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDENTE')
-    
-    def __str__(self):
-        # Retorna os primeiros 50 caracteres do enunciado para fácil identificação.
-        return self.enunciado[:50] + "..."
+    TIPO_QUESTAO_CHOICES = [
+        ('RESPOSTA_UNICA', 'Resposta Única'),
+        ('MULTIPLA_ESCOLHA', 'Resposta Múltipla'),
+        ('ASSERCAO_RAZAO', 'Asserção-Razão'),
+    ]
 
-# Documentação:
-# Este modelo armazena as alternativas de uma questão.
-# Cada questão pode ter várias alternativas associadas.
+    USO_PROVA_CHOICES = [
+        ('INTEGRADA', 'Apenas Prova Integrada'),
+        ('SIMULADO', 'Apenas Simulado'),
+        ('REPOSICAO', 'Apenas Reposição'),
+        ('RESIDENCIA', 'Apenas Residência'),
+        ('AMBAS', 'Integrada e Reposição'),
+    ]
+
+    # Identificação e Classificação
+    professor_nome = models.CharField(max_length=200)
+    professor_email = models.EmailField()
+    componente = models.ForeignKey(ComponenteCurricular, on_delete=models.CASCADE, related_name="questoes")
+    tipo_questao = models.CharField(max_length=20, choices=TIPO_QUESTAO_CHOICES, default='RESPOSTA_UNICA')
+    uso_prova = models.CharField(max_length=20, choices=USO_PROVA_CHOICES, default='INTEGRADA')
+
+    # Conteúdo
+    texto_base = models.TextField(blank=True, null=True)
+    imagem = models.ImageField(upload_to='imagens_questoes/', blank=True, null=True)
+    enunciado = models.TextField()
+    proposicao_dois = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Usado apenas para questões de Asserção-Razão."
+    )
+
+    # Gabarito e Validação
+    justificativa = models.TextField(help_text="Justificativa da resposta correta e dos distratores.")
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='PENDENTE',
+        help_text="Questões aprovadas serão usadas nas provas. Reprovadas geram notificações de status."
+    )
+    comentario_validacao = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Comentário do administrador ao aprovar ou reprovar a questão."
+    )
+
+    def __str__(self):
+        return (self.enunciado[:50] + "...") if self.enunciado else "(Questão sem enunciado)"
+
+    # Lógica de compressão mantida do arquivo original
+    def save(self, *args, **kwargs):
+        if self.imagem and not getattr(self, '_imagem_comprimida', False):
+            try:
+                img = Image.open(self.imagem)
+
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+
+                max_width = 800
+                if img.width > max_width:
+                    ratio = max_width / float(img.width)
+                    new_height = int(float(img.height) * float(ratio))
+                    img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+
+                output = BytesIO()
+                img.save(output, format='JPEG', quality=70)
+                output.seek(0)
+
+                nome_original = self.imagem.name.split('.')[0]
+                novo_nome = f"{nome_original}_comprimida.jpg"
+
+                self.imagem = InMemoryUploadedFile(
+                    output,
+                    'ImageField',
+                    novo_nome,
+                    'image/jpeg',
+                    sys.getsizeof(output),
+                    None
+                )
+
+                self._imagem_comprimida = True
+
+            except Exception as e:
+                print(f"Erro ao comprimir imagem da questão ID {self.id}: {e}")
+
+        super().save(*args, **kwargs)
+
+# ==========================================
+# ALTERNATIVAS E CONFIGURAÇÕES DE IA
+# ==========================================
+
 class Alternativa(models.Model):
     questao = models.ForeignKey(Questao, on_delete=models.CASCADE, related_name="alternativas")
-    texto = models.CharField(max_length=500, help_text="Texto da alternativa (A, B, C, D ou E).")
-    eh_correta = models.BooleanField(default=False, help_text="Marque esta opção se esta for a alternativa correta (gabarito).")
+    texto = models.CharField(max_length=500, help_text="Texto da alternativa.")
+    eh_correta = models.BooleanField(default=False, help_text="Marque se for a correta.")
 
     def __str__(self):
-        return self.texto
+        return self.texto[:50]
+
+class AIPrompt(models.Model):
+    nome = models.CharField(max_length=100, unique=True)
+    texto_prompt = models.TextField()
+    ativo = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.nome

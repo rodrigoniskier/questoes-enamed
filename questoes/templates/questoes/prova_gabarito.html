@@ -10,77 +10,81 @@
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            .no-print { 
-                display: none; 
-            }
+            .no-print { display: none; }
+            .page-break-after { page-break-after: always; }
         }
-        body { 
-            font-family: 'Times New Roman', Times, serif; 
-            font-size: 12pt; 
-            line-height: 1.5; 
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 11pt;
+            line-height: 1.4;
         }
-        .container { 
-            width: 21cm; 
+        .container {
+            width: 21cm;
             min-height: 29.7cm;
             padding: 2cm;
-            margin: 1cm auto; 
+            margin: 1cm auto;
             box-sizing: border-box;
         }
-        .cabecalho { 
-            text-align: center; 
-            border-bottom: 1px solid black; 
-            padding-bottom: 10px; 
+        .cabecalho {
+            text-align: center; border-bottom: 1px solid black; padding-bottom: 10px;
         }
-        .questao { 
-            margin-bottom: 2.5em; 
-            page-break-inside: avoid; 
+        .questao {
+            margin-bottom: 2.5em; page-break-inside: avoid;
         }
-        .alternativas { 
-            list-style-type: upper-alpha; 
-            padding-left: 20px; 
+        .alternativas {
+            list-style-type: none; /* Removemos o estilo padrão pois vamos controlar manualmente */
+            padding-left: 0;
         }
-        /* Esta é a classe que destaca a resposta correta */
-        .alternativa-correta { 
-            font-weight: bold; 
-            background-color: #e0e0e0; 
+        .alternativa-item {
+            margin-bottom: 0.3em;
+            padding-left: 1.5em;
+            text-indent: -1.5em;
         }
-        /* Esta é a classe que formata a caixa de justificativa */
-        .justificativa { 
-            border-left: 4px solid #888; 
-            padding: 0.5em 1em; 
-            margin-top: 1em; 
-            background-color: #f5f5f5; 
-            font-style: italic;
-            font-size: 11pt;
+        .alternativa-correta {
+            font-weight: bold; background-color: #e0e0e0;
         }
-        img { 
-            max-width: 80%; 
-            height: auto; 
-            display: block; 
-            margin: 1em auto; 
+        .justificativa {
+            border-left: 4px solid #888; padding: 0.5em 1em; margin-top: 1em;
+            background-color: #f5f5f5; font-style: italic; font-size: 11pt;
         }
-        hr { 
-            border: 0; 
-            border-top: 1px dashed #ccc; 
-            margin: 2em 0;
+        img {
+            max-width: 80%; height: auto; display: block; margin: 1em auto;
+        }
+        hr {
+            border: 0; border-top: 1px dashed #ccc; margin: 2em 0;
         }
         .button-link {
-            display: inline-block;
-            margin-top: 2em;
-            padding: 10px 20px;
-            font-size: 14pt;
-            font-family: sans-serif;
-            text-decoration: none;
-            border: 1px solid black;
-            border-radius: 5px;
-            cursor: pointer;
+            display: inline-block; margin-top: 2em; padding: 10px 20px; font-size: 14pt;
+            font-family: sans-serif; text-decoration: none; border: 1px solid black;
+            border-radius: 5px; cursor: pointer;
+        }
+        .gabarito-rapido {
+            text-align: center; border: 2px solid black; padding: 1.0em;
+            margin-top: 2em; page-break-after: always;
+        }
+        .gabarito-grid {
+            display: flex; flex-wrap: wrap; justify-content: center;
+            font-size: 13pt; line-height: 1.4; margin-top: 0.5em;
+        }
+        .gabarito-item {
+            flex-basis: 20%; box-sizing: border-box; text-align: center; padding: 0.1em;
+        }
+        .gabarito-item strong { margin-right: 0.5em; }
+        .titulo-comentarios {
+            text-align: center; margin-top: 0; margin-bottom: 2em;
+            border-bottom: 1px solid black; padding-bottom: 10px; page-break-after: avoid;
+        }
+        .texto-limitado {
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden; text-overflow: ellipsis; line-height: 1.4; height: 2.8em;
+            margin-top: 0.5em; margin-bottom: 1em; color: #333;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="cabecalho">
-            <h2>GABARITO COMENTADO</h2>
+            <h2>GABARITO DA PROVA</h2>
             <h3>
                 Componente(s):
                 {% for c in componentes %}
@@ -89,19 +93,45 @@
             </h3>
         </div>
 
-        <div style="margin: 20px 0;"></div>
+        <div class="gabarito-rapido">
+            <h2 style="margin-top: 0; margin-bottom: 0.5em;">GABARITO COMPLETO</h2>
+            <div class="gabarito-grid">
+                {% for questao in questoes_ordenadas %}
+                <div class="gabarito-item">
+                    <strong>{{ forloop.counter }}.</strong> {{ questao.letra_gabarito }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <h2 class="titulo-comentarios">COMENTÁRIOS INDIVIDUAIS</h2>
 
         {% for questao in questoes_ordenadas %}
             <div class="questao">
-                <p><strong>QUESTÃO {{ forloop.counter }}:</strong> {{ questao.enunciado|linebreaksbr }}</p>
+                <p><strong>QUESTÃO {{ forloop.counter }}:</strong></p>
+                <div class="texto-limitado">
+                    {{ questao.texto_base|default:"(Sem texto-base)"|linebreaksbr }}
+                </div>
 
-                <ol class="alternativas">
-                    {% for alternativa in questao.alternativas.all %}
-                        <li class="{% if alternativa.eh_correta %}alternativa-correta{% endif %}">
-                            {{ alternativa.texto }}
-                        </li>
+                <div class="alternativas">
+
+                    {% if questao.tipo_questao == 'MULTIPLA_ESCOLHA' %}
+                        <div style="margin-bottom: 10px; font-size: 0.95em;">
+                            {% for afirmativa in questao.alternativas.all %}
+                                <p><strong>{% if forloop.counter == 1 %}I.{% elif forloop.counter == 2 %}II.{% elif forloop.counter == 3 %}III.{% elif forloop.counter == 4 %}IV.{% else %}V.{% endif %}</strong> {{ afirmativa.texto }} ({% if afirmativa.eh_correta %}V{% else %}F{% endif %})</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {% for alt in questao.alternativas_finais_exibicao %}
+                        <div class="alternativa-item {% if alt.eh_correta or alt.eh_correta == True %}alternativa-correta{% endif %}">
+                            <strong>
+                                {% if forloop.counter == 1 %}A){% elif forloop.counter == 2 %}B){% elif forloop.counter == 3 %}C){% elif forloop.counter == 4 %}D){% else %}E){% endif %}
+                            </strong>
+                            {{ alt.texto }}
+                        </div>
                     {% endfor %}
-                </ol>
+                </div>
 
                 <div class="justificativa">
                     <p><strong>Justificativa:</strong> {{ questao.justificativa|linebreaksbr }}</p>
@@ -109,7 +139,7 @@
             </div>
             {% if not forloop.last %}<hr>{% endif %}
         {% endfor %}
-        
+
         <div class="no-print" style="text-align: center;">
             <button onclick="window.print()" class="button-link" style="background-color: #f0f0f0;">Imprimir Gabarito</button>
         </div>

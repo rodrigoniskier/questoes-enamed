@@ -1,147 +1,237 @@
-<div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-2 space-y-4">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">3</div>Texto-base</h3>
-            {{ questao_form.texto_base }}
+<div id="form-RESPOSTA_UNICA" class="form-layout-especifico space-y-8" style="display: none;">
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">A</div>Texto-base</h3>
+                {{ questao_form.texto_base }}
+            </div>
+            <div class="diretriz-RESPOSTA_UNICA diretrizes-especificas bg-purple-50 dark:bg-purple-900/20 rounded-xl p-6 border border-purple-200 dark:border-purple-800" style="display: none;">
+                <h4 class="font-semibold text-purple-900 dark:text-purple-100 mb-4">Diretrizes Detalhadas</h4>
+                <p class="text-sm">O texto-base serve como motivador, caso clínico ou situação-estímulo para a questão. Deve ser curto, claro e indispensável para a resolução da questão.</p>
+                <label class="flex items-start space-x-3 text-sm text-purple-800 dark:text-purple-200 cursor-pointer mt-4"><input type="checkbox" class="checklist-item mt-1 rounded border-purple-300 text-purple-600 focus:ring-purple-500"><span>O item não pode ser respondido sem a leitura do texto-base.</span></label>
+            </div>
         </div>
-        <div class="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-6 border border-purple-200 dark:border-purple-800">
-            <h4 class="font-semibold text-purple-900 dark:text-purple-100 mb-4">Diretrizes para Texto-base</h4>
-            <div class="space-y-3">
-                <label class="flex items-start space-x-3 text-sm text-purple-800 dark:text-purple-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-purple-300 text-purple-600 focus:ring-purple-500"><span>Deve servir como motivador, situação-estímulo ou caso clínico.</span></label>
-                <label class="flex items-start space-x-3 text-sm text-purple-800 dark:text-purple-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-purple-300 text-purple-600 focus:ring-purple-500"><span>O item não deve poder ser respondido sem a leitura do texto-base.</span></label>
-                <label class="flex items-start space-x-3 text-sm text-purple-800 dark:text-purple-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-purple-300 text-purple-600 focus:ring-purple-500"><span>Deve ser curto, claro e de fácil compreensão.</span></label>
-                <label class="flex items-start space-x-3 text-sm text-purple-800 dark:text-purple-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-purple-300 text-purple-600 focus:ring-purple-500"><span>A fonte (se houver) deve ser citada e pertencer ao acervo do Unipê.</span></label>
+    </div>
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">B</div>Enunciado</h3>
+                {{ questao_form.enunciado }}
+            </div>
+            <div class="diretriz-RESPOSTA_UNICA diretrizes-especificas bg-orange-50 dark:bg-orange-900/20 rounded-xl p-6 border border-orange-200 dark:border-orange-800" style="display: none;">
+                <h4 class="font-semibold text-orange-900 dark:text-orange-100 mb-4">Diretrizes Detalhadas</h4>
+                <p class="text-sm">O enunciado deve ser uma pergunta ou comando direto, claro e objetivo, sem informações extras e evitando formulações negativas.</p>
+                <label class="flex items-start space-x-3 text-sm text-orange-800 dark:text-orange-200 cursor-pointer mt-4"><input type="checkbox" class="checklist-item mt-1 rounded border-orange-300 text-orange-600 focus:ring-orange-500"><span>A instrução é clara e não contém negativas.</span></label>
+            </div>
+        </div>
+    </div>
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-pink-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">C</div>Alternativas</h3>
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                    {{ alternativa_formset.management_form }}
+                    <div class="space-y-4">
+                        {% for form in alternativa_formset %}
+                            <div class="flex items-center space-x-4 p-4 bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
+                                <div class="flex-1">{{ form.texto }}</div>
+                                <label class="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    {{ form.eh_correta }}
+                                    <span>Correta?</span>
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="diretriz-RESPOSTA_UNICA diretrizes-especificas bg-pink-50 dark:bg-pink-900/20 rounded-xl p-6 border border-pink-200 dark:border-pink-800" style="display: none;">
+                <h4 class="font-semibold text-pink-900 dark:text-pink-100 mb-4">Diretrizes Detalhadas</h4>
+                <p class="text-sm mb-3">As 5 alternativas devem ser plausíveis, com paralelismo sintático e tamanho semelhante. Evite termos como "sempre" ou "nunca".</p>
+                <label class="flex items-start space-x-3 text-sm text-pink-800 dark:text-pink-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-pink-300 text-pink-600 focus:ring-pink-500"><span>Há apenas UMA alternativa correta.</span></label>
+            </div>
+        </div>
+    </div>
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">D</div>Imagem (Opcional)</h3>
+                {{ questao_form.imagem }}
+            </div>
+            <div class="diretriz-RESPOSTA_UNICA diretrizes-especificas bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-6 border border-indigo-200 dark:border-indigo-800" style="display: none;">
+                <h4 class="font-semibold text-indigo-900 dark:text-indigo-100 mb-4">Diretrizes para Imagem</h4>
+                <p class="text-sm">A imagem é opcional, mas se utilizada, deve ser de boa qualidade, legível e diretamente relevante para a questão.</p>
+            </div>
+        </div>
+    </div>
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">E</div>Justificativa</h3>
+                {{ questao_form.justificativa }}
+            </div>
+            <div class="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-6 border border-teal-200 dark:border-teal-800">
+                <h4 class="font-semibold text-teal-900 dark:text-teal-100 mb-4">Diretrizes para Justificativa</h4>
+                <div class="diretriz-RESPOSTA_UNICA diretrizes-especificas space-y-3" style="display: none;">
+                    <p class="text-sm text-teal-800 dark:text-teal-200">Justifique a alternativa CORRETA e explique brevemente por que cada uma das alternativas incorretas (distratores) está errada.</p>
+                    <label class="flex items-start space-x-3 text-sm text-teal-800 dark:text-teal-200 cursor-pointer mt-2"><input type="checkbox" class="checklist-item mt-1 rounded border-teal-300 text-teal-600 focus:ring-teal-500"><span>Todas as justificativas foram preenchidas.</span></label>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-2 space-y-4">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">4</div>Imagem (Opcional)</h3>
-            {{ questao_form.imagem }}
+<div id="form-MULTIPLA_ESCOLHA" class="form-layout-especifico space-y-8" style="display: none;">
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">A</div>Texto-base</h3>
+                {{ questao_form.texto_base }}
+            </div>
+            <div class="diretriz-MULTIPLA_ESCOLHA diretrizes-especificas bg-purple-50 dark:bg-purple-900/20 rounded-xl p-6 border border-purple-200 dark:border-purple-800" style="display: none;">
+                <h4 class="font-semibold text-purple-900 dark:text-purple-100 mb-4">Diretrizes Detalhadas</h4>
+                <p class="text-sm">O texto-base deve fornecer o cenário para as afirmativas que virão a seguir. Ele é essencial para este tipo de questão.</p>
+                <label class="flex items-start space-x-3 text-sm text-purple-800 dark:text-purple-200 cursor-pointer mt-4"><input type="checkbox" class="checklist-item mt-1 rounded border-purple-300 text-purple-600 focus:ring-purple-500"><span>O texto-base é claro e indispensável.</span></label>
+            </div>
         </div>
-        <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-6 border border-indigo-200 dark:border-indigo-800">
-            <h4 class="font-semibold text-indigo-900 dark:text-indigo-100 mb-4">Diretrizes para Imagem</h4>
-            <div class="space-y-3 text-sm text-indigo-800 dark:text-indigo-200">
-                <p><span class="font-medium">Opcional:</span> Este campo é opcional.</p>
-                <p>A imagem (gráfico, figura, etc.) deve ser pertinente e de boa qualidade.</p>
+    </div>
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-pink-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">B</div>Afirmativas (I, II, III...)</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Preencha as afirmativas abaixo e marque as que forem corretas. O enunciado padrão ("Avalie as afirmações...") e as alternativas finais (A, B, C...) serão baseados no que for marcado.</p>
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                    <div class="space-y-4">
+                        {% for form in alternativa_formset %}
+                            <div class="flex items-center space-x-4 p-4 bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
+                                <div class="flex-1">{{ form.texto }}</div>
+                                <label class="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    {{ form.eh_correta }}
+                                    <span>Afirmativa Correta?</span>
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="diretriz-MULTIPLA_ESCOLHA diretrizes-especificas bg-pink-50 dark:bg-pink-900/20 rounded-xl p-6 border border-pink-200 dark:border-pink-800" style="display: none;">
+                <h4 class="font-semibold text-pink-900 dark:text-pink-100 mb-4">Diretrizes Detalhadas</h4>
+                <p class="text-sm mb-3">As afirmativas devem ser independentes e com estrutura sintática completa. A chave de respostas final (A, B, C...) será criada com base nas afirmativas que você marcar como corretas.</p>
+                <label class="flex items-start space-x-3 text-sm text-pink-800 dark:text-pink-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-pink-300 text-pink-600 focus:ring-pink-500"><span>Criei de 3 a 5 afirmativas.</span></label>
+                <label class="flex items-start space-x-3 text-sm text-pink-800 dark:text-pink-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-pink-300 text-pink-600 focus:ring-pink-500"><span>Há pelo menos uma afirmativa correta e uma incorreta.</span></label>
+            </div>
+        </div>
+    </div>
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">C</div>Imagem (Opcional)</h3>
+                {{ questao_form.imagem }}
+            </div>
+            <div class="diretriz-MULTIPLA_ESCOLHA diretrizes-especificas bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-6 border border-indigo-200 dark:border-indigo-800" style="display: none;">
+                <h4 class="font-semibold text-indigo-900 dark:text-indigo-100 mb-4">Diretrizes para Imagem</h4>
+                <p class="text-sm">A imagem é opcional e pode ser usada para ilustrar o texto-base.</p>
+            </div>
+        </div>
+    </div>
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">D</div>Justificativa</h3>
+                {{ questao_form.justificativa }}
+            </div>
+            <div class="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-6 border border-teal-200 dark:border-teal-800">
+                <h4 class="font-semibold text-teal-900 dark:text-teal-100 mb-4">Diretrizes para Justificativa</h4>
+                <div class="diretriz-MULTIPLA_ESCOLHA diretrizes-especificas space-y-3" style="display: none;">
+                    <p class="text-sm text-teal-800 dark:text-teal-200">Justifique cada uma das AFIRMATIVAS (I, II, III...), indicando se são verdadeiras ou falsas, com base no referencial teórico.</p>
+                     <label class="flex items-start space-x-3 text-sm text-teal-800 dark:text-teal-200 cursor-pointer mt-2"><input type="checkbox" class="checklist-item mt-1 rounded border-teal-300 text-teal-600 focus:ring-teal-500"><span>Todas as afirmativas foram justificadas.</span></label>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-2 space-y-4">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">5</div>Enunciado</h3>
-            {{ questao_form.enunciado }}
-        </div>
-        <div class="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-6 border border-orange-200 dark:border-orange-800">
-            <h4 class="font-semibold text-orange-900 dark:text-orange-100 mb-4">Diretrizes para Enunciado</h4>
-            <div class="space-y-3">
-                <label class="flex items-start space-x-3 text-sm text-orange-800 dark:text-orange-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-orange-300 text-orange-600 focus:ring-orange-500"><span>Deve dar uma instrução clara, direta e objetiva.</span></label>
-                <label class="flex items-start space-x-3 text-sm text-orange-800 dark:text-orange-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-orange-300 text-orange-600 focus:ring-orange-500"><span>Não deve conter informações adicionais ao texto-base.</span></label>
-                <label class="flex items-start space-x-3 text-sm text-orange-800 dark:text-orange-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-orange-300 text-orange-600 focus:ring-orange-500"><span>Evitar formulações negativas.</span></label>
+<div id="form-ASSERCAO_RAZAO" class="form-layout-especifico space-y-8" style="display: none;">
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">A</div>Texto-base</h3>
+                {{ questao_form.texto_base }}
+            </div>
+            <div class="diretriz-ASSERCAO_RAZAO diretrizes-especificas bg-purple-50 dark:bg-purple-900/20 rounded-xl p-6 border border-purple-200 dark:border-purple-800" style="display: none;">
+                 <h4 class="font-semibold text-purple-900 dark:text-purple-100 mb-4">Diretrizes Detalhadas</h4>
+                <p class="text-sm">O texto-base deve contextualizar as duas proposições que serão apresentadas a seguir.</p>
+                <label class="flex items-start space-x-3 text-sm text-purple-800 dark:text-purple-200 cursor-pointer mt-4"><input type="checkbox" class="checklist-item mt-1 rounded border-purple-300 text-purple-600 focus:ring-purple-500"><span>O texto-base é claro e indispensável.</span></label>
             </div>
         </div>
     </div>
-    <div class="mt-8">
-        <h4 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Exemplos de Tipos de Enunciado</h4>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
-                <h5 class="font-semibold text-gray-900 dark:text-white mb-2">1. Resposta Única</h5>
-                <div class="example-box text-xs text-gray-700 dark:text-gray-300">
-                    <p><em>Após um caso clínico...</em></p>
-                    <p>"Considerando o caso, assinale a opção que apresenta o procedimento correto do exame físico e a alteração esperada."</p>
-                </div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
-                <h5 class="font-semibold text-gray-900 dark:text-white mb-2">2. Resposta Múltipla</h5>
-                <div class="example-box text-xs text-gray-700 dark:text-gray-300">
-                    <p><em>Após um texto sobre etarismo...</em></p>
-                    <p>"Considerando o texto, avalie as afirmações a seguir."</p>
-                    <p>I. ... II. ... III. ...</p>
-                    <p>"É correto o que se afirmar em"</p>
-                </div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
-                <h5 class="font-semibold text-gray-900 dark:text-white mb-2">3. Asserção-Razão</h5>
-                <div class="example-box text-xs text-gray-700 dark:text-gray-300">
-                    <p><em>Após um texto sobre um tema...</em></p>
-                    <p>"Avalie as asserções a seguir e a relação proposta entre elas."</p>
-                    <p>I. ... <b class="block my-1">PORQUE</b> II. ...</p>
-                    <p>"A respeito dessas asserções, assinale a opção correta."</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-2 space-y-4">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-pink-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">6</div>Alternativas</h3>
-            <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                {{ alternativa_formset.management_form }}
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Proposições</h3>
                 <div class="space-y-4">
-                    {% for form in alternativa_formset %}
-                        <div class="flex items-center space-x-4 p-4 bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
-                            <div class="flex-1">{{ form.texto }}</div>
-                            <label class="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
-                                {{ form.eh_correta }}
-                                <span>Correta?</span>
-                            </label>
-                        </div>
-                    {% endfor %}
+                    <div>
+                        <label for="id_enunciado" class="font-semibold block mb-2 text-gray-800 dark:text-gray-200">Proposição I</label>
+                        {{ questao_form.enunciado }}
+                    </div>
+                    <div class="text-center font-bold text-gray-500 dark:text-gray-400 my-4 text-xl">PORQUE</div>
+                    <div>
+                        <label for="id_proposicao_dois" class="font-semibold block mb-2 text-gray-800 dark:text-gray-200">Proposição II</label>
+                        {{ questao_form.proposicao_dois }}
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="bg-pink-50 dark:bg-pink-900/20 rounded-xl p-6 border border-pink-200 dark:border-pink-800">
-            <h4 class="font-semibold text-pink-900 dark:text-pink-100 mb-4">Diretrizes Detalhadas para Alternativas</h4>
-            <div class="space-y-4 text-sm text-pink-800 dark:text-pink-200">
-                <div>
-                    <label class="flex items-start space-x-3 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-pink-300 text-pink-600 focus:ring-pink-500"><span class="font-semibold">Gabarito Único e Inquestionável:</span></label>
-                    <p class="ml-6 text-xs">Apenas UMA alternativa deve ser a resposta correta, sem margem para outras interpretações.</p>
-                </div>
-                <div>
-                    <label class="flex items-start space-x-3 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-pink-300 text-pink-600 focus:ring-pink-500"><span class="font-semibold">Distratores Plausíveis:</span></label>
-                    <p class="ml-6 text-xs">As alternativas incorretas devem ser verossímeis, retratando erros comuns que um estudante poderia ter. Não devem ser "pegadinhas".</p>
-                </div>
-                <div>
-                    <label class="flex items-start space-x-3 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-pink-300 text-pink-600 focus:ring-pink-500"><span class="font-semibold">Paralelismo Sintático:</span></label>
-                    <p class="ml-6 text-xs">Todas as alternativas devem começar da mesma forma (ex: todas com verbos, todas com substantivos) e devem completar a frase do enunciado de forma gramaticalmente correta.</p>
-                </div>
-                <div>
-                    <label class="flex items-start space-x-3 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-pink-300 text-pink-600 focus:ring-pink-500"><span class="font-semibold">Formato e Tamanho:</span></label>
-                    <p class="ml-6 text-xs">As opções devem ter tamanho semelhante ou estarem dispostas em ordem lógica (crescente/decrescente) para formar um padrão trapezoidal.</p>
-                </div>
-                <div>
-                    <label class="flex items-start space-x-3 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-pink-300 text-pink-600 focus:ring-pink-500"><span class="font-semibold">Evitar Repetições e Pistas:</span></label>
-                    <p class="ml-6 text-xs">Evite repetir palavras que já aparecem no enunciado e não crie alternativas excessivamente longas.</p>
-                </div>
-                <div>
-                    <label class="flex items-start space-x-3 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-pink-300 text-pink-600 focus:ring-pink-500"><span class="font-semibold">Evitar Termos Absolutos:</span></label>
-                    <p class="ml-6 text-xs">Termos como "sempre", "nunca", "todos", "apenas", "somente" são frequentemente usados para criar falsas afirmações e podem ser descartados pelo estudante sem uma real análise do conteúdo.</p>
-                </div>
+            <div class="diretriz-ASSERCAO_RAZAO diretrizes-especificas bg-orange-50 dark:bg-orange-900/20 rounded-xl p-6 border border-orange-200 dark:border-orange-800" style="display: none;">
+                <h4 class="font-semibold text-orange-900 dark:text-orange-100 mb-4">Diretrizes Detalhadas</h4>
+                <p class="text-sm">As duas proposições devem ser afirmativas curtas e completas, que possam ser julgadas como verdadeiras ou falsas independentemente.</p>
+                <label class="flex items-start space-x-3 text-sm text-orange-800 dark:text-orange-200 cursor-pointer mt-4"><input type="checkbox" class="checklist-item mt-1 rounded border-orange-300 text-orange-600 focus:ring-orange-500"><span>As duas proposições foram preenchidas.</span></label>
             </div>
         </div>
     </div>
-</div>
-
-<div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
-   <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-2 space-y-4">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">7</div>Justificativa</h3>
-            {{ questao_form.justificativa }}
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Gabarito da Relação entre as Proposições</h3>
+                 <div class="text-sm text-gray-700 dark:text-gray-300 mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-3 assercao-gabarito-container">
+                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="A" class="hidden"><span class="block p-2"><b>A)</b> As asserções I e II são proposições verdadeiras, e a II é uma justificativa correta da I.</span></label>
+                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="B" class="hidden"><span class="block p-2"><b>B)</b> As asserções I e II são proposições verdadeiras, mas a II não é uma justificativa correta da I.</span></label>
+                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="C" class="hidden"><span class="block p-2"><b>C)</b> A asserção I é uma proposição verdadeira, e a II é uma proposição falsa.</span></label>
+                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="D" class="hidden"><span class="block p-2"><b>D)</b> A asserção I é uma proposição falsa, e a II é uma proposição verdadeira.</span></label>
+                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="E" class="hidden"><span class="block p-2"><b>E)</b> As asserções I e II são proposições falsas.</span></label>
+                 </div>
+            </div>
+            <div class="diretriz-ASSERCAO_RAZAO diretrizes-especificas bg-pink-50 dark:bg-pink-900/20 rounded-xl p-6 border border-pink-200 dark:border-pink-800" style="display: none;">
+                <h4 class="font-semibold text-pink-900 dark:text-pink-100 mb-4">Diretrizes</h4>
+                <p class="text-sm">Selecione a opção que descreve corretamente a relação entre as duas proposições. Esta será a resposta correta da questão.</p>
+                <label class="flex items-start space-x-3 text-sm text-pink-800 dark:text-pink-200 cursor-pointer mt-4"><input type="checkbox" class="checklist-item mt-1 rounded border-pink-300 text-pink-600 focus:ring-pink-500"><span>O gabarito da relação foi selecionado.</span></label>
+            </div>
         </div>
-        <div class="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-6 border border-teal-200 dark:border-teal-800">
-            <h4 class="font-semibold text-teal-900 dark:text-teal-100 mb-4">Diretrizes para Justificativa</h4>
-            <div class="space-y-3">
-                <label class="flex items-start space-x-3 text-sm text-teal-800 dark:text-teal-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-teal-300 text-teal-600 focus:ring-teal-500"><span>A justificativa auxilia na validação e na discussão futura com os alunos.</span></label>
-                <label class="flex items-start space-x-3 text-sm text-teal-800 dark:text-teal-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-teal-300 text-teal-600 focus:ring-teal-500"><span>Explique por que a alternativa correta é correta.</span></label>
-                <label class="flex items-start space-x-3 text-sm text-teal-800 dark:text-teal-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-teal-300 text-teal-600 focus:ring-teal-500"><span>Explique brevemente por que cada distrator está incorreto.</span></label>
+    </div>
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">C</div>Imagem (Opcional)</h3>
+                {{ questao_form.imagem }}
+            </div>
+            <div class="diretriz-ASSERCAO_RAZAO diretrizes-especificas bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-6 border border-indigo-200 dark:border-indigo-800" style="display: none;">
+                <h4 class="font-semibold text-indigo-900 dark:text-indigo-100 mb-4">Diretrizes para Imagem</h4>
+                <p class="text-sm">A imagem é opcional e pode ser usada para ilustrar o texto-base.</p>
+            </div>
+        </div>
+    </div>
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">D</div>Justificativa</h3>
+                {{ questao_form.justificativa }}
+            </div>
+            <div class="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-6 border border-teal-200 dark:border-teal-800">
+                <h4 class="font-semibold text-teal-900 dark:text-teal-100 mb-4">Diretrizes para Justificativa</h4>
+                <div class="diretriz-ASSERCAO_RAZAO diretrizes-especificas space-y-3" style="display: none;">
+                    <p class="text-sm text-teal-800 dark:text-teal-200">A justificativa deve conter três partes: a análise da veracidade da Proposição I, a da Proposição II e, por fim, a da relação de causalidade entre elas, confirmando o gabarito (A, B, C, D ou E) escolhido.</p>
+                    <label class="flex items-start space-x-3 text-sm text-teal-800 dark:text-teal-200 cursor-pointer mt-2"><input type="checkbox" class="checklist-item mt-1 rounded border-teal-300 text-teal-600 focus:ring-teal-500"><span>A Proposição I foi justificada.</span></label>
+                    <label class="flex items-start space-x-3 text-sm text-teal-800 dark:text-teal-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-teal-300 text-teal-600 focus:ring-teal-500"><span>A Proposição II foi justificada.</span></label>
+                    <label class="flex items-start space-x-3 text-sm text-teal-800 dark:text-teal-200 cursor-pointer"><input type="checkbox" class="checklist-item mt-1 rounded border-teal-300 text-teal-600 focus:ring-teal-500"><span>A relação de causalidade foi justificada.</span></label>
+                </div>
             </div>
         </div>
     </div>

@@ -1,0 +1,116 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizar Questões - {{ componente.nome }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { primary: '#5D5CDE', secondary: '#0056b3', accent: '#28a745' },
+                    fontFamily: { 'sans': ['Inter', 'system-ui', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .glass-effect { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.95); }
+        .dark .glass-effect { background: rgba(31, 41, 55, 0.95); }
+        /* Estilo para limitar altura do texto-base se for muito longo */
+        .texto-scroll { max-height: 100px; overflow-y: auto; padding-right: 5px; }
+        .texto-scroll::-webkit-scrollbar { width: 4px; }
+        .texto-scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen gradient-bg">
+    <div class="container mx-auto px-4 py-8">
+        <div class="glass-effect rounded-xl p-6 mb-8 shadow-lg border border-white/20 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Banco de Questões</h1>
+                <p class="text-primary font-medium">{{ componente.nome }}</p>
+            </div>
+            <a href="{% url 'submeter_selecao' %}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 transition">
+                Voltar
+            </a>
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+
+            <div class="space-y-6">
+                {% for questao in questoes %}
+                <div class="glass-effect rounded-xl p-6 shadow-md border border-white/20">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 pb-4 border-b border-gray-200 dark:border-gray-700 gap-4">
+                        <div class="flex items-center gap-3">
+                            <span class="font-mono text-xs text-gray-500">ID: {{ questao.id }}</span>
+                            {% if questao.status == 'APROVADA' %}
+                                <span class="px-2 py-1 text-xs font-bold rounded bg-green-100 text-green-800">APROVADA</span>
+                            {% elif questao.status == 'REPROVADA' %}
+                                <span class="px-2 py-1 text-xs font-bold rounded bg-red-100 text-red-800">REPROVADA</span>
+                            {% else %}
+                                <span class="px-2 py-1 text-xs font-bold rounded bg-yellow-100 text-yellow-800">PENDENTE</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="w-full md:w-auto flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg border border-blue-100 dark:border-blue-800">
+                            <label class="text-sm font-bold text-blue-800 dark:text-blue-300 whitespace-nowrap">Uso da Prova:</label>
+                            <select name="uso_prova_{{ questao.id }}" class="form-select block w-full mt-0 px-3 py-1.5 bg-white border border-gray-300 rounded-md text-sm shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                                {% for codigo, nome in opcoes_uso %}
+                                    <option value="{{ codigo }}" {% if questao.uso_prova == codigo %}selected{% endif %}>
+                                        {{ nome }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                        {% if questao.texto_base %}
+                            <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border-l-4 border-gray-300 italic texto-scroll">
+                                {{ questao.texto_base|linebreaksbr }}
+                            </div>
+                        {% endif %}
+
+                        <div class="font-bold text-base">
+                            {{ questao.enunciado|linebreaksbr }}
+                        </div>
+
+                        <ul class="space-y-1 pl-4">
+                            {% for alt in questao.alternativas.all %}
+                                <li class="flex items-start gap-2">
+                                    <span class="{% if alt.eh_correta %}text-green-600 font-bold{% else %}text-gray-400{% endif %}">
+                                        {% if alt.eh_correta %}✔{% else %}○{% endif %}
+                                    </span>
+                                    <span class="{% if alt.eh_correta %}font-semibold text-gray-900 dark:text-white{% endif %}">
+                                        {{ alt.texto }}
+                                    </span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% empty %}
+                    <div class="text-center p-10 glass-effect rounded-xl text-white">
+                        <p>Nenhuma questão encontrada para este componente.</p>
+                    </div>
+                {% endfor %}
+            </div>
+
+            {% if questoes %}
+            <div class="fixed bottom-6 right-6 z-50">
+                <button type="submit" class="px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full shadow-xl flex items-center gap-2 transition transform hover:scale-105">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    SALVAR ALTERAÇÕES
+                </button>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+</body>
+</html>
