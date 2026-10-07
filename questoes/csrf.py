@@ -15,4 +15,3 @@ def csrf_failure(request, reason=""):
             status=403,
         )
     return default_csrf_failure(request, reason=reason)
-
