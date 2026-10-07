@@ -9,6 +9,7 @@ from questoes.models import ComponenteCurricular, Periodo, Semestre
 # FORMULÁRIO 1: SUBMISSÃO DE QUESTÕES
 # ==========================================
 class BulkSubmitForm(forms.Form):
+    submission_token = forms.CharField(widget=forms.HiddenInput)
     # Campos de identificação
     professor_nome = forms.CharField(
         label="Nome Completo do Professor",
@@ -69,6 +70,7 @@ class BulkSubmitForm(forms.Form):
 
     # Caixa de texto para colar as questões (IA)
     texto_questoes = forms.CharField(
+        max_length=20000,
         required=False,
         label="Ou cole aqui o texto das questões para a IA processar",
         widget=forms.Textarea(
@@ -79,6 +81,12 @@ class BulkSubmitForm(forms.Form):
             }
         ),
     )
+
+    def clean_arquivo_backup(self):
+        file = self.cleaned_data.get("arquivo_backup")
+        if file and file.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("O backup deve ter no máximo 5 MB.")
+        return file
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

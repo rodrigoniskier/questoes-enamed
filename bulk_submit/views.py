@@ -3,17 +3,20 @@ import csv
 import json
 import logging
 import re  # <--- Nova importação para a Mágica
+import uuid
 from io import StringIO  # <--- Trocamos o TextIOWrapper pelo StringIO
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core import signing
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.shortcuts import redirect, render
 
-from questoes.models import Alternativa, ComponenteCurricular, Periodo, Questao
+from questoes.models import Alternativa, ComponenteCurricular, Periodo, Questao, SubmissionReceipt
 
 from .forms import BulkSubmitForm, UploadGradeCSVForm
-from .utils import processar_texto_com_ia
+from .utils import processar_texto_com_ia, validate_import
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,17 @@ def bulk_submit_view(request):
         form = BulkSubmitForm(request.POST, request.FILES)
 
         if form.is_valid():
+            try:
+                token = signing.loads(form.cleaned_data["submission_token"], salt="bulk.v1", max_age=86400)
+                if token["user"] != request.user.pk:
+                    raise ValueError
+                token_id = uuid.UUID(token["id"])
+            except (signing.BadSignature, KeyError, ValueError, TypeError):
+                form.add_error("submission_token", "O formulário expirou. Reabra para renovar o envio.")
+                return render(request, "bulk_submit/bulk_submit_form.html", {"form": form})
+            if SubmissionReceipt.objects.filter(token=token_id).exists():
+                messages.info(request, "Este lote já foi enviado. Nenhuma cópia foi criada.")
+                return redirect("bulk_submit_form")
             professor_nome = form.cleaned_data["professor_nome"]
             professor_email = form.cleaned_data["professor_email"]
             componente = form.cleaned_data["componente"]
@@ -44,9 +58,12 @@ def bulk_submit_view(request):
             # LÓGICA 1: RESTAURAR VIA ARQUIVO JSON
             if arquivo_backup:
                 try:
-                    dados_backup = json.load(arquivo_backup)
+                    dados_backup = validate_import(json.load(arquivo_backup), componente, backup=True)
 
                     with transaction.atomic():
+                        receipt, created = SubmissionReceipt.objects.get_or_create(token=token_id)
+                        if not created:
+                            return redirect("bulk_submit_form")
                         for item in dados_backup:
                             enunciado = item.get("enunciado")
                             if not enunciado:
@@ -61,6 +78,7 @@ def bulk_submit_view(request):
                                 uso_prova=item.get("uso_prova", "INTEGRADA"),
                                 status="PENDENTE",
                                 texto_base=item.get("texto_base"),
+                                proposicao_dois=item.get("proposicao_dois"),
                                 enunciado=enunciado,
                                 justificativa=item.get("justificativa"),
                                 comentario_validacao=item.get("comentario_validacao"),
@@ -70,10 +88,12 @@ def bulk_submit_view(request):
                                 Alternativa.objects.create(
                                     questao=nova_questao,
                                     texto=alt.get("texto", "Texto não extraído"),
-                                    eh_correta=alt.get("correta", False),
+                                    eh_correta=alt["eh_correta"],
                                 )
 
                             questoes_criadas_count += 1
+                        receipt.questao = nova_questao
+                        receipt.save(update_fields=["questao"])
 
                     messages.success(
                         request,
@@ -87,11 +107,14 @@ def bulk_submit_view(request):
 
                     return redirect("bulk_submit_form")
 
+                except ValidationError as error:
+                    messages.error(request, " ".join(error.messages))
+                    return render(request, "bulk_submit/bulk_submit_form.html", {"form": form})
                 except json.JSONDecodeError:
                     messages.error(request, "O arquivo selecionado não é um JSON válido.")
                     return render(request, "bulk_submit/bulk_submit_form.html", {"form": form})
-                except Exception:
-                    logger.exception("Backup import failed")
+                except Exception as error:
+                    logger.error("Backup import failed: %s", type(error).__name__)
                     messages.error(
                         request, "Não foi possível importar. Nenhuma questão deste lote foi salva."
                     )
@@ -100,7 +123,7 @@ def bulk_submit_view(request):
             # LÓGICA 2: PROCESSAR TEXTO COM IA
             elif texto_questoes_bruto.strip():
                 try:
-                    resultado_ia = processar_texto_com_ia(texto_questoes_bruto)
+                    resultado_ia = processar_texto_com_ia(texto_questoes_bruto, request_id=str(token_id))
 
                     if isinstance(resultado_ia, dict) and "erro" in resultado_ia:
                         messages.error(request, f"Erro ao processar o texto com a IA: {resultado_ia['erro']}")
@@ -111,9 +134,12 @@ def bulk_submit_view(request):
                         )
                         return render(request, "bulk_submit/bulk_submit_form.html", {"form": form})
                     else:
-                        dados_estruturados = resultado_ia
+                        dados_estruturados = validate_import(resultado_ia, componente)
 
                     with transaction.atomic():
+                        receipt, created = SubmissionReceipt.objects.get_or_create(token=token_id)
+                        if not created:
+                            return redirect("bulk_submit_form")
                         for dados_q in dados_estruturados:
                             enunciado_extraido = dados_q.get("enunciado")
                             if not enunciado_extraido:
@@ -151,6 +177,8 @@ def bulk_submit_view(request):
                                     eh_correta=dados_alt.get("eh_correta", False),
                                 )
                             questoes_criadas_count += 1
+                        receipt.questao = nova_questao
+                        receipt.save(update_fields=["questao"])
 
                     if questoes_criadas_count > 0:
                         messages.success(
@@ -167,8 +195,10 @@ def bulk_submit_view(request):
 
                     return redirect("bulk_submit_form")
 
-                except Exception:
-                    logger.exception("Bulk AI import failed")
+                except ValidationError as error:
+                    messages.error(request, " ".join(error.messages))
+                except Exception as error:
+                    logger.error("Bulk AI import failed: %s", type(error).__name__)
                     messages.error(request, "Não foi possível processar o lote. Nenhuma questão foi salva.")
 
             else:
@@ -181,7 +211,13 @@ def bulk_submit_view(request):
             messages.warning(request, "Por favor, corrija os erros no formulário.")
 
     else:
-        form = BulkSubmitForm()
+        form = BulkSubmitForm(
+            initial={
+                "submission_token": signing.dumps(
+                    {"id": str(uuid.uuid4()), "user": request.user.pk}, salt="bulk.v1"
+                )
+            }
+        )
 
     return render(request, "bulk_submit/bulk_submit_form.html", {"form": form})
 

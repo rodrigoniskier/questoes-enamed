@@ -29,6 +29,7 @@ urlpatterns = [
     path("api/get-componentes/", views.get_componentes_por_periodo, name="api_get_componentes"),
     path("api/get-historico/", views.get_historico_questoes, name="api_get_historico"),
     path("api/gerar-questao/", views.api_gerar_questao_view, name="api_gerar_questao"),
+    path("api/version/", views.api_version_view, name="api_version"),
     path("api/csrf/", views.api_csrf_view, name="api_csrf"),
     # --- URLS DE PROVA ---
     path("gerar-prova/", views.pagina_gerar_prova, name="pagina_gerar_prova"),

@@ -97,7 +97,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-CSRF_TRUSTED_ORIGINS = ["https://*.pythonanywhere.com", "https://rodrigoniskier.pythonanywhere.com"]
+CSRF_TRUSTED_ORIGINS = ["https://rodrigoniskier.pythonanywhere.com"]
 
 JAZZMIN_SETTINGS = {
     "site_title": "QUESTÕES MEDICINA",
@@ -138,3 +138,15 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
 # Return machine-readable CSRF errors to the AI endpoint; other pages keep Django's default.
 CSRF_FAILURE_VIEW = "questoes.csrf.csrf_failure"
+
+# Private shared ledger: never a per-process cache or public static/media directory.
+AI_CONTROL_DATABASE = os.getenv("AI_CONTROL_DATABASE", str(BASE_DIR / "private" / "ai-control.sqlite3"))
+AI_GLOBAL_PER_MINUTE = int(os.getenv("AI_GLOBAL_PER_MINUTE", "6"))
+AI_GLOBAL_PER_DAY = int(os.getenv("AI_GLOBAL_PER_DAY", "100"))
+AI_SUBJECT_PER_MINUTE = int(os.getenv("AI_SUBJECT_PER_MINUTE", "2"))
+AI_MAX_CONCURRENT = int(os.getenv("AI_MAX_CONCURRENT", "2"))
+GEMINI_TIMEOUT_SECONDS = int(os.getenv("GEMINI_TIMEOUT_SECONDS", "60"))
+GEMINI_MAX_OUTPUT_TOKENS = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "4096"))
+EMAIL_TIMEOUT = 15
+RELEASE_VERSION = "2026.2"
+RELEASE_REVISION = os.getenv("RELEASE_REVISION", "development")

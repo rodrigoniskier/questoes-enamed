@@ -4,10 +4,10 @@ import json
 import logging
 import re
 
-import google.generativeai as genai
 from django.conf import settings
 from django.core.mail import send_mail
 
+from .ai_control import AIControlError, generate_text
 from .models import ComponenteCurricular
 
 logger = logging.getLogger(__name__)
@@ -101,12 +101,8 @@ IMPORTANTE: Sua resposta DEVE começar EXATAMENTE com "RELATÓRIO DE ANÁLISE DO
 
         if not settings.GEMINI_API_KEY:
             return {"erro": "A geração com IA está indisponível no momento."}
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel(settings.GEMINI_MODEL)  # Modelo padronizado
 
-        response = model.generate_content(prompt_final, request_options={"timeout": 60, "retry": None})
-
-        relatorio_bruto = response.text.strip()
+        relatorio_bruto = generate_text(prompt_final).strip()
         relatorio_limpo = relatorio_bruto.replace("**", "")
 
         if "RELATÓRIO DE ANÁLISE DO ITEM" not in relatorio_limpo:
@@ -122,8 +118,10 @@ IMPORTANTE: Sua resposta DEVE começar EXATAMENTE com "RELATÓRIO DE ANÁLISE DO
 
         return {"relatorio": relatorio_final}
 
-    except Exception:
-        logger.exception("Gemini evaluation failed")
+    except AIControlError as error:
+        return {"erro": str(error)}
+    except Exception as error:
+        logger.error("Gemini evaluation failed: %s", type(error).__name__)
         return {"erro": "A avaliação com IA falhou. Tente novamente."}
 
 
@@ -135,6 +133,8 @@ def gerar_questao_com_ia(
     tipo_questao: str,
     num_alternativas: int,
     parametros: dict | None = None,
+    request_id: str | None = None,
+    subject: str = "administration",
 ) -> dict:
     """
     Gera o rascunho de uma questão com base no prompt do professor e nos
@@ -143,8 +143,6 @@ def gerar_questao_com_ia(
     try:
         if not settings.GEMINI_API_KEY:
             return {"erro": "A geração com IA está indisponível no momento."}
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
         # Garante que temos um dicionário mesmo se não for enviado
         if parametros is None:
@@ -242,8 +240,9 @@ def gerar_questao_com_ia(
         elif tipo_questao == "ASSERCAO_RAZAO":
             prompt_mestre += "\nREGRA ESPECÍFICA: preencha enunciado com a proposição I e proposicao_dois com a proposição II. Retorne assercao_gabarito com uma letra de A a E: A=ambas verdadeiras e II justifica I; B=ambas verdadeiras sem causalidade; C=I verdadeira e II falsa; D=I falsa e II verdadeira; E=ambas falsas. Justifique ambas e sua relação."
 
-        response = model.generate_content(prompt_mestre, request_options={"timeout": 60, "retry": None})
-        resposta_texto = response.text.strip()
+        resposta_texto = generate_text(
+            prompt_mestre, request_id=request_id, subject=subject, json_output=True
+        ).strip()
 
         # Limpeza simples para extrair o JSON (proteção contra formatação indesejada da IA)
         match = re.search(r"\{.*\}", resposta_texto, re.DOTALL)
@@ -259,7 +258,8 @@ def gerar_questao_com_ia(
             logger.warning("Gemini returned no JSON object")
             return {"erro": "A IA não retornou um JSON válido. Tente novamente."}
 
-    except Exception:
-        logger.warning("Gemini request failed")
-        logger.exception("Gemini generation failed")
+    except AIControlError:
+        raise
+    except Exception as error:
+        logger.error("Gemini generation failed: %s", type(error).__name__)
         return {"erro": "Falha na comunicação com a IA. Tente novamente."}

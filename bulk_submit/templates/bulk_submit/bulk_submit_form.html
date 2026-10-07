@@ -59,6 +59,8 @@
 
             <form method="post" enctype="multipart/form-data" class="p-8 space-y-8">
                 {% csrf_token %}
+                {{ form.submission_token }}
+                {% if form.errors %}<div role="alert" class="form-errors">{{ form.errors }}</div>{% endif %}
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-2">
