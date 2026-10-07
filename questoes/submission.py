@@ -6,7 +6,7 @@ from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from .models import Alternativa, SubmissionReceipt
+from .models import Alternativa, ComponenteCurricular, SubmissionReceipt
 
 FORM_ROUTES = {
     "RESPOSTA_UNICA": "submeter_resposta_unica",
@@ -48,7 +48,7 @@ def new_submission_token(componente, style):
 def read_submission_token(token, componente, style):
     try:
         data = signing.loads(token, salt=TOKEN_SALT, max_age=86400)
-        if data["componente"] != componente.pk or data["style"] != style:
+        if data["componente"] not in componente.ids_compartilhados() or data["style"] != style:
             raise ValueError
         return uuid.UUID(data["id"])
     except (signing.BadSignature, ValueError, KeyError, TypeError):
@@ -104,6 +104,8 @@ def save_submission(form, alternatives, token_id):
     receipt, created = SubmissionReceipt.objects.get_or_create(token=token_id)
     if not created:
         return receipt.questao, False
+    # A form opened before consolidation may still contain a previous component ID.
+    form.instance.componente = ComponenteCurricular.objects.get(pk=form.instance.componente_id).canonico
     question = form.save()
     Alternativa.objects.bulk_create(
         [Alternativa(questao=question, **alternative) for alternative in alternatives]
@@ -127,6 +129,6 @@ def remember_header(request, question):
 def get_header(request, componente):
     key = request.GET.get("continuar", "")
     header = request.session.get("submission_headers", {}).get(key, {})
-    if header.get("componente") != componente.pk:
+    if header.get("componente") not in componente.ids_compartilhados():
         return {}
     return {field: header[field] for field in HEADER_FIELDS}

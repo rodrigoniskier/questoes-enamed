@@ -48,16 +48,18 @@ Importações, montagem/exportação de provas e alterações de destinos exigem
 
 ### Grade de Medicina 2026.2 e arquivo histórico
 
-A grade em `questoes/data/grade_2026_2.json` foi transcrita do Quadro 1 (páginas 2–4) das orientações da Prova Integrada 2026.2: nove grupos de períodos/turmas, 62 componentes e 50 questões por prova. Turmas com matrizes ou metas diferentes têm cadastros próprios. O 5º período inclui somente A e C, conforme o edital.
+A grade em `questoes/data/grade_2026_2.json` preserva os nove blocos originais do Quadro 1 (páginas 2–4), com 62 entradas e 50 questões por bloco. `questoes/catalog.py` reúne os blocos em cinco períodos (2º, 4º, 5º, 6º e 8º), com 50 componentes compartilhados. Nomes repetidos dentro do mesmo período utilizam um único banco de questões, indicam todas as turmas atendidas e adotam a maior meta solicitada. O 5º período inclui somente A e C, conforme o edital; componentes de períodos diferentes continuam separados, como em 2026.1.
 
-Após backup consistente e aplicação da migração 0013, execute:
+Após backup consistente e aplicação das migrações até 0014, execute:
 
 ```sh
 python manage.py configurar_semestre_2026_2 --dry-run
 python manage.py configurar_semestre_2026_2
 ```
 
-O comando é atômico e pode ser repetido sem duplicações. A simulação desfaz todas as alterações. Cadastros inesperados ou duplicados em 2026.2 impedem a ativação. Somente 2026.1 é marcado como inativo; seus períodos, componentes, questões, alternativas e vínculos são preservados e continuam disponíveis na administração por filtro de semestre. Links antigos não permitem novos envios ou geração de rascunhos para semestres arquivados. A unicidade do nome do período passa a ser por semestre, permitindo reutilizar os mesmos nomes sem mover registros históricos.
+O comando é atômico e pode ser repetido sem duplicações. A simulação desfaz todas as alterações. Cadastros inesperados impedem a consolidação. Registros de componentes existentes são reaproveitados; entradas repetidas passam a apontar para o cadastro compartilhado. Os nove blocos anteriores são arquivados pelo campo `Periodo.ativo`, sem exclusão de períodos ou componentes. Questões são vinculadas ao cadastro compartilhado, mantendo seus IDs, conteúdo, status, imagens, alternativas e recibos. Links e formulários abertos antes da consolidação continuam funcionando. O histórico de 2026.1 permanece integralmente preservado e inativo. A unicidade do nome do período continua sendo por semestre.
+
+No gerador, selecione os componentes que comporão cada avaliação. A quantidade começa na maior meta de envio e pode ser reduzida para a prova da turma selecionada, sem alterar a meta ou o banco. Por exemplo, APSC VI atende A/B/C/D com meta de seis questões; a prova C/D pode usar cinco. Quantidades fora de 1 até a meta são rejeitadas no servidor. Selecionar dois links antigos do mesmo componente não duplica o banco na prova.
 
 Os formulários de 2026.2 usam quatro alternativas; asserção-razão mantém a chave padrão de cinco respostas. Questões históricas não são reescritas. A marca pública e administrativa passa a ser QUESTÕES MEDICINA, com as logos existentes `static/images/logo.jpg` (UNIPÊ) e `static/images/naped.jpg` (NAPED), e o crédito de produção no rodapé.
 

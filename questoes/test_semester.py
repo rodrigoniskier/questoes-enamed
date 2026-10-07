@@ -42,26 +42,23 @@ class SemesterCatalogTests(TestCase):
         self.assertFalse(self.old.ativo)
         current = Semestre.objects.get(nome="2026.2")
         self.assertTrue(current.ativo)
-        self.assertEqual(current.periodos.count(), 9)
-        self.assertEqual(len(ids), 62)
+        self.assertEqual(current.periodos.filter(ativo=True).count(), 5)
+        self.assertEqual(len(ids), 50)
         self.assertEqual(
             ids,
             list(ComponenteCurricular.objects.filter(periodo__semestre=current).values_list("pk", flat=True)),
         )
-        for period in current.periodos.all():
-            self.assertEqual(sum(period.componentes.values_list("numero_questoes_prova", flat=True)), 50)
+        self.assertEqual(current.periodos.get(nome="4º Período").componentes.count(), 8)
         self.assertEqual(Questao.objects.values().get(pk=self.question.pk), before_question)
         self.assertEqual(Alternativa.objects.values().get(pk=self.answer.pk), before_answer)
         self.assertTrue(Periodo.objects.filter(pk=self.period.pk, semestre=self.old).exists())
         self.assertTrue(ComponenteCurricular.objects.filter(pk=self.component.pk).exists())
-        ab = current.periodos.get(nome="6º Período (turmas A e B)")
-        cd = current.periodos.get(nome="6º Período (turmas C e D)")
-        self.assertEqual(
-            ab.componentes.get(nome="Atenção Primária em Saúde na Comunidade VI").numero_questoes_prova, 6
+        period = current.periodos.get(nome="6º Período")
+        shared = period.componentes.get(
+            nome="Atenção Primária em Saúde na Comunidade VI (turmas A, B, C e D)"
         )
-        self.assertEqual(
-            cd.componentes.get(nome="Atenção Primária em Saúde na Comunidade VI").numero_questoes_prova, 5
-        )
+        self.assertEqual(shared.numero_questoes_prova, 6)
+        self.assertEqual(period.componentes.count(), 13)
 
     def test_dry_run_does_not_archive_or_create_records(self):
         self.configure(dry_run=True)
@@ -172,7 +169,7 @@ class SemesterCatalogTests(TestCase):
         response = self.client.get(reverse("submeter_resposta_unica"), {"componente": current.pk})
         self.assertEqual(response.context["alternativa_formset"].total_form_count(), 4)
         selection = self.client.get(reverse("submeter_selecao"))
-        self.assertEqual(len(selection.context["periodos"]), 9)
+        self.assertEqual(len(selection.context["periodos"]), 5)
         self.assertNotIn(self.period, selection.context["periodos"])
         self.assertContains(selection, "QUESTÕES MEDICINA")
         self.assertContains(selection, "Desenvolvido por Prof. Rodrigo Niskier")

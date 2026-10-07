@@ -140,7 +140,7 @@ def visualizar_questoes_view(request):
     if not componente_id or not componente_id.isdigit():
         return redirect("submeter_selecao")
 
-    componente = get_object_or_404(ComponenteCurricular, id=componente_id)
+    componente = get_object_or_404(ComponenteCurricular, id=componente_id).canonico
 
     if request.method == "POST":
         if not request.user.is_staff:
@@ -171,12 +171,14 @@ def visualizar_questoes_view(request):
 # --- VIEWS DE SUBMISSÃO ---
 def submeter_selecao_view(request):
     context = {
-        "periodos": Periodo.objects.filter(semestre__ativo=True).order_by("nome"),
+        "periodos": Periodo.objects.filter(ativo=True, semestre__ativo=True).order_by("nome"),
         "semestres_ativos": Semestre.objects.filter(ativo=True),
     }
     componente_id = request.GET.get("componente")
     if componente_id and componente_id.isdigit() and request.GET.get("continuar"):
-        componente = get_object_or_404(ComponenteCurricular, pk=componente_id, periodo__semestre__ativo=True)
+        componente = get_object_or_404(
+            ComponenteCurricular, pk=componente_id, periodo__semestre__ativo=True
+        ).canonico
         if get_header(request, componente):
             query = urlencode({"componente": componente.pk, "continuar": request.GET["continuar"]})
             context.update(
@@ -194,8 +196,13 @@ def submeter_form_view(request, tipo_questao):
     componente_id = request.GET.get("componente")
     if not componente_id or not componente_id.isdigit():
         return redirect("submeter_selecao")
-    componente = get_object_or_404(ComponenteCurricular.objects.select_related("periodo"), pk=componente_id)
-    if componente.periodo.semestre and not componente.periodo.semestre.ativo:
+    componente = get_object_or_404(
+        ComponenteCurricular.objects.select_related("periodo__semestre", "consolidado_em__periodo__semestre"),
+        pk=componente_id,
+    ).canonico
+    if not componente.periodo.ativo or (
+        componente.periodo.semestre and not componente.periodo.semestre.ativo
+    ):
         messages.info(request, "Este semestre está arquivado. Selecione um componente do semestre atual.")
         return redirect("submeter_selecao")
     if tipo_questao not in allowed_styles(componente):
@@ -218,7 +225,7 @@ def submeter_form_view(request, tipo_questao):
         alternativa_formset = FormSet(request.POST, prefix="alternativas")
         valid = questao_form.is_valid()
         if (
-            request.POST.get("componente") != str(componente.pk)
+            request.POST.get("componente") not in {str(pk) for pk in componente.ids_compartilhados()}
             or request.POST.get("tipo_questao") != tipo_questao
         ):
             questao_form.add_error(None, "O componente e o estilo devem corresponder ao formulário aberto.")
@@ -314,9 +321,12 @@ def get_componentes_por_periodo(request):
     if len(ids_para_filtrar) > 100 or not all(value.isdigit() for value in ids_para_filtrar):
         return JsonResponse({"error": "Período inválido"}, status=400)
     componentes = ComponenteCurricular.objects.filter(
-        periodo_id__in=ids_para_filtrar, periodo__semestre__ativo=True
+        periodo_id__in=ids_para_filtrar,
+        periodo__ativo=True,
+        periodo__semestre__ativo=True,
+        consolidado_em__isnull=True,
     ).order_by("nome")
-    return JsonResponse(list(componentes.values("id", "nome")), safe=False)
+    return JsonResponse(list(componentes.values("id", "nome", "numero_questoes_prova")), safe=False)
 
 
 def get_historico_questoes(request):
@@ -324,8 +334,8 @@ def get_historico_questoes(request):
     if not componente_id or not componente_id.isdigit():
         return JsonResponse({"error": "Componente inválido"}, status=400)
     try:
-        componente = ComponenteCurricular.objects.get(id=componente_id)
-        questoes = Questao.objects.filter(componente_id=componente_id).order_by("-id")
+        componente = ComponenteCurricular.objects.get(id=componente_id).canonico
+        questoes = Questao.objects.filter(componente=componente).order_by("-id")
         total_necessario = componente.numero_questoes_prova
         total_enviado = questoes.count()
         restantes = total_necessario - total_enviado
@@ -374,8 +384,16 @@ def api_gerar_questao_view(request):
             return JsonResponse({"erro": "Informe um tema de até 5000 caracteres."}, status=400)
         if not str(componente_id).isdigit():
             return JsonResponse({"erro": "Componente inválido."}, status=400)
-        componente = ComponenteCurricular.objects.select_related("periodo").get(id=componente_id)
-        if componente.periodo.semestre and not componente.periodo.semestre.ativo:
+        componente = (
+            ComponenteCurricular.objects.select_related(
+                "periodo__semestre", "consolidado_em__periodo__semestre"
+            )
+            .get(id=componente_id)
+            .canonico
+        )
+        if not componente.periodo.ativo or (
+            componente.periodo.semestre and not componente.periodo.semestre.ativo
+        ):
             return JsonResponse({"erro": "O semestre deste componente está arquivado."}, status=400)
         if (
             tipo_questao not in allowed_styles(componente)
@@ -427,7 +445,7 @@ def montador_manual_view(request):
 
     if not periodo_id:
         # AJUSTE AQUI: Mostrar apenas os períodos ativos na primeira tela do montador
-        context["periodos"] = Periodo.objects.filter(semestre__ativo=True).order_by("nome")
+        context["periodos"] = Periodo.objects.filter(ativo=True, semestre__ativo=True).order_by("nome")
     else:
         try:
             periodo_selecionado = Periodo.objects.get(id=periodo_id)
@@ -468,7 +486,7 @@ def montador_manual_view(request):
 
         except Periodo.DoesNotExist:
             # AJUSTE AQUI: Redundância caso o período não exista, carrega apenas os ativos
-            context["periodos"] = Periodo.objects.filter(semestre__ativo=True).order_by("nome")
+            context["periodos"] = Periodo.objects.filter(ativo=True, semestre__ativo=True).order_by("nome")
 
     return render(request, "questoes/montador_manual.html", context)
 
@@ -477,7 +495,7 @@ def montador_manual_view(request):
 @staff_member_required
 def pagina_gerar_prova(request):
     # AJUSTE AQUI: Página de gerar prova foca apenas no que está ativo agora
-    periodos = Periodo.objects.filter(semestre__ativo=True).order_by("nome")
+    periodos = Periodo.objects.filter(ativo=True, semestre__ativo=True).order_by("nome")
     context = {"periodos": periodos}
     return render(request, "questoes/gerar_prova.html", context)
 
@@ -496,7 +514,25 @@ def prova_gerada_view(request):
     if not componentes_ids:
         return redirect("pagina_gerar_prova")
 
-    componentes_da_prova = ComponenteCurricular.objects.filter(id__in=componentes_ids).order_by("nome")
+    if len(componentes_ids) > 100 or not all(pk.isdigit() for pk in componentes_ids):
+        messages.error(request, "Selecione componentes válidos para a prova.")
+        return redirect("pagina_gerar_prova")
+    # Previous links may include more than one alias of the same shared bank.
+    selecionados = ComponenteCurricular.objects.filter(pk__in=componentes_ids)
+    canonicos = {c.consolidado_em_id or c.pk for c in selecionados}
+    if not canonicos:
+        messages.error(request, "Selecione pelo menos um componente válido para a prova.")
+        return redirect("pagina_gerar_prova")
+    componentes_da_prova = ComponenteCurricular.objects.filter(pk__in=canonicos).order_by("nome")
+    quantidades = {}
+    for componente in componentes_da_prova:
+        valor = request.GET.get(f"quantidade_{componente.pk}", str(componente.numero_questoes_prova))
+        if len(valor) > 10 or not valor.isdigit() or not 1 <= int(valor) <= componente.numero_questoes_prova:
+            messages.error(
+                request, f"Informe de 1 a {componente.numero_questoes_prova} questões para {componente.nome}."
+            )
+            return redirect("pagina_gerar_prova")
+        quantidades[componente.pk] = int(valor)
     questoes_selecionadas = []
 
     for componente in componentes_da_prova:
@@ -512,7 +548,7 @@ def prova_gerada_view(request):
             query_tipo = Q(uso_prova="INTEGRADA") | Q(uso_prova="AMBAS")
 
         questoes_aprovadas = list(Questao.objects.filter(query_base & query_tipo))
-        num_questoes = componente.numero_questoes_prova
+        num_questoes = quantidades[componente.pk]
 
         if len(questoes_aprovadas) >= num_questoes:
             questoes_sorteadas = random.sample(questoes_aprovadas, num_questoes)
