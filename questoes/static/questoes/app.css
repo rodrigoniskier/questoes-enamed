@@ -24,7 +24,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 input[type="checkbox"],input[type="radio"]{accent-color:var(--accent);width:16px;height:16px;flex-shrink:0}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .bg-primary{background:var(--accent)!important}.text-primary{color:var(--accent)!important}
-[class*="bg-purple-50"],[class*="bg-orange-50"],[class*="bg-pink-50"],[class*="bg-indigo-50"],[class*="bg-teal-50"]{background:#f2f7f5!important;border-color:var(--line)!important}
+[class~="bg-purple-50"],[class~="bg-orange-50"],[class~="bg-pink-50"],[class~="bg-indigo-50"],[class~="bg-teal-50"]{background:#f2f7f5!important;border-color:var(--line)!important}
 [class*="text-purple-"],[class*="text-orange-"],[class*="text-pink-"],[class*="text-indigo-"],[class*="text-teal-"]{color:var(--muted)!important}
 #tipo-questao-container input[type="radio"]{opacity:1;width:16px;height:16px;position:static;margin:12px 0}
 #tipo-questao-container label{border-radius:8px;padding:14px 20px;background:#fff;border-color:var(--line);font-size:14px}
