@@ -3,8 +3,8 @@
 <nav class="app-navigation" aria-label="Navegação principal">
     <a class="app-brand" href="{% url 'submeter_selecao' %}"><span class="brand-mark" aria-hidden="true">E</span><span>Questões ENAMED <small>Medicina · UNIPÊ</small></span></a>
     <div class="nav-links">
-        <a href="{% url 'submeter_selecao' %}">Elaborar questão</a>
-        {% if user.is_staff %}<a href="{% url 'pagina_gerar_prova' %}">Montar prova</a><a href="{% url 'bulk_submit_form' %}">Importar</a>{% endif %}
+        <a href="{% url 'submeter_selecao' %}"{% if request.resolver_match.url_name == 'submeter_selecao' or request.resolver_match.url_name == 'submeter_resposta_unica' or request.resolver_match.url_name == 'submeter_resposta_multipla' or request.resolver_match.url_name == 'submeter_assercao_razao' or request.resolver_match.url_name == 'submeter_visualizar_questoes' %} aria-current="page"{% endif %}>Elaborar questão</a>
+        {% if user.is_staff %}<a href="{% url 'pagina_gerar_prova' %}"{% if request.resolver_match.url_name == 'pagina_gerar_prova' or request.resolver_match.url_name == 'montador_manual' %} aria-current="page"{% endif %}>Montar prova</a><a href="{% url 'bulk_submit_form' %}"{% if request.resolver_match.url_name == 'bulk_submit_form' or request.resolver_match.url_name == 'upload_grade_csv' %} aria-current="page"{% endif %}>Importar</a>{% endif %}
         <a href="{% url 'admin:index' %}">Administração</a>
     </div>
 </nav>
