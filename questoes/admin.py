@@ -297,12 +297,13 @@ class PeriodoAdmin(admin.ModelAdmin):
     list_display = (
         "nome",
         "semestre",
+        "ativo",
         "meta_questoes",
         "total_enviadas",
         "total_aprovadas",
         "total_pendentes",
     )
-    list_filter = ("semestre", "nome")
+    list_filter = ("semestre", "ativo", "nome")
     search_fields = ("nome",)
 
     def get_queryset(self, request):
@@ -338,13 +339,14 @@ class ComponenteCurricularAdmin(admin.ModelAdmin):
     list_display = (
         "nome",
         "periodo",
+        "consolidado_em",
         "get_semestre",
         "meta_questoes",
         "total_enviadas",
         "total_aprovadas",
         "total_pendentes",
     )
-    list_filter = ("periodo__semestre", "periodo")
+    list_filter = ("periodo__semestre", "periodo__ativo", "periodo")
     search_fields = ("nome",)
 
     def get_queryset(self, request):

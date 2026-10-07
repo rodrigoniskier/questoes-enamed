@@ -26,6 +26,7 @@ class Semestre(models.Model):
 
 class Periodo(models.Model):
     nome = models.CharField(max_length=100, help_text="Ex: 1º Período")
+    ativo = models.BooleanField(default=True, help_text="Desmarque para arquivar um cadastro de período.")
     # Novo campo para vincular ao Semestre
     semestre = models.ForeignKey(
         Semestre, on_delete=models.CASCADE, related_name="periodos", null=True, blank=True
@@ -46,6 +47,22 @@ class ComponenteCurricular(models.Model):
     numero_questoes_prova = models.PositiveIntegerField(
         default=5, help_text="Número de questões a serem selecionadas para a prova."
     )
+    consolidado_em = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        related_name="cadastros_unificados",
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="Cadastro compartilhado que substitui este componente, preservando links antigos.",
+    )
+
+    @property
+    def canonico(self):
+        return self.consolidado_em if self.consolidado_em_id else self
+
+    def ids_compartilhados(self):
+        return {self.pk, *self.cadastros_unificados.values_list("pk", flat=True)}
 
     def __str__(self):
         return f"{self.nome} ({self.periodo.nome})"
