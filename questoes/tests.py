@@ -241,6 +241,25 @@ class SubmissionTests(TestCase):
         ):
             self.assertEqual(self.client.get(reverse(name)).status_code, 302)
 
+    def test_staff_manual_builder_renders_both_steps(self):
+        self.client.force_login(self.staff)
+        url = reverse("montador_manual")
+        response = self.client.get(url)
+        self.assertContains(response, "Passo 1: Selecione o Período")
+        self.assertNotContains(response, "Passo 2: Selecione as Questões")
+        question = Questao.objects.create(
+            componente=self.component,
+            professor_nome="Professor sintético",
+            professor_email="professor@example.com",
+            enunciado="Comando sintético",
+            justificativa="Justificativa sintética",
+        )
+        Alternativa.objects.create(questao=question, texto="Resposta sintética", eh_correta=True)
+        response = self.client.get(url, {"periodo_id": self.component.periodo_id})
+        self.assertContains(response, "Passo 2: Selecione as Questões")
+        self.assertNotContains(response, "Passo 1: Selecione o Período")
+        self.assertContains(response, "A</p>")
+
     def test_bad_query_ids_return_client_errors(self):
         self.assertEqual(self.client.get(reverse("api_get_componentes") + "?periodo_id=abc").status_code, 400)
         self.assertEqual(
