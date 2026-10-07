@@ -14,9 +14,7 @@ class AiCsrfContractTests(SimpleTestCase):
 
     def post(self, token=None):
         kwargs = {"HTTP_X_CSRFTOKEN": token} if token else {}
-        return self.client.post(
-            self.api_url, json.dumps({}), content_type="application/json", **kwargs
-        )
+        return self.client.post(self.api_url, json.dumps({}), content_type="application/json", **kwargs)
 
     def test_missing_token_is_json_403(self):
         response = self.post()
@@ -47,9 +45,7 @@ class AiCsrfContractTests(SimpleTestCase):
         self.assertEqual(response.json()["codigo"], "metodo_invalido")
         self.assertEqual(response["Allow"], "POST")
         token = self.client.get(self.csrf_url).json()["csrfToken"]
-        response = self.client.post(
-            self.api_url, "{}", content_type="text/plain", HTTP_X_CSRFTOKEN=token
-        )
+        response = self.client.post(self.api_url, "{}", content_type="text/plain", HTTP_X_CSRFTOKEN=token)
         self.assertEqual(response.status_code, 415)
         self.assertEqual(response.json()["codigo"], "tipo_invalido")
 
@@ -57,4 +53,3 @@ class AiCsrfContractTests(SimpleTestCase):
         response = self.client.post(reverse("admin:login"), {"username": "x"})
         self.assertEqual(response.status_code, 403)
         self.assertIn("text/html", response["Content-Type"])
-
