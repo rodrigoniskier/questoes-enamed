@@ -373,9 +373,7 @@ def api_gerar_questao_view(request):
         response["Allow"] = "POST"
         return response
     if request.content_type != "application/json":
-        return JsonResponse(
-            {"erro": "Envie os dados em JSON.", "codigo": "tipo_invalido"}, status=415
-        )
+        return JsonResponse({"erro": "Envie os dados em JSON.", "codigo": "tipo_invalido"}, status=415)
     if len(request.body) > 65536:
         return JsonResponse(
             {"erro": "A solicitação ultrapassa o tamanho permitido.", "codigo": "muito_grande"},
