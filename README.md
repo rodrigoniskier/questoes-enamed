@@ -46,6 +46,21 @@ Importações, montagem/exportação de provas e alterações de destinos exigem
 
 ## Decisões e limites
 
+### Grade de Medicina 2026.2 e arquivo histórico
+
+A grade em `questoes/data/grade_2026_2.json` foi transcrita do Quadro 1 (páginas 2–4) das orientações da Prova Integrada 2026.2: nove grupos de períodos/turmas, 62 componentes e 50 questões por prova. Turmas com matrizes ou metas diferentes têm cadastros próprios. O 5º período inclui somente A e C, conforme o edital.
+
+Após backup consistente e aplicação da migração 0013, execute:
+
+```sh
+python manage.py configurar_semestre_2026_2 --dry-run
+python manage.py configurar_semestre_2026_2
+```
+
+O comando é atômico e pode ser repetido sem duplicações. A simulação desfaz todas as alterações. Cadastros inesperados ou duplicados em 2026.2 impedem a ativação. Somente 2026.1 é marcado como inativo; seus períodos, componentes, questões, alternativas e vínculos são preservados e continuam disponíveis na administração por filtro de semestre. Links antigos não permitem novos envios ou geração de rascunhos para semestres arquivados. A unicidade do nome do período passa a ser por semestre, permitindo reutilizar os mesmos nomes sem mover registros históricos.
+
+Os formulários de 2026.2 usam quatro alternativas; asserção-razão mantém a chave padrão de cinco respostas. Questões históricas não são reescritas. A marca pública e administrativa passa a ser QUESTÕES MEDICINA, com as logos existentes `static/images/logo.jpg` (UNIPÊ) e `static/images/naped.jpg` (NAPED), e o crédito de produção no rodapé.
+
 Transações e uma chave única por formulário evitam questões parciais e repetição do mesmo POST, inclusive entre processos e após exclusão administrativa da questão. Um novo formulário ainda permite enviar conteúdo igual intencionalmente. SQLite pode rejeitar gravações concorrentes sob carga: a mensagem preserva o texto e permite tentar novamente.
 
 Notificações administrativas registram o último status entregue para que repetir a ação em lote reenvie apenas as falhas. SMTP não oferece garantia de entrega exatamente uma vez: uma interrupção após envio e antes do registro ainda pode exigir conferência manual.

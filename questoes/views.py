@@ -21,7 +21,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from .forms import AlternativaForm, QuestaoForm
-from .models import Alternativa, ComponenteCurricular, Periodo, Questao
+from .models import Alternativa, ComponenteCurricular, Periodo, Questao, Semestre
 from .submission import (
     ASSERTION_ANSWERS,
     FORM_ROUTES,
@@ -170,10 +170,13 @@ def visualizar_questoes_view(request):
 
 # --- VIEWS DE SUBMISSÃO ---
 def submeter_selecao_view(request):
-    context = {"periodos": Periodo.objects.filter(semestre__ativo=True).order_by("nome")}
+    context = {
+        "periodos": Periodo.objects.filter(semestre__ativo=True).order_by("nome"),
+        "semestres_ativos": Semestre.objects.filter(ativo=True),
+    }
     componente_id = request.GET.get("componente")
     if componente_id and componente_id.isdigit() and request.GET.get("continuar"):
-        componente = get_object_or_404(ComponenteCurricular, pk=componente_id)
+        componente = get_object_or_404(ComponenteCurricular, pk=componente_id, periodo__semestre__ativo=True)
         if get_header(request, componente):
             query = urlencode({"componente": componente.pk, "continuar": request.GET["continuar"]})
             context.update(
@@ -192,6 +195,9 @@ def submeter_form_view(request, tipo_questao):
     if not componente_id or not componente_id.isdigit():
         return redirect("submeter_selecao")
     componente = get_object_or_404(ComponenteCurricular.objects.select_related("periodo"), pk=componente_id)
+    if componente.periodo.semestre and not componente.periodo.semestre.ativo:
+        messages.info(request, "Este semestre está arquivado. Selecione um componente do semestre atual.")
+        return redirect("submeter_selecao")
     if tipo_questao not in allowed_styles(componente):
         messages.error(request, "Este componente permite apenas questões de resposta única.")
         return redirect("submeter_selecao")
@@ -307,7 +313,9 @@ def get_componentes_por_periodo(request):
         return JsonResponse([], safe=False)
     if len(ids_para_filtrar) > 100 or not all(value.isdigit() for value in ids_para_filtrar):
         return JsonResponse({"error": "Período inválido"}, status=400)
-    componentes = ComponenteCurricular.objects.filter(periodo_id__in=ids_para_filtrar).order_by("nome")
+    componentes = ComponenteCurricular.objects.filter(
+        periodo_id__in=ids_para_filtrar, periodo__semestre__ativo=True
+    ).order_by("nome")
     return JsonResponse(list(componentes.values("id", "nome")), safe=False)
 
 
@@ -367,6 +375,8 @@ def api_gerar_questao_view(request):
         if not str(componente_id).isdigit():
             return JsonResponse({"erro": "Componente inválido."}, status=400)
         componente = ComponenteCurricular.objects.select_related("periodo").get(id=componente_id)
+        if componente.periodo.semestre and not componente.periodo.semestre.ativo:
+            return JsonResponse({"erro": "O semestre deste componente está arquivado."}, status=400)
         if (
             tipo_questao not in allowed_styles(componente)
             or type(num_alternativas) is not int

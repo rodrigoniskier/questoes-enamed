@@ -82,14 +82,18 @@ class BulkSubmitForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Keep legacy unassigned periods, but never submit into an archived semester.
+        self.fields["periodo"].queryset = Periodo.objects.exclude(semestre__ativo=False).order_by("nome")
         self.fields["componente"].queryset = ComponenteCurricular.objects.none()
 
         if "periodo" in self.data:
             try:
                 periodo_id = int(self.data.get("periodo"))
-                self.fields["componente"].queryset = ComponenteCurricular.objects.filter(
-                    periodo_id=periodo_id
-                ).order_by("nome")
+                self.fields["componente"].queryset = (
+                    ComponenteCurricular.objects.filter(periodo_id=periodo_id)
+                    .exclude(periodo__semestre__ativo=False)
+                    .order_by("nome")
+                )
             except (ValueError, TypeError):
                 pass
 

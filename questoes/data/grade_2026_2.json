@@ -1,0 +1,299 @@
+{
+  "semestre": "2026.2",
+  "fonte": "Prova Integrada – Medicina – 2026.2, Quadro 1, páginas 2–4",
+  "periodos": [
+    {
+      "nome": "2º Período (turmas A e B)",
+      "componentes": [
+        {
+          "nome": "Atenção Primária em Saúde na Comunidade II",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Controle Nervoso e Movimento",
+          "numero_questoes_prova": 22
+        },
+        {
+          "nome": "Sistema digestório",
+          "numero_questoes_prova": 11
+        },
+        {
+          "nome": "Sistema Hormonal, Reprodutor e Desenvolvimento",
+          "numero_questoes_prova": 11
+        }
+      ]
+    },
+    {
+      "nome": "2º Período (turma C)",
+      "componentes": [
+        {
+          "nome": "Atenção Primária em Saúde na Comunidade II",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Controle Nervoso e Movimento",
+          "numero_questoes_prova": 22
+        },
+        {
+          "nome": "Fluidos Corporais e Hemodinâmica",
+          "numero_questoes_prova": 22
+        }
+      ]
+    },
+    {
+      "nome": "4º Período (turmas A, B e C)",
+      "componentes": [
+        {
+          "nome": "Atenção Primária em Saúde na Comunidade IV",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Bases da Técnica Cirúrgica e da Anestesiologia II",
+          "numero_questoes_prova": 7
+        },
+        {
+          "nome": "Farmacologia II",
+          "numero_questoes_prova": 7
+        },
+        {
+          "nome": "Mecanismo de Agressão/Patológicos e de Defesa II",
+          "numero_questoes_prova": 7
+        },
+        {
+          "nome": "Medicina Saúde e Sociedade II",
+          "numero_questoes_prova": 4
+        },
+        {
+          "nome": "Metodologia da Pesquisa, Comunicação Científica e Inovação II",
+          "numero_questoes_prova": 4
+        },
+        {
+          "nome": "Semiologia Médica II",
+          "numero_questoes_prova": 10
+        },
+        {
+          "nome": "Suporte à Vida II",
+          "numero_questoes_prova": 5
+        }
+      ]
+    },
+    {
+      "nome": "5º Período (turma A)",
+      "componentes": [
+        {
+          "nome": "Atenção à Saúde da Mulher e da Gestante I",
+          "numero_questoes_prova": 8
+        },
+        {
+          "nome": "Atenção Primária em Saúde na Comunidade V",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Clínica Integrada: Dermatologia",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Clínica Integrada: Endocrinologia",
+          "numero_questoes_prova": 8
+        },
+        {
+          "nome": "Clínica Integrada: Gastroenterologia",
+          "numero_questoes_prova": 10
+        },
+        {
+          "nome": "Comunicação Clínica",
+          "numero_questoes_prova": 4
+        },
+        {
+          "nome": "Doenças Infecciosas e Parasitárias",
+          "numero_questoes_prova": 8
+        }
+      ]
+    },
+    {
+      "nome": "5º Período (turma C)",
+      "componentes": [
+        {
+          "nome": "Atenção à Saúde da Mulher e da Gestante I",
+          "numero_questoes_prova": 8
+        },
+        {
+          "nome": "Atenção Primária em Saúde na Comunidade V",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Clínica Integrada: Cardiologia",
+          "numero_questoes_prova": 10
+        },
+        {
+          "nome": "Clínica Integrada: Nefrologia",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Clínica Integrada: Pneumologia",
+          "numero_questoes_prova": 8
+        },
+        {
+          "nome": "Clínica Integrada: Urologia",
+          "numero_questoes_prova": 8
+        },
+        {
+          "nome": "Comunicação Clínica",
+          "numero_questoes_prova": 4
+        }
+      ]
+    },
+    {
+      "nome": "6º Período (turmas A e B)",
+      "componentes": [
+        {
+          "nome": "Atenção à Saúde da Mulher e da Gestante II",
+          "numero_questoes_prova": 7
+        },
+        {
+          "nome": "Atenção Primária em Saúde na Comunidade VI",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Clínica Integrada: Cardiologia",
+          "numero_questoes_prova": 10
+        },
+        {
+          "nome": "Clínica Integrada: Nefrologia",
+          "numero_questoes_prova": 5
+        },
+        {
+          "nome": "Clínica Integrada: Pneumologia",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Clínica Integrada: Urologia",
+          "numero_questoes_prova": 7
+        },
+        {
+          "nome": "Imaginologia",
+          "numero_questoes_prova": 3
+        },
+        {
+          "nome": "Inovação em Saúde",
+          "numero_questoes_prova": 3
+        },
+        {
+          "nome": "Patologia",
+          "numero_questoes_prova": 3
+        }
+      ]
+    },
+    {
+      "nome": "6º Período (turmas C e D)",
+      "componentes": [
+        {
+          "nome": "Atenção à Saúde da Mulher e da Gestante II",
+          "numero_questoes_prova": 7
+        },
+        {
+          "nome": "Atenção Primária em Saúde na Comunidade VI",
+          "numero_questoes_prova": 5
+        },
+        {
+          "nome": "Clínica Integrada: Gastroenterologia",
+          "numero_questoes_prova": 8
+        },
+        {
+          "nome": "Doenças Infecciosas e Parasitárias",
+          "numero_questoes_prova": 7
+        },
+        {
+          "nome": "Clínica Integrada: Endocrinologia",
+          "numero_questoes_prova": 7
+        },
+        {
+          "nome": "Clínica Integrada: Dermatologia",
+          "numero_questoes_prova": 7
+        },
+        {
+          "nome": "Imaginologia",
+          "numero_questoes_prova": 3
+        },
+        {
+          "nome": "Inovação em Saúde",
+          "numero_questoes_prova": 3
+        },
+        {
+          "nome": "Patologia",
+          "numero_questoes_prova": 3
+        }
+      ]
+    },
+    {
+      "nome": "8º Período (turmas A e B)",
+      "componentes": [
+        {
+          "nome": "Saúde da Criança e do Adolescente",
+          "numero_questoes_prova": 10
+        },
+        {
+          "nome": "Atenção Primária em Saúde na Comunidade VIII",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Clínica Integrada: Hematologia",
+          "numero_questoes_prova": 5
+        },
+        {
+          "nome": "Medicina Legal e Deontologia",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Saúde do Idoso",
+          "numero_questoes_prova": 8
+        },
+        {
+          "nome": "Saúde do Trabalhador",
+          "numero_questoes_prova": 3
+        },
+        {
+          "nome": "Saúde Mental",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Urgências e Emergências",
+          "numero_questoes_prova": 6
+        }
+      ]
+    },
+    {
+      "nome": "8º Período (turmas C e D)",
+      "componentes": [
+        {
+          "nome": "Saúde da Criança e do Adolescente",
+          "numero_questoes_prova": 10
+        },
+        {
+          "nome": "Atenção Primária em Saúde na Comunidade VIII",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Clínica Integrada: Otorrinolaringologia",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Clínica Integrada: Neurologia",
+          "numero_questoes_prova": 8
+        },
+        {
+          "nome": "Clínica Integrada: Ortopedia e Traumatologia",
+          "numero_questoes_prova": 8
+        },
+        {
+          "nome": "Clínica Integrada: Reumatologia",
+          "numero_questoes_prova": 6
+        },
+        {
+          "nome": "Clínica Integrada: Oftalmologia",
+          "numero_questoes_prova": 6
+        }
+      ]
+    }
+  ]
+}

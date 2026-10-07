@@ -25,11 +25,14 @@ class Semestre(models.Model):
 
 
 class Periodo(models.Model):
-    nome = models.CharField(max_length=100, unique=True, help_text="Ex: 1º Período")
+    nome = models.CharField(max_length=100, help_text="Ex: 1º Período")
     # Novo campo para vincular ao Semestre
     semestre = models.ForeignKey(
         Semestre, on_delete=models.CASCADE, related_name="periodos", null=True, blank=True
     )
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["semestre", "nome"], name="periodo_nome_por_semestre")]
 
     def __str__(self):
         if self.semestre:

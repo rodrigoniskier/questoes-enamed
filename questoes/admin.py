@@ -253,9 +253,13 @@ class QuestaoAdmin(admin.ModelAdmin):
 # ==========================================
 @admin.register(Semestre)
 class SemestreAdmin(admin.ModelAdmin):
-    list_display = ("nome", "ativo", "total_questoes", "total_aprovadas", "total_pendentes")
+    list_display = ("nome", "situacao", "ativo", "total_questoes", "total_aprovadas", "total_pendentes")
     list_filter = ("ativo",)
     search_fields = ("nome",)
+
+    @admin.display(description="Situação")
+    def situacao(self, obj):
+        return "Ativo" if obj.ativo else "Arquivado"
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

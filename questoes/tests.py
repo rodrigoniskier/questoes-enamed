@@ -12,7 +12,7 @@ from .models import Alternativa, ComponenteCurricular, Periodo, Questao, Semestr
 class SubmissionTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        semester = Semestre.objects.create(nome="2026.2")
+        semester = Semestre.objects.create(nome="2026.1")
         period = Periodo.objects.create(nome="3º Período", semestre=semester)
         cls.component = ComponenteCurricular.objects.create(nome="Clínica", periodo=period)
         cls.other = ComponenteCurricular.objects.create(nome="Cirurgia", periodo=period)
