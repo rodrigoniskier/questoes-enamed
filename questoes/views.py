@@ -11,17 +11,17 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import ValidationError
-from django.middleware.csrf import get_token
 from django.core.mail import send_mail
 from django.db import DatabaseError
 from django.db.models import Q
 from django.forms import formset_factory
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET
 
 from .forms import AlternativaForm, QuestaoForm
 from .models import Alternativa, ComponenteCurricular, Periodo, Questao, Semestre
