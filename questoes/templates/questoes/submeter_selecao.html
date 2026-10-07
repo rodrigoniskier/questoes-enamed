@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Submeter Nova Questão - Seleção</title>
+    <title>QUESTÕES MEDICINA</title>
 
 
     <style>
@@ -22,13 +22,13 @@
         .dark #tipo-questao-container input[type="radio"]:checked + label { background-color: #5D5CDE; border-color: #a5b4fc; }
     </style>
     <link rel="stylesheet" href="{% static 'questoes/tailwind.css' %}">
-    <link rel="stylesheet" href="{% static 'questoes/app.css' %}?v=blue-steel-20261007">
+    <link rel="stylesheet" href="{% static 'questoes/app.css' %}?v=medicina-2026-2-20261007">
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
 {% include "questoes/partials/navigation.html" %}
     <div class="min-h-screen gradient-bg">
         <div class="container mx-auto px-4 py-8">
-            <header class="page-heading"><p class="eyebrow">MEDICINA · NAPED / UNIPÊ</p><h1>Submissão de Questões</h1><p>Elabore, revise e organize questões com clareza.</p></header>
+            <header class="page-heading"><p class="eyebrow">MEDICINA · NAPED / UNIPÊ{% for semestre in semestres_ativos %} · {{ semestre.nome }}{% endfor %}</p><h1>QUESTÕES MEDICINA</h1><p>Elabore, revise e organize questões com clareza.</p></header>
 <div class="max-w-4xl mx-auto">
                 {% if componente_continuacao %}
                 <section class="continuation-panel">
@@ -234,5 +234,6 @@
         });
     </script>
     {% endif %}
+{% include "questoes/partials/footer.html" %}
 </body>
 </html>

@@ -100,14 +100,14 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 CSRF_TRUSTED_ORIGINS = ["https://*.pythonanywhere.com", "https://rodrigoniskier.pythonanywhere.com"]
 
 JAZZMIN_SETTINGS = {
-    "site_title": "Gerador de Provas",
-    "site_header": "Gerador Provas",
-    "site_brand": "Medicina UNIPÊ",
+    "site_title": "QUESTÕES MEDICINA",
+    "site_header": "QUESTÕES MEDICINA",
+    "site_brand": "QUESTÕES MEDICINA",
     "site_logo": "images/naped.jpg",
     "login_logo": "images/logo.jpg",
     "login_logo_max_size": "250px",
     "welcome_sign": "Bem-vindo ao Gerador de Provas do curso de Medicina",
-    "copyright": "Medicina UNIPÊ",
+    "copyright": "Desenvolvido por Prof. Rodrigo Niskier",
     "custom_css": "admin_custom.css",
 }
 JAZZMIN_UI_TWEAKS = {

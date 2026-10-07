@@ -30,7 +30,9 @@ def restricted_period(componente):
 
 
 def alternative_count(componente):
-    return 4 if restricted_period(componente) else 5
+    semestre = componente.periodo.semestre
+    edital_2026_2 = semestre is not None and semestre.nome == "2026.2"
+    return 4 if restricted_period(componente) or edital_2026_2 else 5
 
 
 def allowed_styles(componente):
