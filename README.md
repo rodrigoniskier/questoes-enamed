@@ -71,3 +71,9 @@ Chamadas Gemini têm prazo de 60 segundos, sem retry automático pago; navegador
 
 A remoção da credencial SMTP do código não a revoga nem apaga o histórico Git. Ela precisa ser revogada/substituída pelo titular no provedor. O repositório legado também contém um SQLite e relatório de auditoria versionados; a limpeza do histórico deve ser planejada separadamente para preservar dados e referências existentes.
 
+
+## Correção de CSRF e respostas da IA (2026.2)
+
+O formulário consulta o token CSRF vigente em cada chamada; um bloqueio CSRF devolve JSON com código `csrf_invalido`, sem desativar o middleware de segurança. O navegador renova o token via `GET /app/api/csrf/` (mesma origem, sem cache) e tenta a operação uma única vez **somente** se o servidor rejeitou a primeira chamada por CSRF. Falhas de serviço, sessão ou rede não substituem o conteúdo já digitado. Respostas HTML inesperadas, 404, 405, 415, 502 e 503 são tratadas com mensagens legíveis sem tentar converter HTML em JSON. A rota de geração permanece protegida por CSRF e aceita apenas POST JSON.
+
+A renovação de token não é garantia de funcionamento de serviços externos: é indispensável verificar logs, variáveis de ambiente de produção e disponibilidade do Gemini. A atualização do repositório não publica automaticamente no PythonAnywhere. Depois do backup e deploy, testar uma geração real supervisionada e confirmar o comportamento do token após abrir o formulário em várias abas. O SDK legado, as cotas da IA e o saneamento do banco/CSV previamente versionados exigem intervenções separadas.

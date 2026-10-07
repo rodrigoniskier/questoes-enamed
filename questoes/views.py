@@ -16,9 +16,12 @@ from django.db import DatabaseError
 from django.db.models import Q
 from django.forms import formset_factory
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_GET
 
 from .forms import AlternativaForm, QuestaoForm
 from .models import Alternativa, ComponenteCurricular, Periodo, Questao, Semestre
@@ -353,8 +356,29 @@ def get_historico_questoes(request):
         return JsonResponse({"error": "Componente não encontrado"}, status=404)
 
 
-@require_POST
+@require_GET
+@never_cache
+@ensure_csrf_cookie
+def api_csrf_view(request):
+    """Provide a fresh same-origin CSRF token without altering form data."""
+    return JsonResponse({"csrfToken": get_token(request)})
+
+
+@never_cache
 def api_gerar_questao_view(request):
+    if request.method != "POST":
+        response = JsonResponse(
+            {"erro": "Esta operação exige POST.", "codigo": "metodo_invalido"}, status=405
+        )
+        response["Allow"] = "POST"
+        return response
+    if request.content_type != "application/json":
+        return JsonResponse({"erro": "Envie os dados em JSON.", "codigo": "tipo_invalido"}, status=415)
+    if len(request.body) > 65536:
+        return JsonResponse(
+            {"erro": "A solicitação ultrapassa o tamanho permitido.", "codigo": "muito_grande"},
+            status=413,
+        )
     try:
         data = json.loads(request.body)
         if not isinstance(data, dict):
@@ -418,23 +442,39 @@ def api_gerar_questao_view(request):
 
         if isinstance(dados_questao_ia, dict) and "erro" in dados_questao_ia:
             return JsonResponse(
-                {"erro": "Não foi possível gerar o rascunho. Tente novamente; seus dados foram preservados."},
+                {
+                    "erro": "A geração por IA está temporariamente indisponível. Tente novamente.",
+                    "codigo": "provedor_indisponivel",
+                },
                 status=502,
             )
         return JsonResponse(validate_ai_draft(dados_questao_ia, tipo_questao, num_alternativas))
 
     except json.JSONDecodeError:
-        return JsonResponse({"erro": "JSON Inválido."}, status=400)
+        return JsonResponse({"erro": "JSON inválido.", "codigo": "json_invalido"}, status=400)
     except ComponenteCurricular.DoesNotExist:
-        return JsonResponse({"erro": "Componente não encontrado."}, status=404)
+        return JsonResponse(
+            {"erro": "Componente não encontrado.", "codigo": "componente_inexistente"},
+            status=404,
+        )
     except ValidationError:
         logger.warning("Invalid AI draft for component %s", componente_id)
         return JsonResponse(
-            {"erro": "A IA retornou um rascunho incompleto ou inválido. Tente novamente."}, status=502
+            {
+                "erro": "A IA retornou um rascunho inválido. Tente novamente.",
+                "codigo": "rascunho_invalido",
+            },
+            status=502,
         )
     except Exception:
         logger.exception("AI generation failed")
-        return JsonResponse({"erro": "Não foi possível gerar o rascunho agora. Tente novamente."}, status=503)
+        return JsonResponse(
+            {
+                "erro": "Não foi possível gerar o rascunho agora. Tente novamente.",
+                "codigo": "erro_interno",
+            },
+            status=503,
+        )
 
 
 # --- MONTADOR MANUAL ---
