@@ -1,9 +1,11 @@
 # Em: bulk_submit/utils.py
 
+import json
+import re  # Para ajudar a limpar a resposta da IA
+
 import google.generativeai as genai
 from django.conf import settings
-import json
-import re # Para ajudar a limpar a resposta da IA
+
 
 def processar_texto_com_ia(texto_bruto):
     """
@@ -12,7 +14,7 @@ def processar_texto_com_ia(texto_bruto):
     """
     try:
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-2.5-flash') # Usando um modelo estável
+        model = genai.GenerativeModel("gemini-2.5-flash")  # Usando um modelo estável
 
         # --- PROMPT DE PARSING (IMPORTANTE AJUSTAR/TESTAR) ---
         # Este prompt é um ponto de partida. Pode precisar de muitos ajustes
@@ -78,7 +80,7 @@ def processar_texto_com_ia(texto_bruto):
         resposta_texto = response.text
 
         # Procura pelo início '[' e fim ']' do JSON
-        match = re.search(r'\[.*\]', resposta_texto, re.DOTALL)
+        match = re.search(r"\[.*\]", resposta_texto, re.DOTALL)
         if match:
             json_str = match.group(0)
             try:
@@ -91,11 +93,15 @@ def processar_texto_com_ia(texto_bruto):
                     return {"erro": "A IA retornou um JSON, mas o formato não é uma lista como esperado."}
             except json.JSONDecodeError as json_err:
                 print(f"Erro de Parsing: Falha ao decodificar JSON da IA. Erro: {json_err}")
-                print(f"String JSON que falhou: {json_str[:500]}...") # Mostra o início do JSON problemático
-                return {"erro": f"A IA retornou um texto que parece JSON, mas falhou na decodificação: {json_err}"}
+                print(f"String JSON que falhou: {json_str[:500]}...")  # Mostra o início do JSON problemático
+                return {
+                    "erro": f"A IA retornou um texto que parece JSON, mas falhou na decodificação: {json_err}"
+                }
         else:
             # Se não encontrou nem '[' e ']', a resposta está muito fora do esperado
-            print(f"Erro de Parsing: Resposta da IA não contém uma lista JSON válida. Resposta: {resposta_texto[:500]}...")
+            print(
+                f"Erro de Parsing: Resposta da IA não contém uma lista JSON válida. Resposta: {resposta_texto[:500]}..."
+            )
             return {"erro": "A resposta da IA não continha uma lista JSON válida como solicitado."}
 
     except Exception as e:

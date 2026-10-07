@@ -45,11 +45,11 @@
             <div class="lg:col-span-2 space-y-4">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Gabarito da Relação entre as Proposições</h3>
                  <div class="text-sm text-gray-700 dark:text-gray-300 mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-3 assercao-gabarito-container">
-                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="A" class="hidden"><span class="block p-2"><b>A)</b> As asserções I e II são proposições verdadeiras, e a II é uma justificativa correta da I.</span></label>
-                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="B" class="hidden"><span class="block p-2"><b>B)</b> As asserções I e II são proposições verdadeiras, mas a II não é uma justificativa correta da I.</span></label>
-                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="C" class="hidden"><span class="block p-2"><b>C)</b> A asserção I é uma proposição verdadeira, e a II é uma proposição falsa.</span></label>
-                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="D" class="hidden"><span class="block p-2"><b>D)</b> A asserção I é uma proposição falsa, e a II é uma proposição verdadeira.</span></label>
-                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="E" class="hidden"><span class="block p-2"><b>E)</b> As asserções I e II são proposições falsas.</span></label>
+                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="A" {% if assercao_gabarito == "A" %}checked{% endif %} class="mr-2 mt-3"><span class="block p-2"><b>A)</b> As asserções I e II são proposições verdadeiras, e a II é uma justificativa correta da I.</span></label>
+                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="B" {% if assercao_gabarito == "B" %}checked{% endif %} class="mr-2 mt-3"><span class="block p-2"><b>B)</b> As asserções I e II são proposições verdadeiras, mas a II não é uma justificativa correta da I.</span></label>
+                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="C" {% if assercao_gabarito == "C" %}checked{% endif %} class="mr-2 mt-3"><span class="block p-2"><b>C)</b> A asserção I é uma proposição verdadeira, e a II é uma proposição falsa.</span></label>
+                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="D" {% if assercao_gabarito == "D" %}checked{% endif %} class="mr-2 mt-3"><span class="block p-2"><b>D)</b> A asserção I é uma proposição falsa, e a II é uma proposição verdadeira.</span></label>
+                    <label class="flex items-start cursor-pointer"><input type="radio" name="assercao_gabarito" value="E" {% if assercao_gabarito == "E" %}checked{% endif %} class="mr-2 mt-3"><span class="block p-2"><b>E)</b> As asserções I e II são proposições falsas.</span></label>
                  </div>
             </div>
             <div class="bg-pink-50 dark:bg-pink-900/20 rounded-xl p-6 border border-pink-200 dark:border-pink-800">
@@ -91,10 +91,5 @@
         </div>
     </div>
 
-    <div class="flex justify-center pt-8">
-        <button type="submit" id="botao-submit" disabled class="px-8 py-4 bg-gradient-to-r from-accent to-green-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
-            <span>Enviar Questão de Asserção-Razão</span>
-        </button>
-    </div>
+    {% include "questoes/partials/submit_actions.html" %}
 </div>

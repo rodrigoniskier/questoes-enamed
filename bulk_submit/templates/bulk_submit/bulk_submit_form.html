@@ -5,28 +5,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Submissão em Massa de Questões</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#5D5CDE',
-                        secondary: '#4B4ACD',
-                    }
-                }
-            }
-        }
-    </script>
+
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #555; }
     </style>
+    <link rel="stylesheet" href="{% static 'questoes/tailwind.css' %}">
+    <link rel="stylesheet" href="{% static 'questoes/app.css' %}">
 </head>
 <body class="bg-gray-50 min-h-screen font-sans antialiased text-gray-900">
+{% include "questoes/partials/navigation.html" %}
 
     <div class="max-w-4xl mx-auto px-4 py-12">
         <div class="mb-8 text-center">

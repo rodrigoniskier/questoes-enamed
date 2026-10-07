@@ -5,22 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Submeter Questão - {{ componente.nome }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#5D5CDE', secondary: '#0056b3', accent: '#28a745'
-                    },
-                    fontFamily: {
-                        'sans': ['Inter', 'system-ui', 'sans-serif']
-                    }
-                }
-            }
-        }
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+
     <style>
         .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .glass-effect { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.9); }
@@ -58,26 +44,27 @@
             padding-right: 2rem;
         }
     </style>
+    <link rel="stylesheet" href="{% static 'questoes/tailwind.css' %}">
+    <link rel="stylesheet" href="{% static 'questoes/app.css' %}">
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+{% include "questoes/partials/navigation.html" %}
     <div class="min-h-screen gradient-bg">
         <div class="container mx-auto px-4 py-8">
-            <div class="flex items-center justify-between mb-8">
-                <div class="flex-shrink-0">
-                    <img src="{% static 'images/logo.jpg' %}" alt="Logo Institucional" class="h-16 w-auto object-contain">
-                </div>
-                <div class="text-center flex-1 mx-8">
-                    <h1 class="text-4xl font-bold text-white mb-4">Submissão de Questão</h1>
-                    <p class="text-white/80 text-lg">{{ componente.nome }}</p>
-                </div>
-                <div class="flex-shrink-0">
-                    <img src="{% static 'images/naped.jpg' %}" alt="Logo NAPED" class="h-16 w-auto object-contain">
-                </div>
-            </div>
-
-            <div class="max-w-7xl mx-auto">
+            <header class="page-heading"><p class="eyebrow">MEDICINA · NAPED / UNIPÊ</p><h1>Submissão de Questão</h1><p>{{ componente.nome }} · {{ componente.periodo.nome }}</p><p>{% if tipo_questao == 'RESPOSTA_UNICA' %}Resposta Única{% elif tipo_questao == 'MULTIPLA_ESCOLHA' %}Resposta Múltipla{% else %}Asserção-Razão{% endif %}</p></header>
+<div class="max-w-7xl mx-auto">
                 <form method="post" id="form-questao" enctype="multipart/form-data" class="space-y-8">
                     {% csrf_token %}
+                    <input type="hidden" name="submission_token" value="{{ submission_token }}">
+                    {% if questao_form.errors or alternativa_formset.errors or alternativa_formset.non_form_errors %}
+                    <div class="form-errors" role="alert" tabindex="-1">
+                        <strong>Não foi possível enviar. Revise os pontos abaixo.</strong>
+                        {{ questao_form.non_field_errors }}
+                        {% for field in questao_form %}{% if field.errors %}<p>{{ field.name }}: {{ field.errors|striptags }}</p>{% endif %}{% endfor %}
+                        {{ alternativa_formset.non_form_errors }}
+                        {% for form in alternativa_formset %}{{ form.errors }}{% endfor %}
+                    </div>
+                    {% endif %}
 
                     {{ questao_form.componente.as_hidden }}
                     {{ questao_form.tipo_questao.as_hidden }}
@@ -135,7 +122,7 @@
                             <span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-300">PARAMETRIZADO</span>
                         </div>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                            Selecione os parâmetros pedagógicos abaixo e forneça um comando. A IA irá gerar um rascunho de questão perfeitamente alinhado às diretrizes do ENAMED.
+                            Selecione os parâmetros pedagógicos abaixo e forneça um comando. A IA gera uma proposta com base nos parâmetros selecionados. Revise o conteúdo, as referências e o gabarito antes de enviar.
                         </p>
 
                         <!-- NOVOS PARÂMETROS DA IA (Dropdowns) -->
@@ -144,41 +131,41 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 
                                 <div>
-                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Área Principal</label>
+                                    <label for="ia-area-primaria" class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Área Principal</label>
                                     <select id="ia-area-primaria" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
                                 </div>
 
                                 <div>
-                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Área Secundária</label>
+                                    <label for="ia-area-secundaria" class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Área Secundária</label>
                                     <select id="ia-area-secundaria" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
                                 </div>
 
                                 <div>
-                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Taxonomia de Bloom</label>
+                                    <label for="ia-bloom" class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Taxonomia de Bloom</label>
                                     <select id="ia-bloom" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
                                 </div>
 
                                 <div>
-                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Nível de Dificuldade</label>
+                                    <label for="ia-dificuldade" class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Nível de Dificuldade</label>
                                     <select id="ia-dificuldade" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
                                 </div>
 
                                 <div class="md:col-span-2">
-                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Perfil do Avaliado (Art. 5º)</label>
+                                    <label for="ia-perfil" class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Perfil do Avaliado (Art. 5º)</label>
                                     <select id="ia-perfil" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
                                 </div>
 
                                 <div class="md:col-span-3">
-                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Competências (Art. 6º)</label>
+                                    <label for="ia-competencias" class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Competências (Art. 6º)</label>
                                     <select id="ia-competencias" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
                                 </div>
 
                                 <div class="md:col-span-3">
                                     <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Domínios de Conteúdo (Art. 8º)</label>
                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                        <select id="ia-dc1" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
-                                        <select id="ia-dc2" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
-                                        <select id="ia-dc3" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
+                                        <select aria-label="Domínio de conteúdo 1" id="ia-dc1" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
+                                        <select aria-label="Domínio de conteúdo 2" id="ia-dc2" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
+                                        <select aria-label="Domínio de conteúdo 3" id="ia-dc3" class="ia-select w-full text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-primary"></select>
                                     </div>
                                 </div>
                             </div>
@@ -327,39 +314,37 @@
             const enviadasQuestoesEl = document.getElementById('enviadas-questoes');
             const restantesQuestoesEl = document.getElementById('restantes-questoes');
             const form = document.getElementById('form-questao');
-            const botaoSubmit = document.getElementById('botao-submit');
+            const submitButtons = form.querySelectorAll('button[type="submit"]');
+            let submitting = false;
+            let generating = false;
 
             const tipoSelecionado = "{{ tipo_questao }}";
             const numAlternativas = {{ num_alternativas }};
             const csrfToken = document.querySelector('[name="csrfmiddlewaretoken"]').value;
 
-            // Busca os dados do histórico
+            // Render user-provided text as text, never HTML.
             if (componenteId) {
-                fetch(`/app/api/get-historico/?componente_id=${componenteId}`)
-                    .then(response => response.json())
+                fetch(`{% url 'api_get_historico' %}?componente_id=${componenteId}`)
+                    .then(response => { if (!response.ok) throw new Error(); return response.json(); })
                     .then(data => {
-                        const contagem = data.contagem;
-                        metaQuestoesEl.textContent = contagem.necessario;
-                        enviadasQuestoesEl.textContent = contagem.enviado;
-                        restantesQuestoesEl.textContent = contagem.restantes;
-
-                        const questoes = data.questoes;
-                        historicoContainer.innerHTML = '';
-                        if (questoes.length === 0) {
-                            historicoContainer.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Nenhuma questão foi submetida ainda.</p>';
-                        } else {
-                            questoes.forEach(function(questao) {
-                                let statusBadge;
-                                switch (questao.status) {
-                                    case 'APROVADA': statusBadge = '<span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Aprovada</span>'; break;
-                                    case 'REPROVADA': statusBadge = '<span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">Reprovada</span>'; break;
-                                    default: statusBadge = '<span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">Pendente</span>';
-                                }
-                                const questaoCard = `<div class="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex justify-between items-center"><p class="text-sm text-gray-700 dark:text-gray-300 truncate pr-4">${questao.enunciado}</p>${statusBadge}</div>`;
-                                historicoContainer.innerHTML += questaoCard;
-                            });
-                        }
-                    });
+                        metaQuestoesEl.textContent = data.contagem.necessario;
+                        enviadasQuestoesEl.textContent = data.contagem.enviado;
+                        restantesQuestoesEl.textContent = data.contagem.restantes;
+                        historicoContainer.replaceChildren();
+                        if (!data.questoes.length) historicoContainer.textContent = 'Nenhuma questão enviada ainda.';
+                        data.questoes.forEach(question => {
+                            const card = document.createElement('div');
+                            card.className = 'history-row';
+                            const text = document.createElement('p');
+                            text.textContent = question.enunciado;
+                            const badge = document.createElement('span');
+                            badge.className = 'status-badge';
+                            badge.textContent = {APROVADA: 'Aprovada', REPROVADA: 'Reprovada'}[question.status] || 'Pendente';
+                            card.append(text, badge);
+                            historicoContainer.append(card);
+                        });
+                    })
+                    .catch(() => { historicoContainer.textContent = 'Não foi possível carregar o histórico. Você pode continuar preenchendo a questão.'; });
             }
 
             function verificarFormulario() {
@@ -380,9 +365,14 @@
                 const todosCamposPreenchidos = Array.from(camposVisiveis).every(campo => campo && campo.value.trim() !== '');
                 const todosChecklistsMarcados = Array.from(checklists).every(check => check.checked);
 
-                if (botaoSubmit) {
-                    botaoSubmit.disabled = !(todosCamposPreenchidos && todosChecklistsMarcados);
-                }
+                const alternatives = Array.from(form.querySelectorAll('[name$="-texto"]')).filter(el => el.value.trim());
+                const correct = form.querySelectorAll('[name$="-eh_correta"]:checked').length;
+                let validAnswer = tipoSelecionado === 'ASSERCAO_RAZAO'
+                    ? !!form.querySelector('[name="assercao_gabarito"]:checked')
+                    : tipoSelecionado === 'MULTIPLA_ESCOLHA'
+                        ? alternatives.length >= 3 && correct > 0 && correct < alternatives.length
+                        : alternatives.length === numAlternativas && correct === 1;
+                submitButtons.forEach(button => button.disabled = submitting || generating || !(todosCamposPreenchidos && todosChecklistsMarcados && validAnswer));
             }
 
             if(form) {
@@ -390,6 +380,18 @@
                 form.addEventListener('change', verificarFormulario);
             }
             verificarFormulario();
+            form.addEventListener('submit', event => {
+                if (submitting) { event.preventDefault(); return; }
+                submitting = true;
+                // Keep the clicked button's action in POST when disabling buttons.
+                const action = document.createElement('input');
+                action.type = 'hidden'; action.name = 'submit_action';
+                action.value = event.submitter?.value || 'finish';
+                form.append(action);
+                submitButtons.forEach(button => { button.disabled = true; });
+                document.getElementById('submit-status').textContent = 'Enviando questão…';
+            });
+            window.addEventListener('pageshow', () => { submitting = false; verificarFormulario(); });
 
             // ==========================================
             // NOVO ENVIO DE DADOS PARA A API DA IA
@@ -401,6 +403,15 @@
             iaGenerateButton.addEventListener('click', function() {
                 const promptDoProfessor = iaPromptText.value;
                 const apiUrl = this.dataset.apiUrl;
+                if (!promptDoProfessor.trim()) { alert('Informe o tema ou comando para gerar o rascunho.'); return; }
+                const hasContent = ['texto_base', 'justificativa'].some(name => form.elements[name]?.value.trim()) || Array.from(form.querySelectorAll('[name$="-texto"]')).some(el => el.value.trim());
+                if (hasContent && !confirm('Gerar um novo rascunho substituirá o conteúdo atual da questão. Continuar?')) return;
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 75000);
+                const contentSnapshot = () => JSON.stringify(Array.from(form.querySelectorAll('textarea, [name$="-texto"], [name$="-eh_correta"], [name="assercao_gabarito"]')).map(field => [field.name || field.id, field.value, field.checked]));
+                const contentBeforeRequest = contentSnapshot();
+                generating = true;
+                verificarFormulario();
 
                 iaLoadingSpinner.style.display = 'inline-block';
                 iaGenerateButton.disabled = true;
@@ -425,6 +436,7 @@
 
                 fetch(apiUrl, {
                     method: 'POST',
+                    signal: controller.signal,
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': csrfToken
@@ -442,6 +454,14 @@
                         throw new Error('Erro da IA: ' + data.erro);
                     }
 
+                    if (contentSnapshot() !== contentBeforeRequest && !confirm('Você editou o conteúdo durante a geração. Substituir essas alterações pelo rascunho da IA?')) return;
+                    form.querySelectorAll('.checklist-item').forEach(check => check.checked = false);
+                    form.querySelectorAll('[name$="-texto"]').forEach(field => field.value = '');
+                    form.querySelectorAll('[name$="-eh_correta"], [name="assercao_gabarito"]').forEach(field => field.checked = false);
+                    if (tipoSelecionado === 'ASSERCAO_RAZAO') {
+                        const answer = form.querySelector(`[name="assercao_gabarito"][value="${data.assercao_gabarito}"]`);
+                        if (answer) answer.checked = true;
+                    }
                     // Preenche os campos do formulário com a resposta da IA
                     document.querySelector('[name="texto_base"]').value = data.texto_base || '';
                     document.querySelector('[name="enunciado"]').value = data.enunciado || '';
@@ -463,7 +483,7 @@
                                 textoField.value = alt.texto || '';
                             }
                             if (corretaField) {
-                                corretaField.checked = alt.eh_correta || false;
+                                corretaField.checked = alt.eh_correta === true;
                             }
                         });
                     }
@@ -473,9 +493,12 @@
                 })
                 .catch(error => {
                     console.error('Erro ao gerar questão com IA:', error);
-                    alert('Ocorreu um erro ao tentar gerar a questão: ' + error.message);
+                    alert('Não foi possível gerar o rascunho. Seus dados foram preservados. Tente novamente.');
                 })
                 .finally(() => {
+                    clearTimeout(timeout);
+                    generating = false;
+                    verificarFormulario();
                     iaLoadingSpinner.style.display = 'none';
                     iaGenerateButton.disabled = false;
                 });

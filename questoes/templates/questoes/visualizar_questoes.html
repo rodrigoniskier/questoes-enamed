@@ -5,17 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visualizar Questões - {{ componente.nome }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: { primary: '#5D5CDE', secondary: '#0056b3', accent: '#28a745' },
-                    fontFamily: { 'sans': ['Inter', 'system-ui', 'sans-serif'] }
-                }
-            }
-        }
-    </script>
+
     <style>
         .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .glass-effect { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.95); }
@@ -25,8 +15,11 @@
         .texto-scroll::-webkit-scrollbar { width: 4px; }
         .texto-scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
     </style>
+    <link rel="stylesheet" href="{% static 'questoes/tailwind.css' %}">
+    <link rel="stylesheet" href="{% static 'questoes/app.css' %}">
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 min-h-screen gradient-bg">
+{% include "questoes/partials/navigation.html" %}
     <div class="container mx-auto px-4 py-8">
         <div class="glass-effect rounded-xl p-6 mb-8 shadow-lg border border-white/20 flex justify-between items-center">
             <div>
