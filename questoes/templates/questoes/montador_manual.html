@@ -33,13 +33,14 @@
         }
     </style>
     <link rel="stylesheet" href="{% static 'questoes/tailwind.css' %}">
-    <link rel="stylesheet" href="{% static 'questoes/app.css' %}">
+    <link rel="stylesheet" href="{% static 'questoes/app.css' %}?v=blue-steel-20261007">
 </head>
 <body class="bg-gray-50 dark:bg-gray-900">
 {% include "questoes/partials/navigation.html" %}
     <div class="min-h-screen gradient-bg">
         <div class="container mx-auto px-4 py-8">
             <header class="page-heading"><p class="eyebrow">MEDICINA · NAPED / UNIPÊ</p><h1>Montador Manual de Gabarito</h1><p>Elabore, revise e organize questões com clareza.</p></header>
+{% if not periodo_selecionado %}
 <div class="max-w-lg mx-auto">
                 <form method="GET" class="space-y-8">
                     <div class="glass-effect rounded-2xl p-8 shadow-xl border border-white/20">
