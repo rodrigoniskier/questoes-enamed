@@ -100,6 +100,7 @@ class Questao(models.Model):
     comentario_validacao = models.TextField(
         blank=True, null=True, help_text="Comentário do administrador ao aprovar ou reprovar a questão."
     )
+    notified_status = models.CharField(max_length=20, blank=True, default="", editable=False)
 
     def __str__(self):
         return (self.enunciado[:50] + "...") if self.enunciado else "(Questão sem enunciado)"
@@ -166,6 +167,6 @@ class SubmissionReceipt(models.Model):
 
     token = models.UUIDField(primary_key=True, editable=False)
     questao = models.OneToOneField(
-        Questao, on_delete=models.CASCADE, null=True, related_name="submission_receipt"
+        Questao, on_delete=models.SET_NULL, null=True, related_name="submission_receipt"
     )
     created_at = models.DateTimeField(auto_now_add=True)

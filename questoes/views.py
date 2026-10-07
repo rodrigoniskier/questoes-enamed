@@ -258,6 +258,11 @@ def submeter_form_view(request, tipo_questao):
                     "Não foi possível salvar. Seus textos foram preservados; tente novamente. Se enviou uma imagem, selecione-a novamente.",
                 )
             else:
+                if question is None:
+                    messages.info(
+                        request, "Este envio já foi processado. A questão foi removida e não será recriada."
+                    )
+                    return redirect("submeter_selecao")
                 messages.success(
                     request,
                     "Questão enviada com sucesso!"

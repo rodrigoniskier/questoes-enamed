@@ -40,14 +40,17 @@ python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 ```
 
-Recarregue na aba Web, confirme as páginas e compare os registros existentes antes/depois. A migração 0011 apenas cria recibos de envio. Em rollback, volte o código à revisão anterior, sem apagar recibos ou restaurar dados antigos sobre envios recentes.
+Recarregue na aba Web, confirme as páginas e compare os registros existentes antes/depois. A migração 0011 cria recibos de envio; a 0012 mantém esses recibos após exclusão de uma questão e registra o último status notificado por e-mail. Em rollback, volte o código à revisão anterior, sem apagar recibos ou restaurar dados antigos sobre envios recentes.
 
 Importações, montagem/exportação de provas e alterações de destinos exigem usuário administrador. Submissão individual permanece pública. Respostas da IA são rascunhos e precisam de revisão pedagógica e factual humana.
 
 ## Decisões e limites
 
-Transações e uma chave única por formulário evitam questões parciais e repetição do mesmo POST, inclusive entre processos. Um novo formulário ainda permite enviar conteúdo igual intencionalmente. SQLite pode rejeitar gravações concorrentes sob carga: a mensagem preserva o texto e permite tentar novamente.
+Transações e uma chave única por formulário evitam questões parciais e repetição do mesmo POST, inclusive entre processos e após exclusão administrativa da questão. Um novo formulário ainda permite enviar conteúdo igual intencionalmente. SQLite pode rejeitar gravações concorrentes sob carga: a mensagem preserva o texto e permite tentar novamente.
+
+Notificações administrativas registram o último status entregue para que repetir a ação em lote reenvie apenas as falhas. SMTP não oferece garantia de entrega exatamente uma vez: uma interrupção após envio e antes do registro ainda pode exigir conferência manual.
 
 Chamadas Gemini têm prazo de 60 segundos, sem retry automático pago; navegador aborta após 75 segundos. A resposta é validada antes de preencher o formulário. O SDK legado `google-generativeai` foi mantido para compatibilidade; a migração de SDK/modelos e uma política global de cotas para o endpoint público são trabalhos futuros.
 
 A remoção da credencial SMTP do código não a revoga nem apaga o histórico Git. Ela precisa ser revogada/substituída pelo titular no provedor. O repositório legado também contém um SQLite e relatório de auditoria versionados; a limpeza do histórico deve ser planejada separadamente para preservar dados e referências existentes.
+

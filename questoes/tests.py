@@ -98,6 +98,21 @@ class SubmissionTests(TestCase):
         self.assertEqual(Alternativa.objects.count(), 5)
         self.assertEqual(SubmissionReceipt.objects.count(), 1)
 
+    def test_deleted_question_cannot_be_recreated_by_replayed_post(self):
+        for action in ("finish", "same_style", "other_style"):
+            with self.subTest(action=action):
+                data = self.payload(action=action)
+                self.client.post(self.form_url(), data)
+                question = Questao.objects.get()
+                receipt = SubmissionReceipt.objects.get(questao=question)
+                question.delete()
+                receipt.refresh_from_db()
+                self.assertIsNone(receipt.questao_id)
+                response = self.client.post(self.form_url(), data)
+                self.assertRedirects(response, reverse("submeter_selecao"))
+                self.assertEqual(Questao.objects.count(), 0)
+                self.assertTrue(SubmissionReceipt.objects.filter(pk=receipt.pk).exists())
+
     def test_bad_submission_preserves_text_without_partial_save(self):
         for field, value in [
             ("enunciado", ""),
@@ -231,6 +246,54 @@ class SubmissionTests(TestCase):
         self.assertEqual(
             self.client.get(reverse("api_get_historico") + "?componente_id=abc").status_code, 400
         )
+
+
+class NotificationTests(TestCase):
+    def setUp(self):
+        from django.contrib.admin.sites import AdminSite
+
+        from .admin import QuestaoAdmin
+
+        period = Periodo.objects.create(nome="1º Período")
+        component = ComponenteCurricular.objects.create(nome="Anatomia", periodo=period)
+        self.questions = [
+            Questao.objects.create(
+                componente=component,
+                professor_nome="Professor sintético",
+                professor_email=f"professor{index}@example.com",
+                enunciado="Comando sintético",
+                justificativa="Justificativa sintética",
+            )
+            for index in range(2)
+        ]
+        self.admin = QuestaoAdmin(Questao, AdminSite())
+
+    @patch("questoes.admin.QuestaoAdmin.message_user")
+    @patch("questoes.admin.enviar_email_status")
+    def test_retry_sends_only_failed_notifications(self, notify, message):
+        notify.side_effect = [None, RuntimeError("SMTP failure")]
+        self.admin._set_status_and_notify(None, Questao.objects.order_by("pk"), "APROVADA")
+        self.assertEqual(notify.call_count, 2)
+        self.questions[0].refresh_from_db()
+        self.questions[1].refresh_from_db()
+        self.assertEqual(self.questions[0].notified_status, "APROVADA")
+        self.assertEqual(self.questions[1].notified_status, "")
+        notify.reset_mock()
+        notify.side_effect = None
+        self.admin._set_status_and_notify(None, Questao.objects.order_by("pk"), "APROVADA")
+        self.assertEqual(notify.call_count, 1)
+        self.assertEqual(notify.call_args.args[0].pk, self.questions[1].pk)
+        notify.reset_mock()
+        self.admin._set_status_and_notify(None, Questao.objects.order_by("pk"), "APROVADA")
+        notify.assert_not_called()
+
+    @patch("questoes.admin.QuestaoAdmin.message_user")
+    @patch("questoes.admin.enviar_email_status")
+    def test_new_status_notifies_again_after_success(self, notify, message):
+        self.admin._set_status_and_notify(None, Questao.objects.order_by("pk"), "APROVADA")
+        self.admin._set_status_and_notify(None, Questao.objects.order_by("pk"), "REPROVADA")
+        self.assertEqual(notify.call_count, 4)
+        self.assertEqual(Questao.objects.filter(notified_status="REPROVADA").count(), 2)
 
 
 class GenerationTests(TestCase):

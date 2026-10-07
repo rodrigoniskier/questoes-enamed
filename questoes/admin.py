@@ -167,13 +167,18 @@ class QuestaoAdmin(admin.ModelAdmin):
             self.message_user(request, f"{sucessos} questão(ões) avaliada(s).", level=messages.SUCCESS)
 
     def _set_status_and_notify(self, request, queryset, status):
-        delivered = failed = 0
+        delivered = failed = skipped = 0
         for question in queryset:
             if question.status != status:
                 question.status = status
                 question.save(update_fields=["status"])
+            if question.notified_status == status:
+                skipped += 1
+                continue
             try:
                 enviar_email_status(question)
+                question.notified_status = status
+                question.save(update_fields=["notified_status"])
                 delivered += 1
             except Exception:
                 failed += 1
@@ -183,7 +188,8 @@ class QuestaoAdmin(admin.ModelAdmin):
                     level=messages.WARNING,
                 )
         self.message_user(
-            request, f"{delivered} notificação(ões) enviada(s); {failed} falha(s). Os status foram salvos."
+            request,
+            f"{delivered} notificação(ões) enviada(s); {failed} falha(s); {skipped} já enviada(s). Os status foram salvos.",
         )
 
     @admin.action(description="Aprovar selecionadas e notificar professor")
