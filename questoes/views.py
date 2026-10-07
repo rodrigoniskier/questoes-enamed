@@ -444,7 +444,10 @@ def api_gerar_questao_view(request):
 
         if isinstance(dados_questao_ia, dict) and "erro" in dados_questao_ia:
             return JsonResponse(
-                {"erro": "A geração por IA está temporariamente indisponível. Tente novamente.", "codigo": "provedor_indisponivel"},
+                {
+                    "erro": "A geração por IA está temporariamente indisponível. Tente novamente.",
+                    "codigo": "provedor_indisponivel",
+                },
                 status=502,
             )
         return JsonResponse(validate_ai_draft(dados_questao_ia, tipo_questao, num_alternativas))
@@ -452,17 +455,26 @@ def api_gerar_questao_view(request):
     except json.JSONDecodeError:
         return JsonResponse({"erro": "JSON inválido.", "codigo": "json_invalido"}, status=400)
     except ComponenteCurricular.DoesNotExist:
-        return JsonResponse({"erro": "Componente não encontrado.", "codigo": "componente_inexistente"}, status=404)
+        return JsonResponse(
+            {"erro": "Componente não encontrado.", "codigo": "componente_inexistente"},
+            status=404,
+        )
     except ValidationError:
         logger.warning("Invalid AI draft for component %s", componente_id)
         return JsonResponse(
-            {"erro": "A IA retornou um rascunho inválido. Tente novamente.", "codigo": "rascunho_invalido"},
-            status=502
+            {
+                "erro": "A IA retornou um rascunho inválido. Tente novamente.",
+                "codigo": "rascunho_invalido",
+            },
+            status=502,
         )
     except Exception:
         logger.exception("AI generation failed")
         return JsonResponse(
-            {"erro": "Não foi possível gerar o rascunho agora. Tente novamente.", "codigo": "erro_interno"},
+            {
+                "erro": "Não foi possível gerar o rascunho agora. Tente novamente.",
+                "codigo": "erro_interno",
+            },
             status=503,
         )
 
