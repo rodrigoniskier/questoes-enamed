@@ -1,6 +1,7 @@
 # Em: prova-naped/questoes/templatetags/questao_filters.py
 
 import re  # Vamos usar Expressões Regulares (RegEx)
+
 from django import template
 
 register = template.Library()
@@ -17,11 +18,10 @@ register = template.Library()
 #   (\.|\))  -> um ponto literal (.) OU um parêntese literal ())
 #   \s* -> espaços em branco opcionais
 #
-PREFIX_REGEX = re.compile(
-    r"^\s*(((V|IV|I{1,3}|v|iv|i{1,3})|([A-Ea-e]))\s*(\.|\))\s*)"
-)
+PREFIX_REGEX = re.compile(r"^\s*(((V|IV|I{1,3}|v|iv|i{1,3})|([A-Ea-e]))\s*(\.|\))\s*)")
 
-@register.filter(name='limpar_prefixo')
+
+@register.filter(name="limpar_prefixo")
 def limpar_prefixo(texto_da_alternativa):
     """
     Remove um prefixo de alternativa (ex: 'A)', 'I.', 'c)', 'iii.')

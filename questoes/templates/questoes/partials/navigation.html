@@ -1,0 +1,12 @@
+{% load static %}
+<a class="skip-link" href="#main-content">Ir para o conteúdo</a>
+<nav class="app-navigation" aria-label="Navegação principal">
+    <a class="app-brand" href="{% url 'submeter_selecao' %}"><span class="brand-mark" aria-hidden="true">E</span><span>Questões ENAMED <small>Medicina · UNIPÊ</small></span></a>
+    <div class="nav-links">
+        <a href="{% url 'submeter_selecao' %}">Elaborar questão</a>
+        {% if user.is_staff %}<a href="{% url 'pagina_gerar_prova' %}">Montar prova</a><a href="{% url 'bulk_submit_form' %}">Importar</a>{% endif %}
+        <a href="{% url 'admin:index' %}">Administração</a>
+    </div>
+</nav>
+<div id="main-content" tabindex="-1"></div>
+{% if messages %}<div class="app-messages" role="status">{% for message in messages %}<p class="notice {{ message.tags }}">{{ message }}</p>{% endfor %}</div>{% endif %}

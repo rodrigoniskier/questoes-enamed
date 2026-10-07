@@ -1,11 +1,17 @@
 # Em: questoes/utils.py
 
+import json
+import logging
+import re
+
 import google.generativeai as genai
 from django.conf import settings
 from django.core.mail import send_mail
+
 from .models import ComponenteCurricular
-import json
-import re
+
+logger = logging.getLogger(__name__)
+
 
 # --- FUNÇÃO DE E-MAIL (MANTIDA) ---
 def enviar_email_status(questao):
@@ -13,26 +19,28 @@ def enviar_email_status(questao):
     Envia um e-mail para o professor informando a mudança de status da questão.
     """
     if not questao.professor_email:
-        print(f"Aviso: Tentativa de notificar sobre a questão ID {questao.id}, mas não há e-mail de professor cadastrado.")
+        print(
+            f"Aviso: Tentativa de notificar sobre a questão ID {questao.id}, mas não há e-mail de professor cadastrado."
+        )
         return
 
-    if questao.status == 'APROVADA':
-        assunto = f"Sua questão foi Aprovada!"
+    if questao.status == "APROVADA":
+        assunto = "Sua questão foi Aprovada!"
         mensagem = (
             f"Olá, {questao.professor_nome},\n\n"
             f"Temos uma ótima notícia! Sua questão sobre '{questao.componente.nome}' foi APROVADA.\n\n"
-            f"Enunciado: \"{questao.enunciado[:80]}...\"\n\n"
+            f'Enunciado: "{questao.enunciado[:80]}..."\n\n'
             f"Agradecemos sua valiosa contribuição para o nosso banco de questões.\n\n"
             f"Atenciosamente,\n"
             f"NAPED - Medicina UNIPÊ"
         )
-    elif questao.status == 'REPROVADA':
-        assunto = f"Feedback sobre sua questão submetida"
+    elif questao.status == "REPROVADA":
+        assunto = "Feedback sobre sua questão submetida"
         mensagem = (
             f"Olá, {questao.professor_nome},\n\n"
             f"Sua questão sobre '{questao.componente.nome}' foi avaliada e precisa de ajustes.\n\n"
             f"Status: REPROVADA\n"
-            f"Enunciado: \"{questao.enunciado[:80]}...\"\n\n"
+            f'Enunciado: "{questao.enunciado[:80]}..."\n\n'
             f"Relatório de Análise:\n"
             f"--------------------------------\n"
             f"{questao.comentario_validacao or 'Nenhum comentário adicional fornecido.'}\n"
@@ -52,9 +60,9 @@ def enviar_email_status(questao):
             [questao.professor_email],
             fail_silently=False,
         )
-        print(f"E-mail de status '{questao.status}' enviado para {questao.professor_email} sobre a questão ID {questao.id}.")
+        logger.info("Status notification delivered for question %s", questao.id)
     except Exception as e:
-        print(f"ERRO ao enviar e-mail para {questao.professor_email} sobre a questão ID {questao.id}: {e}")
+        logger.exception("Status notification failed for question %s", questao.id)
         raise e
 
 
@@ -67,53 +75,76 @@ def avaliar_questao_com_ia(questao):
     try:
         prompt_template = """
 Você atuará como um Professor Doutor especialista em Avaliação Educacional e Psicometria...
-... (todo o seu prompt de AVALIAÇÃO que já funciona) ...
+Avalie o item abaixo: suficiência do contexto, clareza do comando, plausibilidade
+dos distratores, validade do gabarito e qualidade da justificativa. Aponte limitações,
+ambiguidades e correções concretas. Não invente referências nem confirme validade sem evidência.
+Tipo: {tipo_questao}
+Contexto: {texto_base}
+Comando / proposição I: {enunciado}
+Proposição II: {proposicao_dois}
+Alternativas e gabarito: {alternativas}
+Justificativa: {justificativa}
 IMPORTANTE: Sua resposta DEVE começar EXATAMENTE com "RELATÓRIO DE ANÁLISE DO ITEM"...
 """
         dados_formatados = {
             "tipo_questao": questao.get_tipo_questao_display(),
             "texto_base": questao.texto_base or "",
             "enunciado": questao.enunciado or "",
-            "proposicao_dois": questao.proposicao_dois or 'N/A',
-            "alternativas": [alt.texto for alt in questao.alternativas.all()],
-            "justificativa": questao.justificativa or ""
+            "proposicao_dois": questao.proposicao_dois or "N/A",
+            "alternativas": [
+                {"texto": alt.texto, "eh_correta": alt.eh_correta} for alt in questao.alternativas.all()
+            ],
+            "justificativa": questao.justificativa or "",
         }
 
         prompt_final = prompt_template.format(**dados_formatados)
 
+        if not settings.GEMINI_API_KEY:
+            return {"erro": "A geração com IA está indisponível no momento."}
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-3-flash-preview') # Modelo padronizado
+        model = genai.GenerativeModel(settings.GEMINI_MODEL)  # Modelo padronizado
 
-        response = model.generate_content(prompt_final)
+        response = model.generate_content(prompt_final, request_options={"timeout": 60, "retry": None})
 
         relatorio_bruto = response.text.strip()
-        relatorio_limpo = relatorio_bruto.replace('**', '')
+        relatorio_limpo = relatorio_bruto.replace("**", "")
 
         if "RELATÓRIO DE ANÁLISE DO ITEM" not in relatorio_limpo:
-             return {"erro": f"Resposta inesperada da IA (não encontrou o início do relatório): {relatorio_limpo[:200]}..."}
+            return {
+                "erro": f"Resposta inesperada da IA (não encontrou o início do relatório): {relatorio_limpo[:200]}..."
+            }
 
         try:
             inicio_relatorio = relatorio_limpo.index("RELATÓRIO DE ANÁLISE DO ITEM")
             relatorio_final = relatorio_limpo[inicio_relatorio:]
         except ValueError:
-             return {"erro": f"Erro ao extrair o relatório da resposta da IA: {relatorio_limpo[:200]}..."}
+            return {"erro": f"Erro ao extrair o relatório da resposta da IA: {relatorio_limpo[:200]}..."}
 
         return {"relatorio": relatorio_final}
 
-    except Exception as e:
-        return {"erro": f"Falha na avaliação com a IA: {str(e)}"}
+    except Exception:
+        logger.exception("Gemini evaluation failed")
+        return {"erro": "A avaliação com IA falhou. Tente novamente."}
 
 
 # --- NOVA FUNÇÃO PARA GERAR QUESTÕES COM IA (PROMPT PARAMETRIZADO) ---
 # AJUSTE: Adicionámos o argumento 'parametros' que vem do views.py
-def gerar_questao_com_ia(prompt_professor: str, componente: ComponenteCurricular, tipo_questao: str, num_alternativas: int, parametros: dict = None) -> dict:
+def gerar_questao_com_ia(
+    prompt_professor: str,
+    componente: ComponenteCurricular,
+    tipo_questao: str,
+    num_alternativas: int,
+    parametros: dict | None = None,
+) -> dict:
     """
     Gera o rascunho de uma questão com base no prompt do professor e nos
     parâmetros pedagógicos do ENAMED selecionados na interface.
     """
     try:
+        if not settings.GEMINI_API_KEY:
+            return {"erro": "A geração com IA está indisponível no momento."}
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-3-flash-preview')
+        model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
         # Garante que temos um dicionário mesmo se não for enviado
         if parametros is None:
@@ -124,7 +155,7 @@ def gerar_questao_com_ia(prompt_professor: str, componente: ComponenteCurricular
             {"texto": "...", "eh_correta": False},
             {"texto": "...", "eh_correta": True},
             {"texto": "...", "eh_correta": False},
-            {"texto": "...", "eh_correta": False}
+            {"texto": "...", "eh_correta": False},
         ]
         if num_alternativas == 5:
             alternativas_exemplo.append({"texto": "...", "eh_correta": False})
@@ -136,8 +167,8 @@ def gerar_questao_com_ia(prompt_professor: str, componente: ComponenteCurricular
         alternativas_json_string = json.dumps(alternativas_exemplo, indent=16)
 
         # --- LÓGICA DA ÁREA SECUNDÁRIA ---
-        area_primaria = parametros.get('area_primaria', 'Clínica Médica')
-        area_secundaria = parametros.get('area_secundaria', 'Nenhuma')
+        area_primaria = parametros.get("area_primaria", "Clínica Médica")
+        area_secundaria = parametros.get("area_secundaria", "Nenhuma")
 
         instrucao_areas = f"- **Área Principal:** {area_primaria}"
         if area_secundaria and area_secundaria != "Nenhuma":
@@ -154,22 +185,22 @@ def gerar_questao_com_ia(prompt_professor: str, componente: ComponenteCurricular
         =========================================================
         PARÂMETROS PEDAGÓGICOS (DIRETRIZES ENAMED)
         =========================================================
-        * Nível Cognitivo (Bloom): {parametros.get('bloom', 'Aplicar')}
-        * Nível de Dificuldade: {parametros.get('dificuldade', 'Médio')}
+        * Nível Cognitivo (Bloom): {parametros.get("bloom", "Aplicar")}
+        * Nível de Dificuldade: {parametros.get("dificuldade", "Médio")}
 
         ÁREAS DE FORMAÇÃO:
         {instrucao_areas}
 
         PERFIL DO AVALIADO A TESTAR:
-        - {parametros.get('perfil', 'Defensor da cidadania e da dignidade humana...')}
+        - {parametros.get("perfil", "Defensor da cidadania e da dignidade humana...")}
 
         COMPETÊNCIA EXIGIDA:
-        - {parametros.get('competencia', 'Reconhecer, diagnosticar e tratar urgências e emergências...')}
+        - {parametros.get("competencia", "Reconhecer, diagnosticar e tratar urgências e emergências...")}
 
         DOMÍNIOS DE CONTEÚDO (Integrar na questão):
-        1. {parametros.get('dc1', '')}
-        2. {parametros.get('dc2', '')}
-        3. {parametros.get('dc3', '')}
+        1. {parametros.get("dc1", "")}
+        2. {parametros.get("dc2", "")}
+        3. {parametros.get("dc3", "")}
 
         COMANDO DO PROFESSOR (TEMA/CONTEXTO ESPECÍFICO):
         "{prompt_professor}"
@@ -206,23 +237,29 @@ def gerar_questao_com_ia(prompt_professor: str, componente: ComponenteCurricular
         }}
         """
 
-        response = model.generate_content(prompt_mestre)
+        if tipo_questao == "MULTIPLA_ESCOLHA":
+            prompt_mestre += "\nREGRA ESPECÍFICA: alternativas representam afirmativas I, II, III, IV, V. Deve haver ao menos uma verdadeira e uma falsa, e cada uma deve ser justificada. Esta regra substitui a exigência de apenas uma correta."
+        elif tipo_questao == "ASSERCAO_RAZAO":
+            prompt_mestre += "\nREGRA ESPECÍFICA: preencha enunciado com a proposição I e proposicao_dois com a proposição II. Retorne assercao_gabarito com uma letra de A a E: A=ambas verdadeiras e II justifica I; B=ambas verdadeiras sem causalidade; C=I verdadeira e II falsa; D=I falsa e II verdadeira; E=ambas falsas. Justifique ambas e sua relação."
+
+        response = model.generate_content(prompt_mestre, request_options={"timeout": 60, "retry": None})
         resposta_texto = response.text.strip()
 
         # Limpeza simples para extrair o JSON (proteção contra formatação indesejada da IA)
-        match = re.search(r'\{.*\}', resposta_texto, re.DOTALL)
+        match = re.search(r"\{.*\}", resposta_texto, re.DOTALL)
         if match:
             json_str = match.group(0)
             try:
                 dados_questao = json.loads(json_str)
-                return dados_questao # Sucesso!
+                return dados_questao  # Sucesso!
             except json.JSONDecodeError as json_err:
                 print(f"Erro de Parsing IA (Geração): Falha ao decodificar JSON. Erro: {json_err}")
-                return {"erro": f"A IA retornou um JSON inválido."}
+                return {"erro": "A IA retornou um JSON inválido."}
         else:
-            print(f"Erro de Parsing IA (Geração): Resposta não continha JSON. Resposta: {resposta_texto[:500]}...")
+            logger.warning("Gemini returned no JSON object")
             return {"erro": "A IA não retornou um JSON válido. Tente novamente."}
 
-    except Exception as e:
-        print(f"Erro geral na chamada da IA (Geração): {e}")
-        return {"erro": f"Falha na comunicação com a API do Gemini: {str(e)}"}
+    except Exception:
+        logger.warning("Gemini request failed")
+        logger.exception("Gemini generation failed")
+        return {"erro": "Falha na comunicação com a IA. Tente novamente."}

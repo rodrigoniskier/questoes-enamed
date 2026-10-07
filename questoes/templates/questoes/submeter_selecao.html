@@ -5,22 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Submeter Nova Questão - Seleção</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#5D5CDE', secondary: '#0056b3', accent: '#28a745'
-                    },
-                    fontFamily: {
-                        'sans': ['Inter', 'system-ui', 'sans-serif']
-                    }
-                }
-            }
-        }
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+
     <style>
         .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .glass-effect { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.9); }
@@ -35,24 +21,24 @@
         .dark #tipo-questao-container label { background-color: #374151; border-color: #4b5563; color: #d1d5db; }
         .dark #tipo-questao-container input[type="radio"]:checked + label { background-color: #5D5CDE; border-color: #a5b4fc; }
     </style>
+    <link rel="stylesheet" href="{% static 'questoes/tailwind.css' %}">
+    <link rel="stylesheet" href="{% static 'questoes/app.css' %}">
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+{% include "questoes/partials/navigation.html" %}
     <div class="min-h-screen gradient-bg">
         <div class="container mx-auto px-4 py-8">
-            <div class="flex items-center justify-between mb-8">
-                <div class="flex-shrink-0">
-                    <img src="{% static 'images/logo.jpg' %}" alt="Logo Institucional" class="h-16 w-auto object-contain">
-                </div>
-                <div class="text-center flex-1 mx-8">
-                    <h1 class="text-4xl font-bold text-white mb-4">Submissão de Questões</h1>
-                    <p class="text-white/80 text-lg">Sistema Acadêmico de Gestão de Questões</p>
-                </div>
-                <div class="flex-shrink-0">
-                    <img src="{% static 'images/naped.jpg' %}" alt="Logo NAPED" class="h-16 w-auto object-contain">
-                </div>
-            </div>
-
-            <div class="max-w-4xl mx-auto">
+            <header class="page-heading"><p class="eyebrow">MEDICINA · NAPED / UNIPÊ</p><h1>Submissão de Questões</h1><p>Elabore, revise e organize questões com clareza.</p></header>
+<div class="max-w-4xl mx-auto">
+                {% if componente_continuacao %}
+                <section class="continuation-panel">
+                    <p class="eyebrow">PRÓXIMA QUESTÃO</p><h2>Selecione outro estilo</h2>
+                    <p>{{ componente_continuacao.nome }} · {{ componente_continuacao.periodo.nome }}</p>
+                    <p>Seu nome, e-mail e destino da prova serão mantidos. O conteúdo da nova questão estará em branco.</p>
+                    <div class="style-links">{% for estilo in estilos %}<a class="style-link" href="{{ estilo.url }}">{{ estilo.nome }} <span aria-hidden="true">→</span></a>{% endfor %}</div>
+                    <a href="{% url 'submeter_selecao' %}">Escolher outro componente curricular</a>
+                </section>
+                {% else %}
                 <div class="glass-effect rounded-2xl p-8 shadow-xl border border-white/20 space-y-8">
 
                     <div>
@@ -67,7 +53,7 @@
                             <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">1</div>
                             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Selecione o Período</h2>
                         </div>
-                        <select id="id_periodo_selector" class="w-full text-base px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-primary bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                        <select aria-label="Período" id="id_periodo_selector" class="w-full text-base px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-primary bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
                             <option value="">--- Selecione um Período ---</option>
                             {% for periodo in periodos %}
                                 <option value="{{ periodo.id }}">{{ periodo.nome }}</option>
@@ -80,7 +66,7 @@
                             <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">2</div>
                             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Selecione o Componente Curricular</h2>
                         </div>
-                        <select id="id_componente_selector" class="w-full text-base px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-primary bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                        <select aria-label="Componente curricular" id="id_componente_selector" class="w-full text-base px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-primary bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
                             <option value="">---------</option>
                         </select>
                     </div>
@@ -122,10 +108,11 @@
                     </div>
 
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>
-
+    {% if not componente_continuacao %}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Seletores dos elementos principais
@@ -151,9 +138,17 @@
             function showBlock(el) { if(el) { el.classList.remove('hidden'); } }
             function hideBlock(el) { if(el) { el.classList.add('hidden'); } }
 
+            let componentController;
+            const selectionStatus = document.createElement('p');
+            selectionStatus.setAttribute('role', 'status');
+            seletorPeriodo.after(selectionStatus);
             // Evento para quando o PERÍODO é alterado
             seletorPeriodo.addEventListener('change', function() {
                 const periodoId = this.value;
+                componentController?.abort();
+                componentController = new AbortController();
+                tipoQuestaoRadios.forEach(radio => radio.checked = false);
+                selectionStatus.textContent = '';
                 hideBlock(blocoComponente);
                 hideBlock(blocoVisualizar);
                 hideBlock(blocoTipoQuestao);
@@ -161,12 +156,14 @@
                 seletorComponente.innerHTML = '<option value="">---------</option>';
 
                 if (periodoId) {
-                    fetch(`/app/api/get-componentes/?periodo_id=${periodoId}`)
-                        .then(response => response.json())
+                    selectionStatus.textContent = 'Carregando componentes…';
+                    fetch(`{% url 'api_get_componentes' %}?periodo_id=${periodoId}`, {signal: componentController.signal})
+                        .then(response => { if (!response.ok) throw new Error(); return response.json(); })
                         .then(data => {
+                            selectionStatus.textContent = data.length ? '' : 'Nenhum componente disponível neste período.';
                             data.forEach(componente => seletorComponente.add(new Option(componente.nome, componente.id)));
                             showBlock(blocoComponente);
-                        });
+                        }).catch(error => { if (error.name !== 'AbortError') selectionStatus.textContent = 'Não foi possível carregar os componentes. Selecione o período novamente para tentar.'; });
                 }
             });
 
@@ -236,5 +233,6 @@
             });
         });
     </script>
+    {% endif %}
 </body>
 </html>

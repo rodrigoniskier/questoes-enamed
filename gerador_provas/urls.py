@@ -1,22 +1,19 @@
 # gerador_provas/urls.py
 
-from django.contrib import admin
-from django.urls import path, include # Importa 'include'
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
+from django.urls import include, path  # Importa 'include'
 
 urlpatterns = [
     # URL do admin
-    path('admin/', admin.site.urls),
-
+    path("admin/", admin.site.urls),
     # URLs da app 'questoes' (existente)
-    path('app/', include('questoes.urls')),
-
+    path("app/", include("questoes.urls")),
     # --- NOVA LINHA ADICIONADA ---
     # URLs da nova app 'bulk_submit'
-    path('bulk/', include('bulk_submit.urls')),
+    path("bulk/", include("bulk_submit.urls")),
     # --- FIM DA NOVA LINHA ---
-
     # Você pode adicionar outras URLs de nível de projeto aqui, se houver.
     # Exemplo: path('', include('outra_app.urls')), # Para a página inicial
 ]

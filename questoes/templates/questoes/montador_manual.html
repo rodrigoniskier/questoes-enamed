@@ -5,22 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Montador Manual de Gabarito</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#5D5CDE', secondary: '#0056b3', accent: '#28a745'
-                    },
-                    fontFamily: {
-                        'sans': ['Inter', 'system-ui', 'sans-serif']
-                    }
-                }
-            }
-        }
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+
     <style>
         .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .glass-effect { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.9); }
@@ -46,25 +32,15 @@
             height: 3em; /* 1.5 (line-height) * 2 (linhas) */
         }
     </style>
+    <link rel="stylesheet" href="{% static 'questoes/tailwind.css' %}">
+    <link rel="stylesheet" href="{% static 'questoes/app.css' %}">
 </head>
 <body class="bg-gray-50 dark:bg-gray-900">
+{% include "questoes/partials/navigation.html" %}
     <div class="min-h-screen gradient-bg">
         <div class="container mx-auto px-4 py-8">
-            <div class="flex items-center justify-between mb-8">
-                <div class="flex-shrink-0">
-                    <img src="{% static 'images/logo.jpg' %}" alt="Logo Institucional" class="h-16 w-auto object-contain">
-                </div>
-                <div class="text-center flex-1 mx-8">
-                    <h1 class="text-4xl font-bold text-white mb-4">Montador Manual de Gabarito</h1>
-                    <p class="text-white/80 text-lg">Área do Administrador</p>
-                </div>
-                <div class="flex-shrink-0">
-                    <img src="{% static 'images/naped.jpg' %}" alt="Logo NAPED" class="h-16 w-auto object-contain">
-                </div>
-            </div>
-
-            {% if not questoes and periodos %}
-            <div class="max-w-lg mx-auto">
+            <header class="page-heading"><p class="eyebrow">MEDICINA · NAPED / UNIPÊ</p><h1>Montador Manual de Gabarito</h1><p>Elabore, revise e organize questões com clareza.</p></header>
+<div class="max-w-lg mx-auto">
                 <form method="GET" class="space-y-8">
                     <div class="glass-effect rounded-2xl p-8 shadow-xl border border-white/20">
                         <div class="text-center mb-8">

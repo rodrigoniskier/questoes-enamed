@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Segredos e variáveis de ambiente
 .env
 .env.*
@@ -36,9 +35,9 @@ local_settings.py
 .DS_Store
 
 # IDE
+node_modules/
 .vscode/
 .idea/
-=======
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -257,4 +256,3 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
->>>>>>> 72799eeadaf3781671c98a8391b54efea06c2b2e
