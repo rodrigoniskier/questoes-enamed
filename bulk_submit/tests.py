@@ -26,6 +26,9 @@ class BulkImportTests(TestCase):
             ],
         }
         return {
+            "submission_token": self.client.get(reverse("bulk_submit_form"))
+            .context["form"]["submission_token"]
+            .value(),
             "professor_nome": "Professor",
             "professor_email": "example@example.com",
             "componente": str(self.component.pk),
@@ -50,4 +53,19 @@ class BulkImportTests(TestCase):
         data["arquivo_backup"] = SimpleUploadedFile("backup.json", b"{invalid")
         response = self.client.post(reverse("bulk_submit_form"), data)
         self.assertContains(response, "não é um JSON válido")
+        self.assertEqual(Questao.objects.count(), 0)
+
+    def test_backup_replay_creates_one_batch(self):
+        data = self.payload()
+        self.assertEqual(self.client.post(reverse("bulk_submit_form"), data).status_code, 302)
+        data["arquivo_backup"].seek(0)
+        self.assertEqual(self.client.post(reverse("bulk_submit_form"), data).status_code, 302)
+        self.assertEqual(Questao.objects.count(), 1)
+
+    def test_invalid_boolean_rolls_back_whole_batch(self):
+        data = self.payload()
+        items = json.loads(data["arquivo_backup"].read())
+        items[0]["alternativas"][0]["correta"] = "true"
+        data["arquivo_backup"] = SimpleUploadedFile("backup.json", json.dumps(items).encode())
+        self.client.post(reverse("bulk_submit_form"), data)
         self.assertEqual(Questao.objects.count(), 0)

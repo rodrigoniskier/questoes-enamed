@@ -6,7 +6,7 @@ O fluxo de submissão oferece **Enviar e criar outra no mesmo estilo**, **Enviar
 
 ## Desenvolvimento
 
-Python 3.10 ou superior. Crie um ambiente virtual, instale `requirements.txt` e configure `.env` a partir de `.env.example`. Para desenvolvimento, defina `DJANGO_DEBUG=true`, hosts locais e um caminho de banco de dados separado em `DJANGO_DATABASE_PATH`. Não use o SQLite versionado como banco de testes.
+Python 3.10 ou superior. Crie um ambiente virtual, instale `requirements.txt` e configure `.env` a partir de `.env.example`. Para desenvolvimento, defina `DJANGO_DEBUG=true`, hosts locais e um caminho de banco de dados separado em `DJANGO_DATABASE_PATH`. Crie um banco local separado; bancos e relatórios privados não são versionados.
 
 ```sh
 python manage.py migrate
@@ -30,7 +30,7 @@ Testes usam banco em memória, e-mail simulado e IA simulada. Nenhuma geração 
 
 ## Implantação no PythonAnywhere
 
-Antes do pull, faça backup consistente do SQLite usando `sqlite3.Connection.backup`, guarde o commit atual e confirme que os arquivos de código estão limpos. O banco existente contém dados de produção e não deve ser restaurado a partir do Git. Preserve `.env`, mídias e configuração WSGI.
+Na primeira atualização que remove o SQLite do Git, siga obrigatoriamente [o procedimento que preserva o banco no disco](docs/OPERATIONS_2026_2.md). Antes de atualizar, faça backup consistente do SQLite usando `sqlite3.Connection.backup`, guarde o commit atual e confirme que os arquivos de código estão limpos. O banco existente contém dados de produção e não deve ser restaurado a partir do Git. Preserve `.env`, mídias e configuração WSGI.
 
 ```sh
 git pull --ff-only origin main
@@ -67,13 +67,15 @@ Transações e uma chave única por formulário evitam questões parciais e repe
 
 Notificações administrativas registram o último status entregue para que repetir a ação em lote reenvie apenas as falhas. SMTP não oferece garantia de entrega exatamente uma vez: uma interrupção após envio e antes do registro ainda pode exigir conferência manual.
 
-Chamadas Gemini têm prazo de 60 segundos, sem retry automático pago; navegador aborta após 75 segundos. A resposta é validada antes de preencher o formulário. O SDK legado `google-generativeai` foi mantido para compatibilidade; a migração de SDK/modelos e uma política global de cotas para o endpoint público são trabalhos futuros.
+Chamadas Gemini usam `google-genai`, timeout de 60 segundos, saída limitada e uma tentativa. Cotas globais e por origem usam SQLite privado compartilhado entre workers, com HTTP 429 e `Retry-After`. Geração, avaliação e importação passam pelo mesmo controle. O formulário individual permanece na tela em falhas, mantendo campos e imagem; o recibo permite repetir um envio sem duplicá-lo. Veja [limites, recuperação e operação](docs/OPERATIONS_2026_2.md).
 
-A remoção da credencial SMTP do código não a revoga nem apaga o histórico Git. Ela precisa ser revogada/substituída pelo titular no provedor. O repositório legado também contém um SQLite e relatório de auditoria versionados; a limpeza do histórico deve ser planejada separadamente para preservar dados e referências existentes.
+A remoção da credencial SMTP do código não a revoga nem apaga o histórico Git. Ela precisa ser revogada/substituída pelo titular no provedor. SQLite e CSV foram removidos do rastreamento atual, preservando a base da hospedagem. As cópias históricas continuam acessíveis até um saneamento autorizado. Veja [o plano de limpeza e rotação](docs/HISTORY_CLEANUP_PLAN.md).
 
 
 ## Correção de CSRF e respostas da IA (2026.2)
 
 O formulário consulta o token CSRF vigente em cada chamada; um bloqueio CSRF devolve JSON com código `csrf_invalido`, sem desativar o middleware de segurança. O navegador renova o token via `GET /app/api/csrf/` (mesma origem, sem cache) e tenta a operação uma única vez **somente** se o servidor rejeitou a primeira chamada por CSRF. Falhas de serviço, sessão ou rede não substituem o conteúdo já digitado. Respostas HTML inesperadas, 404, 405, 415, 502 e 503 são tratadas com mensagens legíveis sem tentar converter HTML em JSON. A rota de geração permanece protegida por CSRF e aceita apenas POST JSON.
 
-A renovação de token não é garantia de funcionamento de serviços externos: é indispensável verificar logs, variáveis de ambiente de produção e disponibilidade do Gemini. A atualização do repositório não publica automaticamente no PythonAnywhere. Depois do backup e deploy, testar uma geração real supervisionada e confirmar o comportamento do token após abrir o formulário em várias abas. O SDK legado, as cotas da IA e o saneamento do banco/CSV previamente versionados exigem intervenções separadas.
+A renovação de token não é garantia de funcionamento de serviços externos: é indispensável verificar logs, variáveis de ambiente de produção e disponibilidade do Gemini. A atualização do repositório não publica automaticamente no PythonAnywhere. Depois do backup e deploy, testar uma geração real supervisionada e confirmar o comportamento do token após abrir o formulário em várias abas. A homologação posterior inclui SDK novo, cotas globais, preservação do arquivo na submissão individual e remoção do banco/CSV da árvore atual. Rotação de segredos e limpeza histórica permanecem operações separadas, descritas no plano.
+
+Veja também [registro de alterações](CHANGELOG.md). A versão executada pode ser conferida em `/app/api/version/`; a revisão vem de `RELEASE_REVISION` definida na hospedagem.

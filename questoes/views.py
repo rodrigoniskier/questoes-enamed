@@ -5,9 +5,11 @@ import logging
 import math
 import random
 import re
+import uuid
 from itertools import combinations
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import ValidationError
@@ -23,6 +25,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET
 
+from .ai_control import AIControlError, subject_key
 from .forms import AlternativaForm, QuestaoForm
 from .models import Alternativa, ComponenteCurricular, Periodo, Questao, Semestre
 from .submission import (
@@ -267,8 +270,10 @@ def submeter_form_view(request, tipo_questao):
         if valid:
             try:
                 question, created = save_submission(questao_form, alternatives, token_id)
-            except (DatabaseError, OSError):
-                logger.exception("Submission persistence failed for component %s", componente.pk)
+            except (DatabaseError, OSError) as error:
+                logger.error(
+                    "Submission persistence failed for component %s: %s", componente.pk, type(error).__name__
+                )
                 questao_form.add_error(
                     None,
                     "Não foi possível salvar. Seus textos foram preservados; tente novamente. Se enviou uma imagem, selecione-a novamente.",
@@ -278,7 +283,12 @@ def submeter_form_view(request, tipo_questao):
                     messages.info(
                         request, "Este envio já foi processado. A questão foi removida e não será recriada."
                     )
-                    return redirect("submeter_selecao")
+                    target = reverse("submeter_selecao")
+                    return (
+                        JsonResponse({"redirect": target})
+                        if request.headers.get("Accept") == "application/json"
+                        else redirect(target)
+                    )
                 messages.success(
                     request,
                     "Questão enviada com sucesso!"
@@ -286,15 +296,41 @@ def submeter_form_view(request, tipo_questao):
                     else "Esta questão já foi enviada; nenhuma cópia foi criada.",
                 )
                 if action == "finish":
-                    return redirect("submeter_selecao")
+                    target = reverse("submeter_selecao")
+                    return (
+                        JsonResponse({"redirect": target})
+                        if request.headers.get("Accept") == "application/json"
+                        else redirect(target)
+                    )
                 continuation = remember_header(request, question)
                 route = FORM_ROUTES[tipo_questao] if action == "same_style" else "submeter_selecao"
-                return redirect(
+                target = (
                     reverse(route) + "?" + urlencode({"componente": componente.pk, "continuar": continuation})
+                )
+                return (
+                    JsonResponse({"redirect": target})
+                    if request.headers.get("Accept") == "application/json"
+                    else redirect(target)
                 )
     else:
         questao_form = QuestaoForm(initial=initial)
         alternativa_formset = FormSet(prefix="alternativas")
+    if request.method == "POST" and request.headers.get("Accept") == "application/json":
+        errors = [str(e) for values in questao_form.errors.values() for e in values]
+        errors += [str(e) for e in alternativa_formset.non_form_errors()]
+        errors += [
+            str(e)
+            for form_errors in alternativa_formset.errors
+            for values in form_errors.values()
+            for e in values
+        ]
+        return JsonResponse(
+            {
+                "erro": " ".join(errors) or "Revise os campos e tente novamente.",
+                "submission_token": submission_token,
+            },
+            status=422,
+        )
     return render(
         request,
         "questoes/submeter_form.html",
@@ -431,13 +467,27 @@ def api_gerar_questao_view(request):
         ):
             return JsonResponse({"erro": "Parâmetros pedagógicos inválidos."}, status=400)
 
+        try:
+            read_submission_token(data.get("submission_token", ""), componente, tipo_questao)
+            request_id = str(uuid.UUID(data.get("request_id", "")))
+        except (ValidationError, ValueError, TypeError, AttributeError):
+            return JsonResponse(
+                {
+                    "erro": "Reabra o formulário para renovar a autorização de geração.",
+                    "codigo": "formulario_invalido",
+                },
+                status=400,
+            )
+
         # --- CHAMADA ATUALIZADA DA FUNÇÃO UTILS ---
         dados_questao_ia = gerar_questao_com_ia(
             prompt_professor=prompt_professor,
             componente=componente,
             tipo_questao=tipo_questao,
             num_alternativas=num_alternativas,
-            parametros=parametros_ia,  # Passamos o dicionário com os novos filtros
+            parametros=parametros_ia,
+            request_id=request_id,
+            subject=subject_key(request.META.get("REMOTE_ADDR", "unknown")),
         )
 
         if isinstance(dados_questao_ia, dict) and "erro" in dados_questao_ia:
@@ -450,7 +500,12 @@ def api_gerar_questao_view(request):
             )
         return JsonResponse(validate_ai_draft(dados_questao_ia, tipo_questao, num_alternativas))
 
-    except json.JSONDecodeError:
+    except AIControlError as error:
+        response = JsonResponse({"erro": str(error), "codigo": error.code}, status=error.status)
+        if error.retry_after:
+            response["Retry-After"] = str(error.retry_after)
+        return response
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"erro": "JSON inválido.", "codigo": "json_invalido"}, status=400)
     except ComponenteCurricular.DoesNotExist:
         return JsonResponse(
@@ -466,8 +521,8 @@ def api_gerar_questao_view(request):
             },
             status=502,
         )
-    except Exception:
-        logger.exception("AI generation failed")
+    except Exception as error:
+        logger.error("AI generation failed: %s", type(error).__name__)
         return JsonResponse(
             {
                 "erro": "Não foi possível gerar o rascunho agora. Tente novamente.",
@@ -801,3 +856,9 @@ def admin_editar_questao(request, pk):
     return render(
         request, "admin/questoes/questao/edicao_unificada.html", {"questao": questao, "mensagem": mensagem}
     )
+
+
+@require_GET
+@never_cache
+def api_version_view(request):
+    return JsonResponse({"version": settings.RELEASE_VERSION, "revision": settings.RELEASE_REVISION})

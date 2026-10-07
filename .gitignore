@@ -256,3 +256,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Academic/private production data must never be tracked
+*.sqlite3
+*.sqlite3-*
+relatorio_auditoria_admin.csv
+private/
+backups/
+*.bundle

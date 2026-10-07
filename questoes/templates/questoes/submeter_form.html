@@ -321,6 +321,7 @@
             const tipoSelecionado = "{{ tipo_questao }}";
             const numAlternativas = {{ num_alternativas }};
             // Read CSRF at each request: another tab/login may have rotated the cookie.
+            form.addEventListener('submit', () => { form.elements['csrfmiddlewaretoken'].value = currentCsrfToken(); });
             function currentCsrfToken() {
                 const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='));
                 return cookie ? decodeURIComponent(cookie.slice('csrftoken='.length)) :
@@ -373,7 +374,7 @@
                     return await send();
                 } catch (error) {
                     // A rejected CSRF request did not reach paid AI generation. Refresh once.
-                    if (error.status !== 403 || (error.isJson && error.code !== 'csrf_invalido')) {
+                    if (error.status !== 403 || !error.isJson || error.code !== 'csrf_invalido') {
                         throw error;
                     }
                     const refreshed = await fetch("{% url 'api_csrf' %}", {
@@ -423,7 +424,7 @@
                 if (tipoSelecionado === 'RESPOSTA_UNICA') {
                     camposObrigatorios = camposObrigatorios.concat(['texto_base', 'enunciado', 'justificativa']);
                 } else if (tipoSelecionado === 'MULTIPLA_ESCOLHA') {
-                    camposObrigatorios = camposObrigatorios.concat(['texto_base', 'justificativa']);
+                    camposObrigatorios = camposObrigatorios.concat(['texto_base', 'enunciado', 'proposicao_dois', 'justificativa']);
                 } else if (tipoSelecionado === 'ASSERCAO_RAZAO') {
                     camposObrigatorios = camposObrigatorios.concat(['texto_base', 'enunciado', 'proposicao_dois', 'justificativa']);
                 }
@@ -450,16 +451,52 @@
                 form.addEventListener('change', verificarFormulario);
             }
             verificarFormulario();
-            form.addEventListener('submit', event => {
-                if (submitting) { event.preventDefault(); return; }
+            form.addEventListener('submit', async event => {
+                event.preventDefault();
+                if (submitting) return;
                 submitting = true;
-                // Keep the clicked button's action in POST when disabling buttons.
-                const action = document.createElement('input');
-                action.type = 'hidden'; action.name = 'submit_action';
-                action.value = event.submitter?.value || 'finish';
-                form.append(action);
+                const action = event.submitter?.value || 'finish';
                 submitButtons.forEach(button => { button.disabled = true; });
-                document.getElementById('submit-status').textContent = 'Enviando questão…';
+                const status = document.getElementById('submit-status');
+                status.textContent = 'Enviando questão…';
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 45000);
+                const send = async () => {
+                    const body = new FormData(form);
+                    body.set('submit_action', action);
+                    body.set('csrfmiddlewaretoken', currentCsrfToken());
+                    const response = await fetch(window.location.href, {method: 'POST', body,
+                        credentials: 'same-origin', signal: controller.signal,
+                        headers: {'Accept': 'application/json', 'X-CSRFToken': currentCsrfToken()}});
+                    if (!(response.headers.get('content-type') || '').includes('application/json')) {
+                        throw new Error('O servidor retornou uma resposta inesperada. Tente novamente.');
+                    }
+                    const data = await response.json();
+                    if (data.submission_token) form.elements['submission_token'].value = data.submission_token;
+                    if (!response.ok) {
+                        const error = new Error(data.erro || 'Não foi possível enviar.');
+                        error.status = response.status; error.code = data.codigo;
+                        throw error;
+                    }
+                    if (!data.redirect) throw new Error('Não foi possível confirmar o envio.');
+                    window.location.assign(data.redirect);
+                };
+                try {
+                    try { await send(); } catch (error) {
+                        if (error.status !== 403 || error.code !== 'csrf_invalido') throw error;
+                        const refreshed = await fetch("{% url 'api_csrf' %}", {credentials: 'same-origin',
+                            cache: 'no-store', signal: controller.signal}).then(readAiResponse);
+                        form.elements['csrfmiddlewaretoken'].value = refreshed.csrfToken;
+                        await send();
+                    }
+                } catch (error) {
+                    status.textContent = (error.name === 'AbortError' ? 'O envio excedeu o tempo limite.' : error.message) +
+                        ' Todos os campos e a imagem foram preservados. Tente novamente: o recibo evita duplicidade.';
+                } finally {
+                    clearTimeout(timeout);
+                    submitting = false;
+                    verificarFormulario();
+                }
             });
             window.addEventListener('pageshow', () => { submitting = false; verificarFormulario(); });
 
@@ -474,7 +511,7 @@
                 const promptDoProfessor = iaPromptText.value;
                 const apiUrl = this.dataset.apiUrl;
                 if (!promptDoProfessor.trim()) { alert('Informe o tema ou comando para gerar o rascunho.'); return; }
-                const hasContent = ['texto_base', 'justificativa'].some(name => form.elements[name]?.value.trim()) || Array.from(form.querySelectorAll('[name$="-texto"]')).some(el => el.value.trim());
+                const hasContent = ['texto_base', 'enunciado', 'proposicao_dois', 'justificativa'].some(name => form.elements[name]?.value.trim()) || Array.from(form.querySelectorAll('[name$="-texto"]')).some(el => el.value.trim());
                 if (hasContent && !confirm('Gerar um novo rascunho substituirá o conteúdo atual da questão. Continuar?')) return;
                 const controller = new AbortController();
                 const timeout = setTimeout(() => controller.abort(), 75000);
@@ -488,6 +525,8 @@
 
                 // Captura todos os novos valores do Dropdown
                 const payload = {
+                    'request_id': crypto.randomUUID(),
+                    'submission_token': form.elements['submission_token'].value,
                     'prompt_professor': promptDoProfessor,
                     'componente_id': componenteId,
                     'tipo_questao': tipoSelecionado,

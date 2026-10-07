@@ -6,7 +6,11 @@ from django.views.csrf import csrf_failure as default_csrf_failure
 
 
 def csrf_failure(request, reason=""):
-    if request.path == reverse("api_gerar_questao"):
+    form_routes = ("submeter_resposta_unica", "submeter_resposta_multipla", "submeter_assercao_razao")
+    if request.path == reverse("api_gerar_questao") or (
+        request.headers.get("Accept") == "application/json"
+        and request.path in {reverse(route) for route in form_routes}
+    ):
         return JsonResponse(
             {
                 "erro": "A autenticação de segurança expirou. Renove o token e tente novamente.",

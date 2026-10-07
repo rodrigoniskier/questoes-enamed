@@ -1,4 +1,5 @@
 import json
+import uuid
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -7,6 +8,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from .models import Alternativa, ComponenteCurricular, Periodo, Questao, Semestre, SubmissionReceipt
+from .submission import new_submission_token
 
 
 class SubmissionTests(TestCase):
@@ -320,6 +322,8 @@ class GenerationTests(TestCase):
         period = Periodo.objects.create(nome="1º Período")
         self.component = ComponenteCurricular.objects.create(nome="Anatomia", periodo=period)
         self.payload = {
+            "submission_token": new_submission_token(self.component, "RESPOSTA_UNICA"),
+            "request_id": str(uuid.uuid4()),
             "prompt_professor": "Tema sintético",
             "componente_id": self.component.pk,
             "tipo_questao": "RESPOSTA_UNICA",
@@ -378,3 +382,53 @@ class GenerationTests(TestCase):
         response = self.post(self.payload)
         self.assertEqual(response.status_code, 503)
         self.assertNotContains(response, "secret details", status_code=503)
+
+
+class AILimitResponseTests(GenerationTests):
+    @patch("questoes.views.gerar_questao_com_ia")
+    def test_429_contract_and_retry_header(self, generate):
+        from .ai_control import AIControlError
+
+        generate.side_effect = AIControlError("Aguarde; seus dados foram preservados.", "cota_ia", 429, 60)
+        response = self.post(self.payload)
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response["Retry-After"], "60")
+        self.assertEqual(response.json()["codigo"], "cota_ia")
+
+    @patch("questoes.views.gerar_questao_com_ia")
+    def test_invalid_authorization_never_calls_provider(self, generate):
+        for field in ("submission_token", "request_id"):
+            self.assertEqual(self.post({**self.payload, field: "invalid"}).status_code, 400)
+        generate.assert_not_called()
+
+
+class AsyncSubmissionTests(SubmissionTests):
+    def test_json_submission_and_replay_return_same_continuation(self):
+        data = self.payload()
+        response = self.client.post(self.form_url(), data, HTTP_ACCEPT="application/json")
+        self.assertEqual(response.status_code, 200)
+        follow = self.client.get(response.json()["redirect"])
+        self.assertEqual(follow.context["questao_form"]["professor_nome"].value(), "Professora Exemplo")
+        self.assertFalse(follow.context["questao_form"]["enunciado"].value())
+        replay = self.client.post(self.form_url(), data, HTTP_ACCEPT="application/json")
+        self.assertEqual(replay.status_code, 200)
+        self.assertEqual(Questao.objects.count(), 1)
+
+    def test_json_failure_keeps_receipt_for_safe_retry(self):
+        data = self.payload()
+        with patch("questoes.views.save_submission", side_effect=OperationalError("synthetic")):
+            response = self.client.post(self.form_url(), data, HTTP_ACCEPT="application/json")
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["submission_token"], data["submission_token"])
+        self.assertEqual(Questao.objects.count(), 0)
+        self.assertEqual(
+            self.client.post(self.form_url(), data, HTTP_ACCEPT="application/json").status_code, 200
+        )
+        self.assertEqual(Questao.objects.count(), 1)
+
+    def test_json_csrf_failure_is_recoverable(self):
+        response = Client(enforce_csrf_checks=True).post(
+            self.form_url(), self.payload(), HTTP_ACCEPT="application/json"
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["codigo"], "csrf_invalido")
