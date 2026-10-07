@@ -320,7 +320,77 @@
 
             const tipoSelecionado = "{{ tipo_questao }}";
             const numAlternativas = {{ num_alternativas }};
-            const csrfToken = document.querySelector('[name="csrfmiddlewaretoken"]').value;
+            // Read CSRF at each request: another tab/login may have rotated the cookie.
+            function currentCsrfToken() {
+                const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='));
+                return cookie ? decodeURIComponent(cookie.slice('csrftoken='.length)) :
+                    (form.elements['csrfmiddlewaretoken']?.value || '');
+            }
+
+            async function readAiResponse(response) {
+                const isJson = (response.headers.get('content-type') || '').toLowerCase().includes('application/json');
+                let data = null;
+                if (isJson) {
+                    try {
+                        data = await response.json();
+                    } catch {
+                        throw new Error('O servidor enviou uma resposta incompleta. Tente novamente.');
+                    }
+                }
+                if (!response.ok) {
+                    const fallback = response.status === 403
+                        ? 'A sessão de segurança expirou. Atualize a página caso o problema persista.'
+                        : response.status === 404
+                            ? 'O serviço de geração não foi encontrado. A publicação precisa ser conferida.'
+                            : response.status === 429
+                                ? 'Muitas solicitações. Aguarde antes de tentar novamente.'
+                                : 'O servidor não conseguiu gerar a questão. Tente novamente.';
+                    const error = new Error((data && (data.erro || data.error)) || fallback);
+                    error.status = response.status;
+                    error.code = data?.codigo;
+                    error.isJson = isJson;
+                    throw error;
+                }
+                if (!data || typeof data !== 'object' || Array.isArray(data)) {
+                    throw new Error('O servidor retornou um formato inesperado. Seus dados permanecem no formulário.');
+                }
+                return data;
+            }
+
+            async function requestAiDraft(url, payload, controller) {
+                const send = () => fetch(url, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    signal: controller.signal,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRFToken': currentCsrfToken()
+                    },
+                    body: JSON.stringify(payload)
+                }).then(readAiResponse);
+                try {
+                    return await send();
+                } catch (error) {
+                    // A rejected CSRF request did not reach paid AI generation. Refresh once.
+                    if (error.status !== 403 || (error.isJson && error.code !== 'csrf_invalido')) {
+                        throw error;
+                    }
+                    const refreshed = await fetch("{% url 'api_csrf' %}", {
+                        method: 'GET',
+                        credentials: 'same-origin',
+                        cache: 'no-store',
+                        signal: controller.signal,
+                        headers: { 'Accept': 'application/json' }
+                    }).then(readAiResponse);
+                    if (!refreshed.csrfToken) {
+                        throw new Error('Não foi possível renovar a segurança. Atualize a página preservando antes seus textos.');
+                    }
+                    const field = form.elements['csrfmiddlewaretoken'];
+                    if (field) field.value = refreshed.csrfToken;
+                    return send();
+                }
+            }
 
             // Render user-provided text as text, never HTML.
             if (componenteId) {
@@ -434,21 +504,7 @@
                     'dc3': document.getElementById('ia-dc3').value
                 };
 
-                fetch(apiUrl, {
-                    method: 'POST',
-                    signal: controller.signal,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
-                    },
-                    body: JSON.stringify(payload)
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(err => { throw new Error(err.erro || 'A resposta da rede não foi OK.')});
-                    }
-                    return response.json();
-                })
+                requestAiDraft(apiUrl, payload, controller)
                 .then(data => {
                     if (data.erro) {
                         throw new Error('Erro da IA: ' + data.erro);
@@ -492,8 +548,11 @@
                     verificarFormulario();
                 })
                 .catch(error => {
-                    console.error('Erro ao gerar questão com IA:', error);
-                    alert('Não foi possível gerar o rascunho. Seus dados foram preservados. Tente novamente.');
+                    console.warn('Falha na geração de IA:', error.name, error.status || '');
+                    const detail = error.name === 'AbortError'
+                        ? 'A geração excedeu o tempo limite.'
+                        : (error.message || 'Falha na comunicação com o servidor.');
+                    alert(detail + ' Seus dados foram preservados no formulário.');
                 })
                 .finally(() => {
                     clearTimeout(timeout);

@@ -135,3 +135,6 @@ SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 SECURE_CONTENT_TYPE_NOSNIFF = True
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
+
+# Return machine-readable CSRF errors to the AI endpoint; other pages keep Django's default.
+CSRF_FAILURE_VIEW = "questoes.csrf.csrf_failure"
