@@ -5,7 +5,7 @@
 - Identidade QUESTÕES MEDICINA, UNIPÊ/NAPED e interface responsiva Blue Steel.
 - Três ações de envio com continuidade, preservação de identificação e limpeza do próximo item.
 - Grade oficial em cinco períodos e cinquenta componentes compartilhados, preservando 2026.1 e links anteriores.
-- Quatro alternativas em 2026.2; regras próprias de resposta múltipla e asserção-razão; parâmetros pedagógicos e validação dos rascunhos.
+- Quatro alternativas em 2026.2; resposta múltipla com 3 a 5 afirmativas, cinco campos disponíveis e combinação automática em quatro alternativas finais; regras próprias de asserção-razão; parâmetros pedagógicos e validação dos rascunhos.
 - CSRF vigente/renovável, contratos JSON e tratamento de HTML inesperado; nenhuma repetição automática de chamadas pagas aceitas.
 - Cotas globais duráveis entre workers, controle de concorrência, HTTP 429/Retry-After e recuperação de geração por UUID.
 - SDK `google-genai` para todos os caminhos da IA, modelo configurável, timeout e limite de saída.

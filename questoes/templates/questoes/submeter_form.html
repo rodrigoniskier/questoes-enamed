@@ -202,10 +202,10 @@
                     </svg>
                 </div>
                 <div class="ml-4">
-                    <h3 class="text-sm font-bold text-amber-800 uppercase tracking-wide">Aviso Importante sobre Resposta Múltipla</h3>
+                    <h3 class="text-sm font-bold text-amber-800 uppercase tracking-wide">Orientações para Resposta Múltipla</h3>
                     <div class="mt-2 text-sm text-amber-700 leading-relaxed">
-                        <p>Por padrão, o assistente de IA e o sistema elaboram este tipo de questão com <strong>apenas uma afirmativa correta</strong> no gabarito.</p>
-                        <p class="mt-1">Caso o professor deseje que o gabarito englobe duas ou mais afirmativas (exemplo: <em>"As afirmativas I e II estão corretas"</em>), é necessário fazer o <strong>ajuste manualmente</strong> nas opções geradas e atualizar a justificativa correspondente abaixo.</p>
+                        <p>Preencha <strong>de 3 a 5 afirmativas</strong>, com pelo menos uma correta e uma incorreta. Marque todas as afirmativas corretas e justifique cada uma.</p>
+                        <p class="mt-1">Os campos restantes podem ficar em branco. O sistema combina as afirmativas para gerar as quatro alternativas finais da prova. Revise o rascunho da IA antes de enviar.</p>
                     </div>
                 </div>
             </div>
@@ -441,7 +441,7 @@
                 let validAnswer = tipoSelecionado === 'ASSERCAO_RAZAO'
                     ? !!form.querySelector('[name="assercao_gabarito"]:checked')
                     : tipoSelecionado === 'MULTIPLA_ESCOLHA'
-                        ? alternatives.length >= 3 && correct > 0 && correct < alternatives.length
+                        ? alternatives.length >= 3 && alternatives.length <= 5 && correct > 0 && correct < alternatives.length
                         : alternatives.length === numAlternativas && correct === 1;
                 submitButtons.forEach(button => button.disabled = submitting || generating || !(todosCamposPreenchidos && todosChecklistsMarcados && validAnswer));
             }
