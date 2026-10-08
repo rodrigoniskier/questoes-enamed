@@ -45,6 +45,8 @@ Há timeout de 60s, limite de 4096 tokens de saída e uma única tentativa no SD
 
 Um UUID identifica a geração; rascunhos concluídos podem ser recuperados com a mesma chave sem nova chamada. Pendências/falhas retornam 409 sem repetição automática. A retenção é de 48h, eliminada na próxima admissão; backups também precisam de retenção privada. Gerar explicitamente outro rascunho cria nova chave e pode consumir outra chamada. CSRF só pode provocar uma repetição quando a resposta JSON comprovar rejeição antes de chegar à IA.
 
+O botão **Recuperar último rascunho** reutiliza o pedido anterior da aba, incluindo seu tema e parâmetros. Ele é habilitado após uma tentativa e exige confirmação antes de substituir conteúdo preenchido. O pedido fica apenas na memória da aba; recarregar/fechar a página encerra essa recuperação pela interface. O botão **Gerar Rascunho parametrizado** cria um novo pedido explícito. Resposta múltipla oferece cinco campos e aceita 3–5 afirmativas; abas antigas com menos campos rejeitam um rascunho que exceda sua capacidade, sem descartar afirmativas.
+
 ## Recuperação do professor
 
 O formulário envia `FormData` sem abandonar a página. Falhas de rede, validação, banco, HTML inesperado ou tempo limite preservam textos, gabarito, checklists e o arquivo selecionado. A chave de submissão permanece para repetir manualmente sem duplicar questões já aceitas. Uma chave expirada recebe nova autorização após a rejeição; a próxima tentativa continua explícita. Sem JavaScript, a submissão HTML continua disponível; por restrição do navegador, imagens precisam ser selecionadas novamente após erro que recarrega a página.

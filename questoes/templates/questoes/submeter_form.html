@@ -175,11 +175,15 @@
                             <label for="ia-prompt-text" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Comando Adicional / Tema da Questão:</label>
                             <textarea id="ia-prompt-text" rows="3" class="w-full text-sm px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-primary bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-all duration-200 custom-scrollbar" placeholder="Ex: Crie um cenário sobre o tratamento de pneumonia comunitária, focando nos critérios de internamento..."></textarea>
                         </div>
-                        <div class="flex items-center justify-end space-x-4 mt-4">
+                        <div class="flex flex-wrap items-center justify-end gap-3 mt-4">
                             <div id="ia-loading-spinner" style="display: none;" role="status">
                                 <svg aria-hidden="true" class="w-6 h-6 text-gray-400 animate-spin dark:text-gray-600 fill-primary" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67228 50 9.67228C27.4013 9.67228 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/><path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0492C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/></svg>
                                 <span class="sr-only">A gerar...</span>
                             </div>
+                            <button type="button" id="ia-recover-button" disabled
+                                    class="px-6 py-2 border border-gray-300 bg-white text-primary font-bold rounded-lg disabled:opacity-50">
+                                Recuperar último rascunho
+                            </button>
                             <button type="button" id="ia-generate-button"
                                     data-api-url="{% url 'api_gerar_questao' %}"
                                     class="px-6 py-2 bg-primary text-white font-bold rounded-lg shadow-md hover:bg-opacity-90 transition-all duration-200 disabled:opacity-50">
@@ -507,12 +511,17 @@
             const iaGenerateButton = document.getElementById('ia-generate-button');
             const iaLoadingSpinner = document.getElementById('ia-loading-spinner');
 
-            iaGenerateButton.addEventListener('click', function() {
-                const promptDoProfessor = iaPromptText.value;
-                const apiUrl = this.dataset.apiUrl;
+            const iaRecoverButton = document.getElementById('ia-recover-button');
+            let lastGenerationPayload = null;
+            function generateDraft(recover = false) {
+                if (generating || submitting || (recover && !lastGenerationPayload)) return;
+                const promptDoProfessor = recover ? lastGenerationPayload.prompt_professor : iaPromptText.value;
+                const apiUrl = iaGenerateButton.dataset.apiUrl;
                 if (!promptDoProfessor.trim()) { alert('Informe o tema ou comando para gerar o rascunho.'); return; }
-                const hasContent = ['texto_base', 'enunciado', 'proposicao_dois', 'justificativa'].some(name => form.elements[name]?.value.trim()) || Array.from(form.querySelectorAll('[name$="-texto"]')).some(el => el.value.trim());
-                if (hasContent && !confirm('Gerar um novo rascunho substituirá o conteúdo atual da questão. Continuar?')) return;
+                const contentNames = tipoSelecionado === 'MULTIPLA_ESCOLHA'
+                    ? ['texto_base', 'justificativa'] : ['texto_base', 'enunciado', 'proposicao_dois', 'justificativa'];
+                const hasContent = contentNames.some(name => form.elements[name]?.value.trim()) || Array.from(form.querySelectorAll('[name$="-texto"]')).some(el => el.value.trim());
+                if (hasContent && !confirm((recover ? 'Recuperar o último rascunho' : 'Gerar um novo rascunho') + ' substituirá o conteúdo atual da questão. Continuar?')) return;
                 const controller = new AbortController();
                 const timeout = setTimeout(() => controller.abort(), 75000);
                 const contentSnapshot = () => JSON.stringify(Array.from(form.querySelectorAll('textarea, [name$="-texto"], [name$="-eh_correta"], [name="assercao_gabarito"]')).map(field => [field.name || field.id, field.value, field.checked]));
@@ -522,9 +531,10 @@
 
                 iaLoadingSpinner.style.display = 'inline-block';
                 iaGenerateButton.disabled = true;
+                iaRecoverButton.disabled = true;
 
                 // Captura todos os novos valores do Dropdown
-                const payload = {
+                const payload = recover ? lastGenerationPayload : {
                     'request_id': crypto.randomUUID(),
                     'submission_token': form.elements['submission_token'].value,
                     'prompt_professor': promptDoProfessor,
@@ -542,6 +552,7 @@
                     'dc2': document.getElementById('ia-dc2').value,
                     'dc3': document.getElementById('ia-dc3').value
                 };
+                lastGenerationPayload = payload;
 
                 requestAiDraft(apiUrl, payload, controller)
                 .then(data => {
@@ -599,8 +610,11 @@
                     verificarFormulario();
                     iaLoadingSpinner.style.display = 'none';
                     iaGenerateButton.disabled = false;
+                    iaRecoverButton.disabled = false;
                 });
-            });
+            }
+            iaGenerateButton.addEventListener('click', () => generateDraft());
+            iaRecoverButton.addEventListener('click', () => generateDraft(true));
         });
     </script>
 {% include "questoes/partials/footer.html" %}

@@ -149,14 +149,7 @@ def gerar_questao_com_ia(
             parametros = {}
 
         # --- PREPARAÇÃO DOS DADOS DO JSON ---
-        alternativas_exemplo = [
-            {"texto": "...", "eh_correta": False},
-            {"texto": "...", "eh_correta": True},
-            {"texto": "...", "eh_correta": False},
-            {"texto": "...", "eh_correta": False},
-        ]
-        if num_alternativas == 5:
-            alternativas_exemplo.append({"texto": "...", "eh_correta": False})
+        alternativas_exemplo = [{"texto": "...", "eh_correta": i == 1} for i in range(num_alternativas)]
 
         justificativa_exemplo = "A) ERRADA. ... B) CERTA. ... C) ERRADA. ... D) ERRADA. ..."
         if num_alternativas == 5:
@@ -164,9 +157,10 @@ def gerar_questao_com_ia(
 
         if tipo_questao == "MULTIPLA_ESCOLHA":
             alternativas_exemplo[0]["eh_correta"] = True
-            justificativa_exemplo = "I) CERTA. ... II) CERTA. ... III) ERRADA. ... IV) ERRADA. ..."
-            if num_alternativas == 5:
-                justificativa_exemplo += " V) ERRADA. ..."
+            justificativa_exemplo = " ".join(
+                f"{roman}) {'CERTA' if i < 2 else 'ERRADA'}. ..."
+                for i, roman in enumerate(("I", "II", "III", "IV", "V")[:num_alternativas])
+            )
             instrucao_itens = f"Crie de 3 a {num_alternativas} afirmativas independentes, identificadas por I, II, III, IV e V."
             instrucao_gabarito = "Deve haver pelo menos uma afirmativa verdadeira e uma falsa; mais de uma pode ser verdadeira."
         else:
