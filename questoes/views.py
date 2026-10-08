@@ -214,7 +214,7 @@ def submeter_form_view(request, tipo_questao):
     if tipo_questao not in allowed_styles(componente):
         messages.error(request, "Este componente permite apenas questões de resposta única.")
         return redirect("submeter_selecao")
-    num_alternativas = alternative_count(componente)
+    num_alternativas = alternative_count(componente, tipo_questao)
     FormSet = formset_factory(
         AlternativaForm,
         extra=num_alternativas,
@@ -458,7 +458,11 @@ def api_gerar_questao_view(request):
         if (
             tipo_questao not in allowed_styles(componente)
             or type(num_alternativas) is not int
-            or num_alternativas != alternative_count(componente)
+            or (
+                not 3 <= num_alternativas <= 5
+                if tipo_questao == "MULTIPLA_ESCOLHA"
+                else num_alternativas != alternative_count(componente, tipo_questao)
+            )
         ):
             return JsonResponse({"erro": "Estilo ou número de alternativas inválido."}, status=400)
         if any(

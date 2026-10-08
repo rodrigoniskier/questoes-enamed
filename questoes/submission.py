@@ -29,7 +29,9 @@ def restricted_period(componente):
     return name in ("ESTÁGIO CURRICULAR OBRIGATÓRIO", "RESIDÊNCIA MÉDICA") or "SIMULADO" in name
 
 
-def alternative_count(componente):
+def alternative_count(componente, style="RESPOSTA_UNICA"):
+    if style == "MULTIPLA_ESCOLHA":
+        return 5
     semestre = componente.periodo.semestre
     edital_2026_2 = semestre is not None and semestre.nome == "2026.2"
     return 4 if restricted_period(componente) or edital_2026_2 else 5
@@ -59,8 +61,9 @@ def validate_alternatives(alternatives, style, count):
     if not isinstance(alternatives, list):
         raise ValidationError("As alternativas devem formar uma lista válida.")
     minimum = 3 if style == "MULTIPLA_ESCOLHA" else count
-    if not minimum <= len(alternatives) <= count:
-        raise ValidationError(f"Preencha {minimum} a {count} alternativas ou afirmativas.")
+    maximum = 5 if style == "MULTIPLA_ESCOLHA" else count
+    if not minimum <= len(alternatives) <= maximum:
+        raise ValidationError(f"Preencha {minimum} a {maximum} alternativas ou afirmativas.")
     texts = []
     for alternative in alternatives:
         if not isinstance(alternative, dict):
@@ -94,6 +97,8 @@ def validate_ai_draft(data, style, count):
             raise ValidationError("A IA não retornou um gabarito válido para as proposições.")
     else:
         validate_alternatives(data.get("alternativas"), style, count)
+        if style == "MULTIPLA_ESCOLHA" and len(data["alternativas"]) > count:
+            raise ValidationError("A IA ultrapassou a quantidade de campos disponíveis no formulário.")
     return data
 
 

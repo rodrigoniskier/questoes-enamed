@@ -149,18 +149,23 @@ def gerar_questao_com_ia(
             parametros = {}
 
         # --- PREPARAÇÃO DOS DADOS DO JSON ---
-        alternativas_exemplo = [
-            {"texto": "...", "eh_correta": False},
-            {"texto": "...", "eh_correta": True},
-            {"texto": "...", "eh_correta": False},
-            {"texto": "...", "eh_correta": False},
-        ]
-        if num_alternativas == 5:
-            alternativas_exemplo.append({"texto": "...", "eh_correta": False})
+        alternativas_exemplo = [{"texto": "...", "eh_correta": i == 1} for i in range(num_alternativas)]
 
         justificativa_exemplo = "A) ERRADA. ... B) CERTA. ... C) ERRADA. ... D) ERRADA. ..."
         if num_alternativas == 5:
             justificativa_exemplo += " E) ERRADA. ..."
+
+        if tipo_questao == "MULTIPLA_ESCOLHA":
+            alternativas_exemplo[0]["eh_correta"] = True
+            justificativa_exemplo = " ".join(
+                f"{roman}) {'CERTA' if i < 2 else 'ERRADA'}. ..."
+                for i, roman in enumerate(("I", "II", "III", "IV", "V")[:num_alternativas])
+            )
+            instrucao_itens = f"Crie de 3 a {num_alternativas} afirmativas independentes, identificadas por I, II, III, IV e V."
+            instrucao_gabarito = "Deve haver pelo menos uma afirmativa verdadeira e uma falsa; mais de uma pode ser verdadeira."
+        else:
+            instrucao_itens = f"Crie exatas {num_alternativas} alternativas."
+            instrucao_gabarito = "Deve haver APENAS UMA resposta inquestionavelmente correta."
 
         alternativas_json_string = json.dumps(alternativas_exemplo, indent=16)
 
@@ -213,8 +218,8 @@ def gerar_questao_com_ia(
             - A questão DEVE ser impossível de responder lendo apenas o enunciado. A resposta correta DEVE depender estritamente da análise das informações fornecidas no texto-base.
 
         3.  Alternativas:
-            - Crie exatas {num_alternativas} alternativas.
-            - Deve haver APENAS UMA resposta inquestionavelmente correta.
+            - {instrucao_itens}
+            - {instrucao_gabarito}
             - Os distratores (respostas incorretas) devem ser plausíveis, baseados em erros médicos comuns.
             - Todas as alternativas devem ter paralelismo sintático (ex: todas começam com verbo).
             - EVITE termos absolutos ("sempre", "nunca", "apenas").
@@ -224,7 +229,7 @@ def gerar_questao_com_ia(
 
         SAÍDA (FORMATO OBRIGATÓRIO):
         Gere APENAS um objeto JSON válido, sem nenhum texto, saudações, avisos ou a formatação "```json".
-        A chave "eh_correta" DEVE ser um booleano (true/false) e apenas UMA deve ser true.
+        A chave "eh_correta" DEVE ser um booleano (true/false). {instrucao_gabarito}
         Estrutura exigida:
         {{
             "texto_base": "...",
@@ -236,7 +241,7 @@ def gerar_questao_com_ia(
         """
 
         if tipo_questao == "MULTIPLA_ESCOLHA":
-            prompt_mestre += "\nREGRA ESPECÍFICA: alternativas representam afirmativas I, II, III, IV, V. Deve haver ao menos uma verdadeira e uma falsa, e cada uma deve ser justificada. Esta regra substitui a exigência de apenas uma correta."
+            prompt_mestre += f"\nREGRA ESPECÍFICA: a lista alternativas contém de 3 a 5 afirmativas, sem combinações de gabarito. Respeite o máximo de {num_alternativas} campos disponíveis neste formulário. Justifique cada afirmativa como CERTA ou ERRADA. As quatro alternativas finais combinando afirmativas serão montadas pelo sistema."
         elif tipo_questao == "ASSERCAO_RAZAO":
             prompt_mestre += "\nREGRA ESPECÍFICA: preencha enunciado com a proposição I e proposicao_dois com a proposição II. Retorne assercao_gabarito com uma letra de A a E: A=ambas verdadeiras e II justifica I; B=ambas verdadeiras sem causalidade; C=I verdadeira e II falsa; D=I falsa e II verdadeira; E=ambas falsas. Justifique ambas e sua relação."
 
