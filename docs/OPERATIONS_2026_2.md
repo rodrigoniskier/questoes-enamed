@@ -4,6 +4,20 @@
 
 Identifique o diretório real, virtualenv, WSGI e `DJANGO_DATABASE_PATH`. Confira a revisão remota e alterações locais de código. Faça backup privado e consistente com `sqlite3.Connection.backup`; verifique `PRAGMA integrity_check`; arquive mídias, `.env`, WSGI e um `git bundle --all`. Registre revisão anterior e contagens. Nunca inclua esses arquivos em commits, estáticos, mídia pública ou relatórios públicos.
 
+Após o pull de uma atualização normal (não na transição especial descrita abaixo), o script `ops/deploy_pre_auditoria.sh` instala dependências, verifica `main == origin/main`, rejeita código local, resolve o SQLite via Django, grava backup privado consistente, guarda mídia e `.env` privados quando disponíveis, aplica migrations, coleta estáticos e compara registros anteriores com `ops/verify_integrity.py`. Exemplo:
+
+```sh
+git pull --ff-only origin main && bash ops/deploy_pre_auditoria.sh
+```
+
+O script requer `python` do virtualenv ativo (ou `PYTHON=/caminho/python`), branch `main`, `origin/main` atualizado e acesso de escrita ao diretório privado. Não executa smoke test HTTP externo nem Reload; esses passos são manuais na aba Web. O backup permanece até homologação. Para remover um arquivo depois da autorização do proprietário, informe o nome exato e confirme:
+
+```sh
+bash ops/remove_pre_auditoria_backup.sh pre_auditoria-REVISAO-DATA.sqlite3
+```
+
+Rollback de código: registre previamente a revisão atual; após confirmar que o working tree está limpo, retorne somente o checkout a essa revisão conhecida, reinstale as dependências correspondentes, rode `check`, `migrate --plan` e `migrate --noinput`, `collectstatic` e recarregue. Não restaure o backup do SQLite nem execute migrations reversas automaticamente; os dados novos e as tabelas aditivas devem permanecer. Compare a integridade e investigue divergências antes de qualquer reparo manual.
+
 ## Atualização que preserva um SQLite anteriormente rastreado
 
 Na primeira atualização que remove o banco do Git, **não faça um pull que apague o arquivo de produção**. Após backup e confirmação de que não há alterações locais de código, atualize os arquivos rastreados excetuando dados; atualize apenas o índice/referência local, sem `reset --hard`:

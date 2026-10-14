@@ -1,5 +1,14 @@
 # Alterações
 
+## Pré-auditoria (em desenvolvimento)
+
+- Criado app Django com fila autenticada por permissão, filtros hierárquicos dos cadastros ativos, indicadores e histórico versionado de pareceres.
+- Incluídas validações determinísticas dos três formatos atuais, análise Gemini com saída JSON validada e rejeição de evidências que não citem o conteúdo da questão.
+- Adicionado editor transacional com histórico antes/depois, controle de concorrência por fingerprint e reavaliação estrutural sem chamada paga.
+- Incluídas confirmação documental de critérios inconclusivos, aprovação humana individual/em lotes limitados e correção docente por link assinado expirável e de uso único.
+- O processamento semântico permanece síncrono por questão; revisão clínica, catálogo bibliográfico, critérios não observáveis e homologação operacional precisam de validação humana.
+- Matriz do Apêndice B: [PRE_AUDITORIA_MATRIZ.md](docs/PRE_AUDITORIA_MATRIZ.md).
+
 ## 2026.2
 
 - Identidade QUESTÕES MEDICINA, UNIPÊ/NAPED e interface responsiva Blue Steel.
