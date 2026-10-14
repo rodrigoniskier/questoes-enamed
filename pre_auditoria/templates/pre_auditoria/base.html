@@ -1,0 +1,18 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pré-auditoria · QUESTÕES MEDICINA</title>
+  <link rel="stylesheet" href="{% static 'questoes/tailwind.css' %}">
+  <link rel="stylesheet" href="{% static 'questoes/app.css' %}">
+  <link rel="stylesheet" href="{% static 'questoes/pre_auditoria.css' %}">
+</head>
+<body>
+  {% include "questoes/partials/navigation.html" %}
+  {% if messages %}<div class="app-messages" role="status">{% for message in messages %}<p class="notice {{ message.tags }}">{{ message }}</p>{% endfor %}</div>{% endif %}
+  <div class="audit-layout">{% block content %}{% endblock %}</div>
+  <footer class="app-footer">Desenvolvido por Prof. Rodrigo Niskier</footer>
+</body>
+</html>

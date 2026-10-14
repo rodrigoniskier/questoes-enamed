@@ -1,0 +1,37 @@
+{% extends "pre_auditoria/base.html" %}
+{% block content %}
+<main>
+  <p><a href="{% url 'pre_auditoria:lista' %}">Voltar à fila</a></p>
+  <h1>Questão {{ questao.pk }} · {{ questao.get_tipo_questao_display }}</h1>
+  <p>{{ questao.componente }} · {{ questao.componente.periodo.semestre }}</p>
+  {% if questao.status == "PENDENTE" and perms.pre_auditoria.review_parecerpreauditoria %}<p><a href="{% url 'pre_auditoria:editar' questao.pk %}">CORRIGIR AGORA</a></p>{% endif %}
+  <section class="audit-question">
+    <h2>Texto-base</h2><p>{{ questao.texto_base|linebreaksbr }}</p>
+    <h2>Enunciado / Proposição I</h2><p>{{ questao.enunciado|linebreaksbr }}</p>
+    {% if questao.proposicao_dois %}<h2>Proposição II</h2><p>{{ questao.proposicao_dois|linebreaksbr }}</p>{% endif %}
+    <h2>Alternativas</h2>
+    <ol>{% for alternative in questao.alternativas.all %}<li>{{ alternative.texto }}{% if alternative.eh_correta %} <strong>(gabarito cadastrado)</strong>{% endif %}</li>{% endfor %}</ol>
+    <h2>Justificativa</h2><p>{{ questao.justificativa|linebreaksbr }}</p>
+  </section>
+  {% if questao.status == "PENDENTE" and perms.pre_auditoria.review_parecerpreauditoria %}<form method="post" action="{% url 'pre_auditoria:iniciar' questao.pk %}">{% csrf_token %}<button class="audit-action-button" type="submit">INICIAR PRÉ-AUDITORIA</button></form>{% endif %}
+  {% for parecer in pareceres %}
+    <section class="audit-section"><h2>{{ parecer.get_resultado_display }} · {{ parecer.criado_em }}</h2>
+      {% if parecer.achados %}<ul>{% for achado in parecer.achados %}<li><strong>{{ achado.criterio }}</strong>: {{ achado.evidencia }} {{ achado.fundamentacao }} Sugestão: {{ achado.recomendacao }} (Manual: {{ achado.secao_manual }})</li>{% endfor %}</ul>{% endif %}
+      {% if parecer.indicadores.inconclusivos %}<h3>Verificações inconclusivas</h3><ul>{% for item in parecer.indicadores.inconclusivos %}<li>Critério {{ item.criterion_id }}: {{ item.reason }}
+        {% if parecer.pk == ultimo_parecer_id and perms.pre_auditoria.review_parecerpreauditoria %}<form class="audit-inline-form" method="post" action="{% url 'pre_auditoria:registrar_evidencia' parecer.pk %}">{% csrf_token %}<input type="hidden" name="criterio_id" value="{{ item.criterion_id }}"><label>Registro da conferência <textarea name="evidencia" minlength="15" required rows="2"></textarea></label><label>Referência ou documento consultado <input name="referencia" type="text"></label><button class="audit-action-button" type="submit">Registrar conferência</button></form>{% endif %}
+        {% for evidence in parecer.evidencias.all %}{% if evidence.criterio_id == item.criterion_id %}<p>Registrado por {{ evidence.revisor_nome|default:"revisor removido" }} em {{ evidence.criada_em }}: {{ evidence.evidencia }}{% if evidence.referencia %} · Referência: {{ evidence.referencia }}{% endif %}</p>{% endif %}{% endfor %}</li>{% endfor %}</ul>{% endif %}
+      {% if parecer.indicadores.nota %}<p>{{ parecer.indicadores.nota }}</p>{% endif %}
+      {% if parecer.pk == ultimo_parecer_id and questao.status == "PENDENTE" and perms.pre_auditoria.review_parecerpreauditoria %}<form method="post" action="{% url 'pre_auditoria:aprovar' questao.pk %}">{% csrf_token %}<label>Justificativa para recomendação não impeditiva <textarea name="justificativa" rows="3"></textarea></label><button type="submit">CONFIRMAR APROVAÇÃO</button></form>{% endif %}
+    </section>
+  {% empty %}<p>Ainda não há pareceres.</p>{% endfor %}
+  {% if questao.status == "PENDENTE" and perms.pre_auditoria.review_parecerpreauditoria %}<section class="audit-section"><h2>Solicitar correções ao professor</h2><form class="audit-inline-form" method="post" action="{% url 'pre_auditoria:solicitar_correcao' questao.pk %}">{% csrf_token %}<label>Orientações <textarea name="mensagem" minlength="20" required rows="4"></textarea></label><button class="audit-action-button" type="submit">SOLICITAR CORREÇÃO AO PROFESSOR</button></form></section>{% endif %}
+  <section class="audit-section"><h2>Histórico de edições</h2>
+    {% for change in alteracoes %}<details><summary>{{ change.criada_em }} · {{ change.revisor|default:"revisor removido" }}</summary><h3>Antes</h3><pre>{{ change.antes }}</pre><h3>Depois</h3><pre>{{ change.depois }}</pre></details>
+    {% empty %}<p>Nenhuma edição registrada.</p>{% endfor %}
+  </section>
+  <section class="audit-section"><h2>Histórico de decisões</h2>
+    {% for decision in decisoes %}<p>{{ decision.get_acao_display }} por {{ decision.revisor|default:"revisor removido" }} em {{ decision.criada_em }} · {{ decision.justificativa|default:"Sem justificativa adicional." }}</p>
+    {% empty %}<p>Nenhuma decisão registrada.</p>{% endfor %}
+  </section>
+</main>
+{% endblock %}

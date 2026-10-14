@@ -19,8 +19,8 @@ O CSS compilado está versionado: Node não é necessário no PythonAnywhere. Pa
 
 ```sh
 python -m pip install -r requirements-dev.txt
-python -m ruff check questoes bulk_submit gerador_provas
-python -m ruff format --check questoes bulk_submit gerador_provas
+python -m ruff check questoes bulk_submit gerador_provas pre_auditoria
+python -m ruff format --check questoes bulk_submit gerador_provas pre_auditoria
 python manage.py test --settings=gerador_provas.test_settings
 python manage.py makemigrations --check --dry-run --settings=gerador_provas.test_settings
 python -m pip_audit -r requirements.txt
@@ -30,19 +30,19 @@ Testes usam banco em memória, e-mail simulado e IA simulada. Nenhuma geração 
 
 ## Implantação no PythonAnywhere
 
-Na primeira atualização que remove o SQLite do Git, siga obrigatoriamente [o procedimento que preserva o banco no disco](docs/OPERATIONS_2026_2.md). Antes de atualizar, faça backup consistente do SQLite usando `sqlite3.Connection.backup`, guarde o commit atual e confirme que os arquivos de código estão limpos. O banco existente contém dados de produção e não deve ser restaurado a partir do Git. Preserve `.env`, mídias e configuração WSGI.
+Na primeira atualização que remove o SQLite do Git, siga obrigatoriamente [o procedimento que preserva o banco no disco](docs/OPERATIONS_2026_2.md). Nas atualizações posteriores, após o pull, use o script que exige `main` igual a `origin/main`, faz backup consistente do banco e das mídias e compara registros existentes. O banco existente não é restaurado pelo Git. Preserve `.env`, mídias e configuração WSGI.
 
 ```sh
-git pull --ff-only origin main
-python -m pip install -r requirements.txt
-python manage.py check
-python manage.py migrate --noinput
-python manage.py collectstatic --noinput
+git pull --ff-only origin main && bash ops/deploy_pre_auditoria.sh
 ```
 
-Recarregue na aba Web, confirme as páginas e compare os registros existentes antes/depois. A migração 0011 cria recibos de envio; a 0012 mantém esses recibos após exclusão de uma questão e registra o último status notificado por e-mail. Em rollback, volte o código à revisão anterior, sem apagar recibos ou restaurar dados antigos sobre envios recentes.
+O backup privado fica em `~/.private_backups/pre_auditoria/` até homologação. O script não restaura nem exclui backups; a remoção posterior exige o nome exato e confirmação explícita com `bash ops/remove_pre_auditoria_backup.sh <nome-do-backup.sqlite3>`. Após o script, recarregue a aplicação na aba Web e faça smoke test autenticado. Em rollback, retorne apenas o código a uma revisão conhecida, sem migrations destrutivas ou restauração de banco antigo sobre novos envios.
 
 Importações, montagem/exportação de provas e alterações de destinos exigem usuário administrador. Submissão individual permanece pública. Respostas da IA são rascunhos e precisam de revisão pedagógica e factual humana.
+
+## Pré-auditoria (em desenvolvimento)
+
+O módulo está disponível em `/app/pre-auditoria/` para usuários com permissões `view_parecerpreauditoria` e `review_parecerpreauditoria`. Inclui fila, análise estrutural/semântica, confirmação documental, editor com histórico, solicitação de correção por link assinado, aprovação individual/em lote e auditoria incremental com cursor persistido (até 25 itens). Cada chamada de IA é síncrona por questão; o navegador conduz o lote e a execução pausa se a página for fechada. A análise não substitui validação clínica, revisão humana nem conferência bibliográfica no acervo do UNIPÊ. Consulte a matriz e limites em [docs/PRE_AUDITORIA_MATRIZ.md](docs/PRE_AUDITORIA_MATRIZ.md) antes de habilitar para uso operacional.
 
 ## Decisões e limites
 

@@ -1,0 +1,72 @@
+{% extends "pre_auditoria/base.html" %}
+{% block content %}
+<main>
+  <header class="audit-heading"><p class="eyebrow">TAREFA {{ lote.pk }}</p><h1>Pré-auditoria em lote</h1><p>Executada uma questão por requisição. O progresso fica salvo e pode ser retomado após recarregar.</p></header>
+  <section class="audit-section" aria-live="polite">
+    <p id="audit-progress">{{ concluidas }} de {{ total }} questões processadas.</p>
+    <progress id="audit-progress-bar" max="{{ total }}" value="{{ concluidas }}">{{ concluidas }}/{{ total }}</progress>
+    <p id="audit-current">{% if lote.status == "CONCLUIDO" %}Lote concluído.{% elif lote.erro %}{{ lote.erro }}{% else %}Preparando a próxima questão.{% endif %}</p>
+    <form method="post" action="{{ process_url }}">{% csrf_token %}<button class="audit-action-button" id="audit-resume" type="submit">CONTINUAR LOTE</button></form>
+  </section>
+  <section class="audit-section"><h2>Pareceres registrados</h2>
+    {% for parecer in pareceres %}<p>Questão {{ parecer.questao_id }} · {{ parecer.get_resultado_display }} · {{ parecer.criado_em }}</p>
+    {% empty %}<p>Nenhum parecer persistido ainda.</p>{% endfor %}
+  </section>
+  <p><a href="{% url 'pre_auditoria:lista' %}">Voltar à fila</a></p>
+</main>
+<script>
+(() => {
+  const button = document.getElementById("audit-resume");
+  const progress = document.getElementById("audit-progress");
+  const progressBar = document.getElementById("audit-progress-bar");
+  const current = document.getElementById("audit-current");
+  const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  const form = button.form;
+  let running = false;
+
+  async function processNext() {
+    if (running) return;
+    running = true;
+    button.disabled = true;
+    current.textContent = "Processando uma questão...";
+    try {
+      while (true) {
+        const response = await fetch("{{ process_url }}", {
+          method: "POST",
+          headers: {"X-CSRFToken": csrf},
+          credentials: "same-origin",
+        });
+        const data = await response.json();
+        if (!response.ok && response.status !== 202) throw new Error(data.erro || "Falha no processamento.");
+        if (data.posicao !== undefined) {
+          progress.textContent = `${data.posicao} de ${data.total} questões processadas.`;
+          progressBar.value = data.posicao;
+        }
+        if (data.erro) throw new Error(data.erro);
+        if (data.ocupado) {
+          current.textContent = "Outro worker está processando uma questão; aguardando a conclusão.";
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+        if (data.ignorada) current.textContent = data.erro;
+        else if (data.resultado) current.textContent = `Questão ${data.questao_id}: ${data.resultado}.`;
+        if (data.concluido) {
+          current.textContent = "Lote concluído. Os pareceres estão disponíveis na fila.";
+          button.hidden = true;
+          window.location.reload();
+          return;
+        }
+      }
+    } catch (error) {
+      current.textContent = `${error.message} Nenhuma repetição automática foi feita; continue manualmente após conferir o estado.`;
+    } finally {
+      running = false;
+      button.disabled = false;
+    }
+  }
+
+  form.addEventListener("submit", event => { event.preventDefault(); processNext(); });
+  if ("{{ lote.status }}" !== "CONCLUIDO") processNext();
+})();
+</script>
+{% endblock %}

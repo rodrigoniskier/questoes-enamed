@@ -3,11 +3,12 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path  # Importa 'include'
+from django.urls import include, path
 
 urlpatterns = [
     # URL do admin
     path("admin/", admin.site.urls),
+    path("app/pre-auditoria/", include("pre_auditoria.urls")),
     # URLs da app 'questoes' (existente)
     path("app/", include("questoes.urls")),
     # --- NOVA LINHA ADICIONADA ---

@@ -1,0 +1,16 @@
+{% extends "pre_auditoria/base.html" %}
+{% block content %}
+<main>
+  <p><a href="{% url 'pre_auditoria:detalhe' questao.pk %}">Voltar ao parecer</a></p>
+  <h1>Editar questão {{ questao.pk }}</h1>
+  <form class="audit-form" method="post" enctype="multipart/form-data">
+    {% csrf_token %}<input type="hidden" name="fingerprint" value="{{ fingerprint }}">
+    {{ form.non_field_errors }}
+    {% for field in form %}<p>{{ field.label_tag }} {{ field }}{{ field.errors }}</p>{% endfor %}
+    <fieldset><legend>Alternativas e gabarito</legend>{{ formset.management_form }}{{ formset.non_form_errors }}
+      {% for alternative_form in formset %}<div>{{ alternative_form.id }}{{ alternative_form.texto.label_tag }} {{ alternative_form.texto }} {{ alternative_form.eh_correta.label_tag }} {{ alternative_form.eh_correta }}{% if alternative_form.DELETE %}{{ alternative_form.DELETE }} Remover{% endif %}{{ alternative_form.errors }}</div>{% endfor %}
+    </fieldset>
+    <button type="submit">Salvar e reavaliar estrutura</button>
+  </form>
+</main>
+{% endblock %}

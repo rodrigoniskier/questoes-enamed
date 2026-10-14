@@ -1,0 +1,53 @@
+{% extends "pre_auditoria/base.html" %}
+{% block content %}
+<main>
+  <header class="audit-heading"><p class="eyebrow">QUESTÕES MEDICINA · REVISÃO</p><h1>Pré-auditoria</h1><p>Fila de questões submetidas nos períodos ativos.</p></header>
+  <section aria-label="Indicadores" class="audit-metrics">
+    <div class="audit-metric"><span>Submetidas</span><strong>{{ total_submetidas }}</strong></div>
+    <div class="audit-metric"><span>Pendentes</span><strong>{{ pendentes }}</strong></div>
+    <div class="audit-metric"><span>Pré-auditadas</span><strong>{{ pre_auditadas }}</strong></div>
+    <div class="audit-metric"><span>Aprovadas</span><strong>{{ aprovadas }}</strong></div>
+  </section>
+  <form method="get" class="audit-section audit-filters">
+    <label>Semestre ativo
+      <select name="semestre" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        {% for semester in semestres %}<option value="{{ semester.pk }}" {% if semestre_selecionado == semester.pk|stringformat:'s' %}selected{% endif %}>{{ semester.nome }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Período acadêmico
+      <select name="periodo" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        {% for period in periodos %}<option value="{{ period.pk }}" {% if periodo_selecionado == period.pk|stringformat:'s' %}selected{% endif %}>{{ period.nome }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Componente curricular
+      <select name="componente" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        {% for component in componentes %}<option value="{{ component.pk }}" {% if componente_selecionado == component.pk|stringformat:'s' %}selected{% endif %}>{{ component.nome }}</option>{% endfor %}
+      </select>
+    </label>
+  </form>
+  <section class="audit-section">
+    {% if perms.pre_auditoria.review_parecerpreauditoria %}<form method="post" action="{% url 'pre_auditoria:aprovar_lote' %}">{% csrf_token %}{% endif %}
+    <div class="audit-table-scroll"><table class="audit-table">
+      <thead><tr><th>Selecionar</th><th>Questão</th><th>Professor</th><th>Componente</th><th>Tipo</th><th>Última verificação</th><th></th></tr></thead>
+      <tbody>
+      {% for question in questoes %}
+        <tr>
+          <td>{% if perms.pre_auditoria.review_parecerpreauditoria %}<input type="checkbox" name="questoes" value="{{ question.pk }}" aria-label="Selecionar questão {{ question.pk }}">{% endif %}</td>
+          <td>{{ question.enunciado|truncatechars:100 }}</td><td>{{ question.professor_nome }}</td>
+          <td>{{ question.componente.nome }}</td><td>{{ question.get_tipo_questao_display }}</td>
+          <td>{% if question.latest_audit %}{% if question.audit_is_current %}{{ question.latest_audit.get_resultado_display }}{% else %}Desatualizada{% endif %}{% else %}Não iniciada{% endif %}</td>
+          <td><a href="{% url 'pre_auditoria:detalhe' question.pk %}">Revisar</a></td>
+        </tr>
+      {% empty %}<tr><td colspan="7">Nenhuma questão pendente neste filtro.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+    {% if perms.pre_auditoria.review_parecerpreauditoria %}<div class="audit-batch"><label class="audit-field">Justificativa para aprovação excepcional<textarea name="justificativa" rows="2"></textarea></label><div><button type="submit" formaction="{% url 'pre_auditoria:criar_lote' %}">INICIAR PRÉ-AUDITORIA (máx. 25)</button><button type="submit">CONFIRMAR APROVAÇÃO DO LOTE (máx. 25)</button></div></div></form>{% endif %}
+    <div class="audit-pagination">{% if questoes.has_previous %}<a href="?page={{ questoes.previous_page_number }}&semestre={{ semestre_selecionado }}&periodo={{ periodo_selecionado }}&componente={{ componente_selecionado }}">Anterior</a>{% endif %}
+    <span>Página {{ questoes.number }} de {{ questoes.paginator.num_pages }}</span>
+    {% if questoes.has_next %}<a href="?page={{ questoes.next_page_number }}&semestre={{ semestre_selecionado }}&periodo={{ periodo_selecionado }}&componente={{ componente_selecionado }}">Próxima</a>{% endif %}</div>
+  </section>
+</main>
+{% endblock %}

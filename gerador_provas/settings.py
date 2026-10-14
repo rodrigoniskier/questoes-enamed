@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "questoes.apps.QuestoesConfig",
     "bulk_submit",
+    "pre_auditoria.apps.PreAuditoriaConfig",
     "django_cleanup.apps.CleanupConfig",
 ]
 
