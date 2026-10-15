@@ -21,22 +21,14 @@ DIRECT_IDENTIFIER_PATTERNS = (
     ),
 )
 
+POLICY_VERSION = "submeter-basica-v1"
 SEMANTIC_CRITERIA = {
-    "02": "Clareza, precisão e necessidade das informações do texto-base.",
-    "03": "Pertinência e qualidade de imagens, quando utilizadas.",
-    "04": "Clareza, objetividade e precisão do comando.",
-    "05": "Extensão e objetividade das opções de resposta.",
-    "06": "Repetição indevida de termos do texto-base nas opções.",
-    "07": "Organização lógica e padronização das opções.",
-    "08": "Termos absolutos ou negativos que deem pistas por exclusão.",
-    "09": "Plausibilidade pedagógica dos distratores, sem pegadinhas.",
-}
-UNCHECKABLE_CRITERIA = {
-    "01": "Os objetivos de conhecimento da encomenda não estão persistidos para comparação.",
-    "10": "A presença no acervo físico ou digital da Biblioteca do UNIPÊ não é consultável pelo sistema.",
-    "11": "Autoria, confiabilidade, atualidade e formatação bibliográfica exigem conferência humana.",
-    "12": "A declaração de material de autoria própria não possui campo estruturado na questão.",
-    "13": "A classificação Bloom não possui campo estruturado na questão.",
+    "texto_base": "Clareza, objetividade e contextualização básica do texto-base.",
+    "enunciado": "Clareza do enunciado e ausência de formulações negativas desnecessárias.",
+    "alternativas": "Organização, tamanho, paralelismo, termos absolutos e plausibilidade aparente das alternativas.",
+    "afirmativas": "Independência e clareza das afirmativas de resposta múltipla.",
+    "proposicoes": "Clareza e concisão das proposições de asserção-razão.",
+    "justificativa": "Coerência aparente da justificativa com o gabarito informado.",
 }
 
 
@@ -72,14 +64,13 @@ def fingerprint_questao(questao):
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
-def _achado(criterio, evidencia, fundamentacao, recomendacao, gravidade="obrigatoria", secao="3.3"):
+def _achado(criterio, evidencia, fundamentacao, recomendacao, gravidade="obrigatoria"):
     return {
         "criterio": criterio,
         "evidencia": evidencia,
         "fundamentacao": fundamentacao,
         "gravidade": gravidade,
         "recomendacao": recomendacao,
-        "secao_manual": secao,
         "validacao": "deterministica",
     }
 
@@ -94,7 +85,7 @@ def validar_estrutura(questao):
                 "texto-base",
                 "O campo texto-base está vazio.",
                 "O formulário exige texto-base para contextualizar o item.",
-                "Inclua contexto pertinente ou confirme a regra institucional aplicável.",
+                "Preencha o texto-base com o contexto da questão.",
             )
         )
     if not (questao.enunciado or "").strip():
@@ -103,7 +94,7 @@ def validar_estrutura(questao):
                 "comando",
                 "O enunciado está vazio.",
                 "Não há comando para orientar a resposta.",
-                "Redija um comando claro.",
+                "Preencha o enunciado com a pergunta ou comando da questão.",
             )
         )
     if not (questao.justificativa or "").strip():
@@ -112,19 +103,7 @@ def validar_estrutura(questao):
                 "justificativa",
                 "O campo justificativa está vazio.",
                 "A justificativa é necessária para validar o gabarito e apoiar a revisão.",
-                "Explique o gabarito e os distratores.",
-                secao="3.4.1",
-            )
-        )
-
-    if questao.imagem and snapshot_questao(questao)["imagem"].get("unreadable"):
-        findings.append(
-            _achado(
-                "imagem.arquivo",
-                "O arquivo de imagem vinculado não pode ser lido.",
-                "O recurso declarado não está disponível para revisão ou exibição.",
-                "Restaure ou substitua o arquivo de imagem antes de aprovar.",
-                secao="3.1.1",
+                "Preencha a justificativa do gabarito.",
             )
         )
 
@@ -161,7 +140,6 @@ def validar_estrutura(questao):
                     f"Foram encontradas {len(alternatives)} alternativas; a política do componente exige {expected_count}.",
                     "A quantidade segue a regra efetivamente usada pelo semestre e não impõe retroativamente a regra geral de cinco opções.",
                     "Ajuste a quantidade conforme o semestre do componente.",
-                    secao="3.4.1",
                 )
             )
         if correct_count != 1:
@@ -171,7 +149,6 @@ def validar_estrutura(questao):
                     f"Foram marcadas {correct_count} respostas corretas.",
                     "Resposta única requer exatamente um gabarito.",
                     "Marque exatamente uma alternativa como correta.",
-                    secao="3.3.9",
                 )
             )
     elif questao.tipo_questao == "MULTIPLA_ESCOLHA":
@@ -182,7 +159,6 @@ def validar_estrutura(questao):
                     f"Foram encontradas {len(alternatives)} afirmativas.",
                     "Resposta múltipla requer de três a cinco afirmativas.",
                     "Mantenha entre três e cinco afirmativas independentes.",
-                    secao="3.4.1",
                 )
             )
         if correct_count == 0 or correct_count == len(alternatives):
@@ -192,7 +168,6 @@ def validar_estrutura(questao):
                     f"Há {correct_count} afirmativas marcadas como corretas em {len(alternatives)}.",
                     "O conjunto precisa conter ao menos uma afirmativa verdadeira e uma falsa.",
                     "Revise a classificação de cada afirmativa.",
-                    secao="3.3.10",
                 )
             )
     elif questao.tipo_questao == "ASSERCAO_RAZAO":
@@ -203,7 +178,6 @@ def validar_estrutura(questao):
                     "A proposição II está vazia.",
                     "O tipo declarado requer duas proposições.",
                     "Inclua a proposição II.",
-                    secao="3.4.1",
                 )
             )
         if len(alternatives) != 5:
@@ -213,7 +187,6 @@ def validar_estrutura(questao):
                     f"Foram encontradas {len(alternatives)} opções de resposta.",
                     "A chave padronizada de asserção-razão utiliza cinco possibilidades.",
                     "Restaure as cinco possibilidades padronizadas.",
-                    secao="3.4.1",
                 )
             )
         elif [alternative.texto.strip().casefold() for alternative in alternatives] != [
@@ -225,7 +198,6 @@ def validar_estrutura(questao):
                     "As cinco opções não correspondem à chave padronizada A–E.",
                     "A asserção-razão deve oferecer as cinco combinações canônicas de veracidade e causalidade.",
                     "Use a chave padronizada do sistema para as cinco possibilidades.",
-                    secao="3.2.3",
                 )
             )
         if correct_count != 1:
@@ -235,7 +207,6 @@ def validar_estrutura(questao):
                     f"Foram marcadas {correct_count} opções como corretas.",
                     "A questão deve ter uma opção de gabarito.",
                     "Marque uma única possibilidade correta.",
-                    secao="3.3.9",
                 )
             )
     else:
@@ -258,42 +229,31 @@ def _semantic_review(questao, request_id=None):
         raise AIControlError(
             "O conteúdo pode conter identificadores pessoais; a chamada externa foi bloqueada para conferência humana."
         )
-    criteria = dict(SEMANTIC_CRITERIA)
-    criteria["tipo"] = "Correspondência entre o tipo declarado e a estrutura efetivamente submetida."
+    criteria = {
+        "texto_base": SEMANTIC_CRITERIA["texto_base"],
+        "justificativa": SEMANTIC_CRITERIA["justificativa"],
+    }
     if questao.tipo_questao == "RESPOSTA_UNICA":
         criteria.update(
-            {
-                "15": "Paralelismo sintático e semântico das opções de resposta única.",
-                "16": "Coesão, coerência e concordância entre comando e opções.",
-            }
+            enunciado=SEMANTIC_CRITERIA["enunciado"], alternativas=SEMANTIC_CRITERIA["alternativas"]
         )
     elif questao.tipo_questao == "MULTIPLA_ESCOLHA":
-        criteria["17"] = "Independência e completude sintática das afirmações de resposta múltipla."
-    elif questao.tipo_questao == "ASSERCAO_RAZAO":
         criteria.update(
-            {
-                "20": "Vínculo das proposições de asserção-razão com contexto e objetivos.",
-                "21": "Presença de duas proposições simples e não excessivamente longas.",
-                "22": "Possibilidade de analisar cada proposição independentemente.",
-            }
+            afirmativas=SEMANTIC_CRITERIA["afirmativas"], alternativas=SEMANTIC_CRITERIA["alternativas"]
         )
-    criteria.pop("03", None)
+    elif questao.tipo_questao == "ASSERCAO_RAZAO":
+        criteria["proposicoes"] = SEMANTIC_CRITERIA["proposicoes"]
 
     prompt = f"""
-Você fará uma revisão pedagógica preliminar de uma questão médica. Não confirme correção clínica,
-protocolo atual, origem bibliográfica, autoria ou acesso à biblioteca. Use exclusivamente o conteúdo
-fornecido; não invente citações nem evidências. Responda somente JSON no schema:
-{{"findings":[{{"criterion_id":"02","evidence":"trecho literal do conteúdo","reason":"...","recommendation":"...","severity":"recommendation"}}],
-"inconclusive":[{{"criterion_id":"01","reason":"..."}}]}}
-
-Para cada critério abaixo, registre exatamente uma ocorrência em findings ou inconclusive. Em findings,
-evidence deve ser uma citação literal contida no conteúdo. Gravidade aceita: mandatory, recommendation,
-conditional. Não trate recomendações como falha obrigatória. Se não houver evidência suficiente, marque
-inconclusive. Se o tipo declarado não corresponder à estrutura, registre tipo como mandatory. A análise
-não é validação clínica final.
-Critérios: {json.dumps(criteria, ensure_ascii=False)}
-Tipo declarado: {questao.get_tipo_questao_display()}
-Conteúdo: {content}
+    Você é um assistente opcional de revisão textual preliminar de uma questão médica. Observe somente
+    os critérios listados abaixo. Não avalie correção médica, protocolos, bibliografia, autoria, Bloom,
+    currículo ou objetivos de aprendizagem. Não aprove nem reprove a questão. Responda somente JSON no
+    formato {{"recommendations":[{{"criterion_id":"texto_base","evidence":"trecho literal",
+    "reason":"...","recommendation":"..."}}]}}. A lista pode ser vazia; inclua somente pontos
+    de atenção concretos, com trecho literal existente no conteúdo. Não invente informações ou citações.
+    Critérios: {json.dumps(criteria, ensure_ascii=False)}
+    Tipo: {questao.get_tipo_questao_display()}
+    Conteúdo: {content}
 """
 
     if not settings.GEMINI_API_KEY:
@@ -304,112 +264,98 @@ Conteúdo: {content}
     except (json.JSONDecodeError, TypeError):
         raise ValueError("A resposta da IA não contém JSON válido.") from None
 
-    if not isinstance(response, dict) or set(response) != {"findings", "inconclusive"}:
+    if not isinstance(response, dict) or set(response) != {"recommendations"}:
         raise ValueError("A resposta da IA não corresponde ao formato esperado.")
-    if not isinstance(response["findings"], list) or not isinstance(response["inconclusive"], list):
-        raise ValueError("A resposta da IA contém listas inválidas.")
+    if not isinstance(response["recommendations"], list):
+        raise ValueError("A resposta da IA contém recomendações inválidas.")
 
     validated = []
     covered = set()
-    valid_severities = {"mandatory", "recommendation", "conditional"}
-    for finding in response["findings"]:
-        if not isinstance(finding, dict):
+    for finding in response["recommendations"]:
+        if not isinstance(finding, dict) or set(finding) != {
+            "criterion_id",
+            "evidence",
+            "reason",
+            "recommendation",
+        }:
             raise ValueError("A IA retornou um achado inválido.")
         criterion_id = finding.get("criterion_id")
         evidence = finding.get("evidence")
         reason = finding.get("reason")
         recommendation = finding.get("recommendation")
-        severity = finding.get("severity")
         if (
             criterion_id not in criteria
             or criterion_id in covered
             or not all(
                 isinstance(value, str) and value.strip() for value in (evidence, reason, recommendation)
             )
-            or severity not in valid_severities
             or evidence.casefold() not in content.casefold()
         ):
             raise ValueError("A IA retornou achado sem evidência verificável ou fora do contrato.")
         covered.add(criterion_id)
         validated.append(
             _achado(
-                f"manual.{criterion_id}",
+                f"recomendacao.{criterion_id}",
                 evidence[:500],
                 reason[:1000],
                 recommendation[:1000],
-                severity,
-                "Apêndice B",
+                "recomendacao",
             )
         )
-
-    for item in response["inconclusive"]:
-        if not isinstance(item, dict):
-            raise ValueError("A IA retornou uma verificação inconclusiva inválida.")
-        criterion_id = item.get("criterion_id")
-        reason = item.get("reason")
-        if (
-            criterion_id not in criteria
-            or criterion_id in covered
-            or not isinstance(reason, str)
-            or not reason.strip()
-        ):
-            raise ValueError("A IA retornou verificação inconclusiva fora do contrato.")
-        covered.add(criterion_id)
-
-    for criterion_id in criteria.keys() - covered:
-        response["inconclusive"].append(
-            {"criterion_id": criterion_id, "reason": "A resposta da IA não avaliou este critério."}
-        )
-    return validated, response["inconclusive"]
+    return validated
 
 
-def executar_pre_auditoria(questao, revisor=None, semantica=True, request_id=None):
+def executar_pre_auditoria(questao, revisor=None, semantica=False, request_id=None):
     questao = Questao.objects.select_related("componente__periodo__semestre").get(pk=questao.pk)
     findings = validar_estrutura(questao)
-    uncheckable = dict(UNCHECKABLE_CRITERIA)
-    if questao.tipo_questao == "MULTIPLA_ESCOLHA":
-        uncheckable["19"] = (
-            "O balanceamento da chave de combinações não está persistido no modelo da questão."
-        )
-    inconclusive = [{"criterion_id": key, "reason": reason} for key, reason in uncheckable.items()]
-    if questao.imagem:
-        inconclusive.append({"criterion_id": "03", "reason": "A imagem requer inspeção visual humana."})
     semantic_checked = False
-    if semantica:
+    semantic_warning = ""
+    if semantica and not findings:
         try:
-            semantic_findings, semantic_inconclusive = _semantic_review(questao, request_id=request_id)
-            findings.extend(semantic_findings)
-            inconclusive.extend(semantic_inconclusive)
+            findings.extend(_semantic_review(questao, request_id=request_id))
             semantic_checked = True
         except (AIControlError, ValueError) as error:
-            inconclusive.append({"criterion_id": "semantica", "reason": str(error)})
+            semantic_warning = str(error)
         except Exception as error:
             logger.error("Pre-audit semantic analysis failed: %s", type(error).__name__)
-            inconclusive.append(
-                {
-                    "criterion_id": "semantica",
-                    "reason": "A análise semântica falhou; nenhuma aprovação foi emitida.",
-                }
-            )
-    else:
-        inconclusive.append(
-            {
-                "criterion_id": "semantica",
-                "reason": "A reavaliação foi estrutural; a análise semântica segue pendente.",
-            }
-        )
+            semantic_warning = "A análise textual está indisponível. A revisão estrutural foi concluída."
 
     result = (
         "PENDENCIAS"
         if any(finding["gravidade"] in ("obrigatoria", "mandatory") for finding in findings)
-        else "INCONCLUSIVA"
+        else "APROVADA"
     )
+    finding_ids = {finding["criterio"] for finding in findings}
     indicators = {
+        "politica": POLICY_VERSION,
         "estruturais_verificados": True,
         "semantica_verificada": semantic_checked,
-        "criterios_aplicaveis_confirmados": False,
-        "inconclusivos": inconclusive,
-        "nota": "Há critérios que dependem de evidência institucional ou revisão humana; este parecer não aprova a questão.",
+        "analise_semantica_aviso": semantic_warning,
+        "tem_recomendacoes": any(finding["gravidade"] == "recomendacao" for finding in findings),
+        "validacoes_estruturais": [
+            {"criterio": label, "conforme": not any(key in finding_ids for key in keys)}
+            for label, keys in (
+                ("Texto-base preenchido", ("texto-base",)),
+                ("Enunciado ou proposições preenchidos", ("comando", "assercao-razao.proposicao")),
+                ("Alternativas ou afirmativas completas e sem duplicação", ("alternativas",)),
+                (
+                    "Quantidade conforme o tipo",
+                    (
+                        "resposta-unica.quantidade",
+                        "resposta-multipla.quantidade",
+                        "assercao-razao.chave",
+                        "assercao-razao.chave-padrao",
+                    ),
+                ),
+                (
+                    "Gabarito válido",
+                    ("resposta-unica.gabarito", "resposta-multipla.distribuicao", "assercao-razao.gabarito"),
+                ),
+                ("Justificativa preenchida", ("justificativa",)),
+                ("Estrutura compatível com o tipo", ("tipo",)),
+            )
+        ],
+        "nota": "A pré-auditoria verifica a estrutura; a decisão técnica, científica e pedagógica é do gestor.",
     }
 
     from .models import ParecerPreAuditoria
@@ -434,13 +380,13 @@ def executar_pre_auditoria(questao, revisor=None, semantica=True, request_id=Non
 
 
 def validar_aprovacao(questao, parecer, justificativa=""):
-    from .models import EvidenciaRevisor
-
     current_fingerprint = fingerprint_questao(questao)
     if parecer.questao_id != questao.pk or parecer.fingerprint != current_fingerprint:
         raise ValidationError(
             "O parecer não corresponde à versão atual da questão. Reavalie antes de aprovar."
         )
+    if parecer.indicadores.get("politica") != POLICY_VERSION:
+        raise ValidationError("Este parecer é histórico. Execute uma nova pré-auditoria antes de aprovar.")
 
     mandatory = [
         finding for finding in parecer.achados if finding.get("gravidade") in ("obrigatoria", "mandatory")
@@ -448,32 +394,4 @@ def validar_aprovacao(questao, parecer, justificativa=""):
     if mandatory:
         raise ValidationError("Há pendências obrigatórias. Corrija a questão e execute nova pré-auditoria.")
 
-    inconclusive = parecer.indicadores.get("inconclusivos", [])
-    latest_evidence = {}
-    for row in EvidenciaRevisor.objects.filter(parecer=parecer).order_by("criterio_id", "-criada_em", "-pk"):
-        latest_evidence.setdefault(row.criterio_id, row)
-    evidenced = set(latest_evidence)
-    unresolved = [item for item in inconclusive if item.get("criterion_id") not in evidenced]
-    if unresolved:
-        criteria = ", ".join(str(item.get("criterion_id")) for item in unresolved)
-        raise ValidationError(f"Registre conferência documental ou humana para os critérios: {criteria}.")
-    documentary_ids = {"01", "10", "11", "12", "13"}
-    missing_references = sorted(
-        criterion_id
-        for criterion_id, row in latest_evidence.items()
-        if criterion_id in documentary_ids and len(row.referencia.strip()) < 8
-    )
-    if missing_references:
-        criteria = ", ".join(missing_references)
-        raise ValidationError(f"Informe a referência documental consultada para os critérios: {criteria}.")
-
-    recommendations = [
-        finding
-        for finding in parecer.achados
-        if finding.get("gravidade") in ("recomendacao", "recommendation", "condicional", "conditional")
-    ]
-    if recommendations and len(justificativa.strip()) < 15:
-        raise ValidationError(
-            "Justifique a aprovação excepcional das recomendações pedagógicas não impeditivas."
-        )
     return current_fingerprint

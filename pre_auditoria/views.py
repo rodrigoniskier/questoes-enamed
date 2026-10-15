@@ -37,6 +37,7 @@ from .models import (
     SolicitacaoCorrecao,
 )
 from .services import (
+    POLICY_VERSION,
     executar_pre_auditoria,
     fingerprint_questao,
     snapshot_questao,
@@ -96,8 +97,6 @@ def lista(request):
     total_submitted = questions.count()
     pending_count = questions.filter(status="PENDENTE").count()
     approved_count = questions.filter(status="APROVADA").count()
-    audited_question_ids = ParecerPreAuditoria.objects.filter(questao__in=questions).values("questao_id")
-    preaudited_count = questions.filter(pk__in=audited_question_ids).count()
 
     latest_audit = ParecerPreAuditoria.objects.filter(questao_id=OuterRef("pk")).order_by("-criado_em", "-pk")
     questions = questions.annotate(latest_audit_id=Subquery(latest_audit.values("pk")[:1])).order_by("-pk")
@@ -109,7 +108,12 @@ def lista(request):
     for question in page.object_list:
         question.latest_audit = audit_map.get(question.latest_audit_id)
         question.audit_is_current = bool(
-            question.latest_audit and question.latest_audit.fingerprint == fingerprint_questao(question)
+            question.latest_audit
+            and question.latest_audit.fingerprint == fingerprint_questao(question)
+            and question.latest_audit.indicadores.get("politica") == POLICY_VERSION
+        )
+        question.audit_is_historical = bool(
+            question.latest_audit and question.latest_audit.indicadores.get("politica") != POLICY_VERSION
         )
 
     return render(
@@ -125,7 +129,6 @@ def lista(request):
             "questoes": page,
             "total_submetidas": total_submitted,
             "pendentes": pending_count,
-            "pre_auditadas": preaudited_count,
             "aprovadas": approved_count,
         },
     )
@@ -148,6 +151,12 @@ def detalhe(request, questao_id):
             "questao": question,
             "pareceres": audits,
             "ultimo_parecer_id": latest_audit.pk if latest_audit else None,
+            "politica_atual": POLICY_VERSION,
+            "parecer_atual": bool(
+                latest_audit
+                and latest_audit.fingerprint == fingerprint_questao(question)
+                and latest_audit.indicadores.get("politica") == POLICY_VERSION
+            ),
             "alteracoes": changes,
             "decisoes": decisions,
         },
@@ -227,7 +236,11 @@ def editar(request, questao_id):
 @require_POST
 def iniciar(request, questao_id):
     question = get_object_or_404(Questao, pk=questao_id, status="PENDENTE")
-    executar_pre_auditoria(question, revisor=request.user)
+    executar_pre_auditoria(
+        question,
+        revisor=request.user,
+        semantica=request.POST.get("analise_textual") == "on",
+    )
     return redirect("pre_auditoria:detalhe", questao_id=question.pk)
 
 
@@ -270,6 +283,7 @@ def detalhe_lote(request, lote_id):
             "total": len(batch.questao_ids),
             "concluidas": batch.posicao,
             "pareceres": reports,
+            "politica_atual": POLICY_VERSION,
             "process_url": reverse("pre_auditoria:processar_proximo", args=[batch.pk]),
         },
     )
@@ -334,7 +348,7 @@ def processar_proximo(request, lote_id):
         report = executar_pre_auditoria(
             question,
             revisor=batch.revisor,
-            semantica=True,
+            semantica=False,
             request_id=str(request_id),
         )
     except Exception as error:
@@ -371,7 +385,12 @@ def processar_proximo(request, lote_id):
             {
                 "posicao": current.posicao,
                 "total": total,
-                "resultado": report.get_resultado_display(),
+                "resultado": (
+                    "Apta para aprovação"
+                    if report.indicadores.get("politica") == POLICY_VERSION
+                    and report.resultado == ParecerPreAuditoria.Resultado.APROVADA
+                    else report.get_resultado_display()
+                ),
                 "questao_id": question.pk,
                 "concluido": current.status == LotePreAuditoria.Status.CONCLUIDO,
             }
@@ -427,7 +446,6 @@ def _aprovar_questao(questao_id, revisor, justificativa=""):
         report.resultado = ParecerPreAuditoria.Resultado.APROVADA
         report.indicadores = {
             **report.indicadores,
-            "criterios_aplicaveis_confirmados": True,
             "confirmado_por_revisor": True,
         }
         report.save(update_fields=["resultado", "indicadores"])

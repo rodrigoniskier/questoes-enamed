@@ -2,9 +2,11 @@
 {% block content %}
 <main>
   <p><a href="{% url 'pre_auditoria:lista' %}">Voltar à fila</a></p>
-  <h1>Questão {{ questao.pk }} · {{ questao.get_tipo_questao_display }}</h1>
-  <p>{{ questao.componente }} · {{ questao.componente.periodo.semestre }}</p>
-  {% if questao.status == "PENDENTE" and perms.pre_auditoria.review_parecerpreauditoria %}<p><a href="{% url 'pre_auditoria:editar' questao.pk %}">CORRIGIR AGORA</a></p>{% endif %}
+  <header class="audit-heading">
+    <p class="eyebrow">QUESTÃO {{ questao.pk }} · {{ questao.get_tipo_questao_display }}</p>
+    <h1>{{ questao.professor_nome }}</h1>
+    <p>{{ questao.componente.periodo.semestre }} · {{ questao.componente.periodo }} · {{ questao.componente.nome }}</p>
+  </header>
   <section class="audit-question">
     <h2>Texto-base</h2><p>{{ questao.texto_base|linebreaksbr }}</p>
     <h2>Enunciado / Proposição I</h2><p>{{ questao.enunciado|linebreaksbr }}</p>
@@ -13,15 +15,46 @@
     <ol>{% for alternative in questao.alternativas.all %}<li>{{ alternative.texto }}{% if alternative.eh_correta %} <strong>(gabarito cadastrado)</strong>{% endif %}</li>{% endfor %}</ol>
     <h2>Justificativa</h2><p>{{ questao.justificativa|linebreaksbr }}</p>
   </section>
-  {% if questao.status == "PENDENTE" and perms.pre_auditoria.review_parecerpreauditoria %}<form method="post" action="{% url 'pre_auditoria:iniciar' questao.pk %}">{% csrf_token %}<button class="audit-action-button" type="submit">INICIAR PRÉ-AUDITORIA</button></form>{% endif %}
+  {% if questao.status == "PENDENTE" and perms.pre_auditoria.review_parecerpreauditoria %}
+    <nav class="audit-actions" aria-label="Ações da questão">
+      <a href="{% url 'pre_auditoria:editar' questao.pk %}">EDITAR</a>
+      <form method="post" action="{% url 'pre_auditoria:iniciar' questao.pk %}">
+        {% csrf_token %}
+        <label><input type="checkbox" name="analise_textual"> Solicitar recomendações opcionais da IA</label>
+        <button class="audit-action-button" type="submit">REAVALIAR</button>
+      </form>
+    </nav>
+  {% endif %}
   {% for parecer in pareceres %}
-    <section class="audit-section"><h2>{{ parecer.get_resultado_display }} · {{ parecer.criado_em }}</h2>
-      {% if parecer.achados %}<ul>{% for achado in parecer.achados %}<li><strong>{{ achado.criterio }}</strong>: {{ achado.evidencia }} {{ achado.fundamentacao }} Sugestão: {{ achado.recomendacao }} (Manual: {{ achado.secao_manual }})</li>{% endfor %}</ul>{% endif %}
-      {% if parecer.indicadores.inconclusivos %}<h3>Verificações inconclusivas</h3><ul>{% for item in parecer.indicadores.inconclusivos %}<li>Critério {{ item.criterion_id }}: {{ item.reason }}
-        {% if parecer.pk == ultimo_parecer_id and perms.pre_auditoria.review_parecerpreauditoria %}<form class="audit-inline-form" method="post" action="{% url 'pre_auditoria:registrar_evidencia' parecer.pk %}">{% csrf_token %}<input type="hidden" name="criterio_id" value="{{ item.criterion_id }}"><label>Registro da conferência <textarea name="evidencia" minlength="15" required rows="2"></textarea></label><label>Referência ou documento consultado <input name="referencia" type="text"></label><button class="audit-action-button" type="submit">Registrar conferência</button></form>{% endif %}
-        {% for evidence in parecer.evidencias.all %}{% if evidence.criterio_id == item.criterion_id %}<p>Registrado por {{ evidence.revisor_nome|default:"revisor removido" }} em {{ evidence.criada_em }}: {{ evidence.evidencia }}{% if evidence.referencia %} · Referência: {{ evidence.referencia }}{% endif %}</p>{% endif %}{% endfor %}</li>{% endfor %}</ul>{% endif %}
-      {% if parecer.indicadores.nota %}<p>{{ parecer.indicadores.nota }}</p>{% endif %}
-      {% if parecer.pk == ultimo_parecer_id and questao.status == "PENDENTE" and perms.pre_auditoria.review_parecerpreauditoria %}<form method="post" action="{% url 'pre_auditoria:aprovar' questao.pk %}">{% csrf_token %}<label>Justificativa para recomendação não impeditiva <textarea name="justificativa" rows="3"></textarea></label><button type="submit">CONFIRMAR APROVAÇÃO</button></form>{% endif %}
+    <section class="audit-section">
+      <h2>{% if parecer.indicadores.politica == politica_atual and parecer.resultado == "APROVADA" %}Apta para aprovação{% else %}{{ parecer.get_resultado_display }}{% endif %} · {{ parecer.criado_em }}</h2>
+      {% if parecer.indicadores.politica != politica_atual %}
+        <p>Política anterior. Parecer histórico preservado e não utilizado para a decisão atual.</p>
+      {% elif parecer.pk != ultimo_parecer_id %}
+        <p>Versão anterior da questão. Parecer histórico preservado e não utilizado para a decisão atual.</p>
+      {% else %}
+        {% if not parecer_atual %}<p>O conteúdo mudou desde este parecer. Execute nova pré-auditoria.</p>{% endif %}
+        <h3>Verificação estrutural</h3>
+        <ul class="audit-checklist">
+          {% for item in parecer.indicadores.validacoes_estruturais %}
+            <li>{% if item.conforme %}Conforme{% else %}Pendente{% endif %}: {{ item.criterio }}</li>
+          {% endfor %}
+        </ul>
+        {% for achado in parecer.achados %}
+          {% if achado.gravidade == "obrigatoria" or achado.gravidade == "mandatory" %}
+            <p><strong>{{ achado.criterio }}</strong>: {{ achado.evidencia }} {{ achado.recomendacao }}</p>
+          {% endif %}
+        {% endfor %}
+        {% if parecer.indicadores.tem_recomendacoes %}
+          <h3>Recomendações</h3>
+          <ul>{% for achado in parecer.achados %}{% if achado.gravidade == "recomendacao" %}<li>{{ achado.recomendacao }}</li>{% endif %}{% endfor %}</ul>
+        {% endif %}
+        {% if parecer.indicadores.analise_semantica_aviso %}<p role="status">A análise textual opcional não ficou disponível. A decisão pode seguir com base na estrutura e na avaliação do gestor.</p>{% endif %}
+        <p>{{ parecer.indicadores.nota }}</p>
+        {% if parecer.pk == ultimo_parecer_id and parecer_atual and parecer.resultado == "APROVADA" and questao.status == "PENDENTE" and perms.pre_auditoria.review_parecerpreauditoria %}
+          <form method="post" action="{% url 'pre_auditoria:aprovar' questao.pk %}">{% csrf_token %}<button type="submit">CONFIRMAR APROVAÇÃO</button></form>
+        {% endif %}
+      {% endif %}
     </section>
   {% empty %}<p>Ainda não há pareceres.</p>{% endfor %}
   {% if questao.status == "PENDENTE" and perms.pre_auditoria.review_parecerpreauditoria %}<section class="audit-section"><h2>Solicitar correções ao professor</h2><form class="audit-inline-form" method="post" action="{% url 'pre_auditoria:solicitar_correcao' questao.pk %}">{% csrf_token %}<label>Orientações <textarea name="mensagem" minlength="20" required rows="4"></textarea></label><button class="audit-action-button" type="submit">SOLICITAR CORREÇÃO AO PROFESSOR</button></form></section>{% endif %}

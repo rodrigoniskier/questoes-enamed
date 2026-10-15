@@ -9,7 +9,7 @@
     <form method="post" action="{{ process_url }}">{% csrf_token %}<button class="audit-action-button" id="audit-resume" type="submit">CONTINUAR LOTE</button></form>
   </section>
   <section class="audit-section"><h2>Pareceres registrados</h2>
-    {% for parecer in pareceres %}<p>Questão {{ parecer.questao_id }} · {{ parecer.get_resultado_display }} · {{ parecer.criado_em }}</p>
+    {% for parecer in pareceres %}<p>Questão {{ parecer.questao_id }} · {% if parecer.indicadores.politica == politica_atual and parecer.resultado == "APROVADA" %}Apta para aprovação{% else %}{{ parecer.get_resultado_display }}{% endif %} · {{ parecer.criado_em }}</p>
     {% empty %}<p>Nenhum parecer persistido ainda.</p>{% endfor %}
   </section>
   <p><a href="{% url 'pre_auditoria:lista' %}">Voltar à fila</a></p>
