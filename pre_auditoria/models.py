@@ -27,6 +27,14 @@ class ParecerPreAuditoria(models.Model):
         related_name="pareceres_pre_auditoria",
     )
     revisor_nome = models.CharField(max_length=150, blank=True, default="")
+    arquivado_em = models.DateTimeField(null=True, blank=True)
+    arquivado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="pareceres_pre_auditoria_arquivados",
+    )
 
     class Meta:
         ordering = ["-criado_em", "-pk"]
@@ -104,6 +112,7 @@ class DecisaoPreAuditoria(models.Model):
     acao = models.CharField(max_length=12, choices=Acao.choices)
     fingerprint = models.CharField(max_length=64)
     justificativa = models.TextField(blank=True)
+    aprovacao_excepcional = models.BooleanField(default=False)
     criada_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -158,3 +167,22 @@ class LotePreAuditoria(models.Model):
 
     class Meta:
         ordering = ["-criado_em"]
+
+
+class OperacaoLimpezaPreAuditoria(models.Model):
+    revisor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="limpezas_pre_auditoria",
+    )
+    revisor_nome = models.CharField(max_length=150)
+    questao_ids = models.JSONField(default=list)
+    pareceres_solicitados = models.JSONField(default=list)
+    pareceres_excluidos = models.JSONField(default=list)
+    pareceres_arquivados = models.JSONField(default=list)
+    nao_elegiveis = models.PositiveIntegerField(default=0)
+    criada_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-criada_em", "-pk"]

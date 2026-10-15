@@ -1,0 +1,26 @@
+{% extends "pre_auditoria/base.html" %}
+{% block content %}
+<main class="audit-cleanup-confirmation">
+  <header class="audit-heading">
+    <p class="eyebrow">CONFIRMAÇÃO DE OPERAÇÃO</p>
+    <h1>EXCLUIR AUDITORIAS ANTERIORES</h1>
+    <p>Esta ação não remove questões, alternativas, imagens, gabaritos ou justificativas.</p>
+  </header>
+  <section class="audit-section">
+    <dl class="audit-cleanup-counts">
+      <div><dt>Exclusão física elegível</dt><dd>{{ plano.deletable_ids|length }}</dd></div>
+      <div><dt>Preservados e arquivados por possuírem evidências/decisões</dt><dd>{{ plano.archivable_ids|length }}</dd></div>
+      <div><dt>Não elegíveis, incluindo o parecer mais recente</dt><dd>{{ plano.not_eligible }}</dd></div>
+    </dl>
+    <p>Os pareceres com histórico vinculado não serão apagados. Eles serão arquivados para ocultá-los da operação corrente sem eliminar evidências ou decisões.</p>
+    <form method="post" action="{% url 'pre_auditoria:excluir_auditorias' %}" class="audit-inline-form">
+      {% csrf_token %}
+      <input type="hidden" name="plano_assinado" value="{{ confirmacao }}">
+      <input type="hidden" name="next" value="{{ return_to }}">
+      <label><input type="checkbox" name="confirmar_operacao" required> Confirmo a operação após revisar as quantidades acima.</label>
+      <button class="audit-action-button" type="submit">CONFIRMAR EXCLUSÃO / ARQUIVAMENTO</button>
+    </form>
+    <p><a href="{{ return_to }}">Cancelar e voltar</a></p>
+  </section>
+</main>
+{% endblock %}

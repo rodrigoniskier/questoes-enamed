@@ -1,0 +1,52 @@
+{% load questao_filters %}
+<section class="question-print-preview" aria-label="Pré-visualização da questão em formato de prova">
+  <p class="question-preview-heading">PRÉ-VISUALIZAÇÃO · FORMATO DE PROVA</p>
+  {% if questao.texto_base %}<div class="texto-base">{{ questao.texto_base|linebreaksbr }}</div>{% endif %}
+  {% if questao.imagem %}<div class="referencia-imagem">(Ver imagem vinculada à questão no anexo)</div>{% endif %}
+
+  {% if questao.tipo_questao == "RESPOSTA_UNICA" %}
+    <div class="enunciado">{{ questao.enunciado|linebreaksbr }}</div>
+    <div class="alternativas">
+      {% for alternativa in questao.alternativas_finais_preview %}
+        <p><span>{% if forloop.counter == 1 %}A{% elif forloop.counter == 2 %}B{% elif forloop.counter == 3 %}C{% elif forloop.counter == 4 %}D{% else %}E{% endif %})</span> {{ alternativa.texto|limpar_prefixo|linebreaksbr }}</p>
+      {% endfor %}
+    </div>
+  {% elif questao.tipo_questao == "MULTIPLA_ESCOLHA" %}
+    <div class="enunciado">Considerando o texto apresentado, avalie as afirmações a seguir.</div>
+    <div class="afirmativas">
+      {% for afirmativa in questao.alternativas.all %}
+        <p><strong>{% if forloop.counter == 1 %}I{% elif forloop.counter == 2 %}II{% elif forloop.counter == 3 %}III{% elif forloop.counter == 4 %}IV{% else %}V{% endif %}.</strong> {{ afirmativa.texto|limpar_prefixo|linebreaksbr }}</p>
+      {% endfor %}
+    </div>
+    <div class="alternativas">
+      {% for alternativa in questao.alternativas_finais_preview %}
+        <p><span>{% if forloop.counter == 1 %}A{% elif forloop.counter == 2 %}B{% elif forloop.counter == 3 %}C{% elif forloop.counter == 4 %}D{% else %}E{% endif %})</span> {{ alternativa.texto|limpar_prefixo|linebreaksbr }}</p>
+      {% endfor %}
+    </div>
+  {% elif questao.tipo_questao == "ASSERCAO_RAZAO" %}
+    <div class="enunciado">Acerca do tema apresentado, avalie as asserções a seguir e a relação proposta entre elas.</div>
+    <div class="proposicao">
+      <p><strong>I.</strong> {{ questao.enunciado|limpar_prefixo|linebreaksbr }}</p>
+      <p class="question-preview-because"><strong>PORQUE</strong></p>
+      <p><strong>II.</strong> {{ questao.proposicao_dois|limpar_prefixo|linebreaksbr }}</p>
+    </div>
+    <div class="alternativas">
+      {% for alternativa in questao.alternativas_finais_preview %}
+        <p>{{ alternativa.texto|linebreaksbr }}</p>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="audit-message">Tipo de questão não compatível com o Gerador de Provas.</p>
+  {% endif %}
+  {% if questao.preview_image_available %}
+    <section class="question-preview-annex">
+      <h2>ANEXO DE IMAGENS</h2>
+      <figure class="question-preview-image">
+        <p>Imagem 1 (Referente à Questão)</p>
+        <img src="{{ questao.preview_image_url }}" alt="Imagem vinculada à questão {{ questao.pk }}">
+      </figure>
+    </section>
+  {% elif questao.imagem %}
+    <p class="audit-message no-print" role="status">Imagem indisponível. O arquivo associado não foi encontrado.</p>
+  {% endif %}
+</section>

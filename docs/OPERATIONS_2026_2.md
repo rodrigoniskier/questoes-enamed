@@ -16,6 +16,8 @@ O script requer `python` do virtualenv ativo (ou `PYTHON=/caminho/python`), bran
 bash ops/remove_pre_auditoria_backup.sh pre_auditoria-REVISAO-DATA.sqlite3
 ```
 
+Atualizações do painel de pré-auditoria podem incluir migrations aditivas de arquivamento e rastreabilidade. Após confirmar o backup privado, a revisão remota e o ambiente virtual, use o fluxo normal do script de deploy; ele executa `migrate` e `collectstatic`. Não apague pareceres nem reverta essas migrations durante deploy/rollback. Em validação local, use `python manage.py migrate --plan --settings=gerador_provas.test_settings` e `python manage.py makemigrations --check --dry-run --settings=gerador_provas.test_settings`. A aprovação excepcional altera apenas o status oficial e cria uma decisão; o parecer e seus achados são preservados.
+
 Rollback de código: registre previamente a revisão atual; após confirmar que o working tree está limpo, retorne somente o checkout a essa revisão conhecida, reinstale as dependências correspondentes, rode `check`, `migrate --plan` e `migrate --noinput`, `collectstatic` e recarregue. Não restaure o backup do SQLite nem execute migrations reversas automaticamente; os dados novos e as tabelas aditivas devem permanecer. Compare a integridade e investigue divergências antes de qualquer reparo manual.
 
 ## Atualização que preserva um SQLite anteriormente rastreado

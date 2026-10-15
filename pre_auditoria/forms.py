@@ -88,6 +88,10 @@ class EvidenciaRevisorForm(forms.Form):
 
 
 class DecisaoForm(forms.Form):
+    confirmar_aprovacao = forms.BooleanField(
+        required=True,
+        error_messages={"required": "Confirme explicitamente a aprovação da questão."},
+    )
     justificativa = forms.CharField(max_length=2000, required=False, widget=forms.Textarea(attrs={"rows": 4}))
 
 
