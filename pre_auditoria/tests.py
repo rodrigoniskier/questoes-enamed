@@ -416,6 +416,160 @@ class PreAuditoriaTests(TestCase):
         self.assertEqual(report.indicadores, original_indicators)
         self.assertEqual(len(mail.outbox), 1)
 
+    def test_exceptional_single_answer_approval_requires_exactly_one_stored_key(self):
+        self.client.force_login(self.reviewer)
+        reason = "Pendência revisada pelo gestor e autorizada para uso."
+        url = reverse("pre_auditoria:aprovar", args=[self.question.pk])
+
+        for correct_indexes in ((), (0, 1)):
+            with self.subTest(correct_indexes=correct_indexes):
+                self.question.alternativas.update(eh_correta=False)
+                for index in correct_indexes:
+                    self.question.alternativas.order_by("pk")[index].eh_correta = True
+                    self.question.alternativas.order_by("pk")[index].save(update_fields=["eh_correta"])
+                self.question.justificativa = ""
+                self.question.save(update_fields=["justificativa"])
+                report = executar_pre_auditoria(self.question, revisor=self.reviewer)
+                self.assertTrue(
+                    any(not item["conforme"] for item in report.indicadores["validacoes_estruturais"])
+                )
+
+                response = self.client.post(
+                    url,
+                    {"confirmar_aprovacao": "on", "justificativa": reason},
+                    follow=True,
+                )
+                self.question.refresh_from_db()
+                self.assertEqual(self.question.status, "PENDENTE")
+                self.assertFalse(DecisaoPreAuditoria.objects.exists())
+                self.assertContains(response, "exatamente uma alternativa marcada como correta")
+
+    def test_exceptional_assertion_reason_requires_one_correct_canonical_option(self):
+        self.question.tipo_questao = "ASSERCAO_RAZAO"
+        self.question.proposicao_dois = "A proposição II explica a proposição I."
+        self.question.justificativa = ""
+        self.question.save()
+        self.question.alternativas.all().delete()
+        for letter, text in ASSERTION_ANSWERS.items():
+            Alternativa.objects.create(
+                questao=self.question,
+                texto=f"{letter}) {text}",
+                eh_correta=False,
+            )
+        self.client.force_login(self.reviewer)
+        url = reverse("pre_auditoria:aprovar", args=[self.question.pk])
+        reason = "Pendências avaliadas manualmente e aceitas para uso."
+
+        for correct_indexes in ((), (0, 1)):
+            with self.subTest(correct_indexes=correct_indexes):
+                self.question.alternativas.update(eh_correta=False)
+                alternatives = list(self.question.alternativas.order_by("pk"))
+                for index in correct_indexes:
+                    alternatives[index].eh_correta = True
+                    alternatives[index].save(update_fields=["eh_correta"])
+                report = executar_pre_auditoria(self.question, revisor=self.reviewer)
+                self.assertEqual(len(alternatives), 5)
+                response = self.client.post(
+                    url,
+                    {"confirmar_aprovacao": "on", "justificativa": reason},
+                    follow=True,
+                )
+                self.question.refresh_from_db()
+                self.assertEqual(self.question.status, "PENDENTE")
+                self.assertFalse(DecisaoPreAuditoria.objects.exists())
+                self.assertContains(response, "exatamente uma resposta marcada como correta")
+                self.assertEqual(report.fingerprint, fingerprint_questao(self.question))
+
+    def test_exceptional_assertion_reason_rejects_noncanonical_response_key(self):
+        self.question.tipo_questao = "ASSERCAO_RAZAO"
+        self.question.proposicao_dois = "A proposição II explica a proposição I."
+        self.question.justificativa = ""
+        self.question.save()
+        self.question.alternativas.all().delete()
+        for index, (letter, text) in enumerate(ASSERTION_ANSWERS.items()):
+            Alternativa.objects.create(
+                questao=self.question,
+                texto=f"{letter}) {text}" if index else "A) Opção não canônica",
+                eh_correta=index == 0,
+            )
+        executar_pre_auditoria(self.question, revisor=self.reviewer)
+        self.client.force_login(self.reviewer)
+
+        response = self.client.post(
+            reverse("pre_auditoria:aprovar", args=[self.question.pk]),
+            {
+                "confirmar_aprovacao": "on",
+                "justificativa": "Pendências avaliadas manualmente e aceitas para uso.",
+            },
+            follow=True,
+        )
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, "PENDENTE")
+        self.assertFalse(DecisaoPreAuditoria.objects.exists())
+        self.assertContains(response, "chave canônica de cinco alternativas")
+
+    def test_exceptional_multiple_choice_allows_valid_single_correct_generated_option(self):
+        self.question.tipo_questao = "MULTIPLA_ESCOLHA"
+        self.question.justificativa = ""
+        self.question.save()
+        self.question.alternativas.all().delete()
+        for index in range(3):
+            Alternativa.objects.create(
+                questao=self.question,
+                texto=f"Afirmativa {index + 1}",
+                eh_correta=index == 0,
+            )
+        report = executar_pre_auditoria(self.question, revisor=self.reviewer)
+        self.assertTrue(any(not item["conforme"] for item in report.indicadores["validacoes_estruturais"]))
+        self.client.force_login(self.reviewer)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("pre_auditoria:aprovar", args=[self.question.pk]),
+                {
+                    "confirmar_aprovacao": "on",
+                    "justificativa": "A pendência foi inspecionada e aceita pelo gestor.",
+                },
+            )
+        self.question.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.question.status, "APROVADA")
+        self.assertTrue(DecisaoPreAuditoria.objects.get().aprovacao_excepcional)
+
+    def test_exceptional_multiple_choice_rejects_generated_options_with_multiple_keys(self):
+        self.question.tipo_questao = "MULTIPLA_ESCOLHA"
+        self.question.justificativa = ""
+        self.question.save()
+        self.question.alternativas.all().delete()
+        for index in range(3):
+            Alternativa.objects.create(
+                questao=self.question,
+                texto=f"Afirmativa {index + 1}",
+                eh_correta=index == 0,
+            )
+        executar_pre_auditoria(self.question, revisor=self.reviewer)
+        self.client.force_login(self.reviewer)
+        generated_options = [
+            {"texto": "Resposta correta 1", "eh_correta": True},
+            {"texto": "Resposta correta 2", "eh_correta": True},
+            {"texto": "Distrator 1", "eh_correta": False},
+            {"texto": "Distrator 2", "eh_correta": False},
+        ]
+
+        with patch("questoes.views.gerar_alternativas_multipla_escolha", return_value=generated_options):
+            response = self.client.post(
+                reverse("pre_auditoria:aprovar", args=[self.question.pk]),
+                {
+                    "confirmar_aprovacao": "on",
+                    "justificativa": "Pendências avaliadas manualmente e aceitas para uso.",
+                },
+                follow=True,
+            )
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, "PENDENTE")
+        self.assertFalse(DecisaoPreAuditoria.objects.exists())
+        self.assertContains(response, "exatamente uma resposta correta")
+
     def test_approval_requires_explicit_confirmation_and_is_not_duplicated(self):
         executar_pre_auditoria(self.question, revisor=self.reviewer)
         self.client.force_login(self.reviewer)

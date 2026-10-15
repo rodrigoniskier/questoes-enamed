@@ -428,21 +428,41 @@ def validar_aprovacao(questao, parecer, justificativa=""):
         raise ValidationError("O tipo da questão não é compatível com o Gerador de Provas.")
     if any(not (alternative.texto or "").strip() for alternative in alternatives):
         raise ValidationError("A questão contém alternativa sem texto e não pode ser representada na prova.")
-    if questao.tipo_questao == "RESPOSTA_UNICA" and not 1 <= len(alternatives) <= 5:
-        raise ValidationError("A questão não possui uma quantidade de alternativas suportada pela prova.")
-    if questao.tipo_questao == "ASSERCAO_RAZAO" and len(alternatives) != 5:
-        raise ValidationError("A asserção-razão precisa das cinco alternativas padronizadas para a prova.")
+    if questao.tipo_questao == "RESPOSTA_UNICA":
+        if not 1 <= len(alternatives) <= 5:
+            raise ValidationError("A questão não possui uma quantidade de alternativas suportada pela prova.")
+        if sum(alternative.eh_correta is True for alternative in alternatives) != 1:
+            raise ValidationError("Resposta única exige exatamente uma alternativa marcada como correta.")
+    if questao.tipo_questao == "ASSERCAO_RAZAO":
+        if len(alternatives) != 5:
+            raise ValidationError(
+                "A asserção-razão precisa das cinco alternativas padronizadas para a prova."
+            )
+        if sum(alternative.eh_correta is True for alternative in alternatives) != 1:
+            raise ValidationError("Asserção-razão exige exatamente uma resposta marcada como correta.")
+        canonical_key = [f"{letter}) {text}".casefold() for letter, text in ASSERTION_ANSWERS.items()]
+        stored_key = [alternative.texto.strip().casefold() for alternative in alternatives]
+        if stored_key != canonical_key:
+            raise ValidationError(
+                "A asserção-razão precisa preservar a chave canônica de cinco alternativas."
+            )
     if questao.tipo_questao == "MULTIPLA_ESCOLHA":
         from questoes.views import gerar_alternativas_multipla_escolha
 
         generated = gerar_alternativas_multipla_escolha(questao)
         if (
-            len(generated) != 4
-            or not any(item.get("eh_correta") for item in generated)
-            or any("Questão com afirmativas inválidas" in item.get("texto", "") for item in generated)
+            not isinstance(generated, list)
+            or len(generated) != 4
+            or any(not isinstance(item, dict) for item in generated)
+            or sum(item.get("eh_correta") is True for item in generated if isinstance(item, dict)) != 1
+            or any(
+                "Questão com afirmativas inválidas" in item.get("texto", "")
+                for item in generated
+                if isinstance(item, dict)
+            )
         ):
             raise ValidationError(
-                "As afirmativas não podem ser convertidas nas alternativas finais do Gerador de Provas."
+                "As alternativas finais do Gerador de Provas precisam conter exatamente uma resposta correta."
             )
 
     return current_fingerprint
