@@ -73,12 +73,15 @@ class PreAuditoriaTests(TestCase):
         self.assertContains(response, "Qual a conduta?")
         self.assertNotContains(response, "Questão arquivada")
 
-    def test_clean_structural_result_is_inconclusive_not_approval(self):
+    def test_clean_structural_result_is_ready_without_gemini(self):
         self.client.force_login(self.reviewer)
         response = self.client.post(reverse("pre_auditoria:iniciar", args=[self.question.pk]))
         self.assertRedirects(response, reverse("pre_auditoria:detalhe", args=[self.question.pk]))
         report = ParecerPreAuditoria.objects.get(questao=self.question)
-        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.INCONCLUSIVA)
+        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.APROVADA)
+        self.assertEqual(report.indicadores["politica"], "submeter-basica-v1")
+        self.assertFalse(report.indicadores["semantica_verificada"])
+        self.assertNotIn("inconclusivos", report.indicadores)
         self.assertEqual(self.question.status, "PENDENTE")
 
     def test_read_only_reviewer_cannot_start_audit(self):
@@ -102,6 +105,13 @@ class PreAuditoriaTests(TestCase):
         self.assertEqual(ParecerPreAuditoria.objects.count(), 1)
 
     def test_editor_saves_content_records_history_and_rechecks_structure(self):
+        historical = ParecerPreAuditoria.objects.create(
+            questao=self.question,
+            resultado=ParecerPreAuditoria.Resultado.INCONCLUSIVA,
+            fingerprint=fingerprint_questao(self.question),
+            achados=[{"criterio": "manual.13", "gravidade": "mandatory"}],
+            indicadores={"inconclusivos": [{"criterion_id": "13", "reason": "Política anterior"}]},
+        )
         self.client.force_login(self.reviewer)
         data = {
             "fingerprint": fingerprint_questao(self.question),
@@ -127,8 +137,13 @@ class PreAuditoriaTests(TestCase):
         self.assertEqual(self.question.enunciado, "Qual é a conduta revisada?")
         self.assertEqual(self.question.status, "PENDENTE")
         self.assertEqual(AlteracaoPreAuditoria.objects.count(), 1)
-        self.assertEqual(ParecerPreAuditoria.objects.count(), 1)
-        self.assertEqual(ParecerPreAuditoria.objects.get().fingerprint, fingerprint_questao(self.question))
+        self.assertEqual(ParecerPreAuditoria.objects.count(), 2)
+        historical.refresh_from_db()
+        self.assertEqual(historical.resultado, ParecerPreAuditoria.Resultado.INCONCLUSIVA)
+        self.assertEqual(historical.achados[0]["criterio"], "manual.13")
+        current = ParecerPreAuditoria.objects.exclude(pk=historical.pk).get()
+        self.assertEqual(current.fingerprint, fingerprint_questao(self.question))
+        self.assertEqual(current.indicadores["politica"], "submeter-basica-v1")
 
     def test_editor_rejects_stale_fingerprint_without_overwriting(self):
         self.client.force_login(self.reviewer)
@@ -169,60 +184,30 @@ class PreAuditoriaTests(TestCase):
     @override_settings(GEMINI_API_KEY="synthetic-test-key")
     @patch(
         "pre_auditoria.services.generate_text",
-        return_value='{"findings":[{"criterion_id":"05","evidence":"Opção 1","reason":"A opção pode ser mais concisa.","recommendation":"Revise a extensão.","severity":"recommendation"}],"inconclusive":[]}',
+        return_value='{"recommendations":[{"criterion_id":"alternativas","evidence":"Opção 1","reason":"A opção pode ser mais concisa.","recommendation":"Revise a extensão."}]}',
     )
     def test_semantic_recommendation_is_not_a_blocking_pendency(self, generate):
-        report = executar_pre_auditoria(self.question)
-        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.INCONCLUSIVA)
+        report = executar_pre_auditoria(self.question, semantica=True)
+        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.APROVADA)
         self.assertTrue(report.indicadores["semantica_verificada"])
-        self.assertEqual(report.achados[0]["gravidade"], "recommendation")
+        self.assertEqual(report.achados[0]["gravidade"], "recomendacao")
         generate.assert_called_once()
+        self.client.force_login(self.reviewer)
+        self.client.post(reverse("pre_auditoria:aprovar", args=[self.question.pk]))
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, "APROVADA")
 
-    def _register_all_inconclusive_evidence(self, report):
-        for item in report.indicadores["inconclusivos"]:
-            EvidenciaRevisor.objects.create(
-                parecer=report,
-                criterio_id=item["criterion_id"],
-                evidencia=f"Conferência humana documentada para {item['criterion_id']}.",
-                referencia=(
-                    "Referência institucional consultada, seção pertinente, 2026"
-                    if item["criterion_id"] in {"01", "10", "11", "12", "13"}
-                    else ""
-                ),
-                revisor=self.reviewer,
-            )
-
-    def test_approval_requires_human_evidence_and_updates_official_status(self):
+    def test_approval_needs_no_bibliography_bloom_or_objectives(self):
         report = executar_pre_auditoria(self.question, revisor=self.reviewer, semantica=False)
+        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.APROVADA)
+        self.assertFalse(report.indicadores["semantica_verificada"])
+        self.assertNotIn("inconclusivos", report.indicadores)
+        self.assertNotIn("bloom", report.indicadores)
+        self.assertNotIn("objetivos", report.indicadores)
         self.client.force_login(self.reviewer)
         url = reverse("pre_auditoria:aprovar", args=[self.question.pk])
-        blocked = self.client.post(url, {"justificativa": ""})
-        self.assertRedirects(blocked, reverse("pre_auditoria:detalhe", args=[self.question.pk]))
-        self.question.refresh_from_db()
-        self.assertEqual(self.question.status, "PENDENTE")
-        self._register_all_inconclusive_evidence(report)
-        EvidenciaRevisor.objects.create(
-            parecer=report,
-            criterio_id="10",
-            evidencia="Conferi a referência bibliográfica no acervo institucional.",
-            revisor=self.reviewer,
-            revisor_nome=self.reviewer.get_username(),
-        )
-        missing_reference = self.client.post(url, {"justificativa": ""})
-        self.assertRedirects(missing_reference, reverse("pre_auditoria:detalhe", args=[self.question.pk]))
-        self.question.refresh_from_db()
-        self.assertEqual(self.question.status, "PENDENTE")
-        EvidenciaRevisor.objects.create(
-            parecer=report,
-            criterio_id="10",
-            evidencia="Conferi a referência bibliográfica no acervo institucional.",
-            referencia="Biblioteca UNIPÊ, acervo digital, registro consultado.",
-            revisor=self.reviewer,
-            revisor_nome=self.reviewer.get_username(),
-        )
-
         with self.captureOnCommitCallbacks(execute=True):
-            approved = self.client.post(url, {"justificativa": ""})
+            approved = self.client.post(url)
         self.assertRedirects(approved, reverse("pre_auditoria:detalhe", args=[self.question.pk]))
         self.question.refresh_from_db()
         report.refresh_from_db()
@@ -234,8 +219,7 @@ class PreAuditoriaTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
 
     def test_approved_question_is_visible_to_admin_submeter_and_generator(self):
-        report = executar_pre_auditoria(self.question, revisor=self.reviewer, semantica=False)
-        self._register_all_inconclusive_evidence(report)
+        executar_pre_auditoria(self.question, revisor=self.reviewer, semantica=False)
         pending = Questao.objects.create(
             componente=self.component,
             professor_nome="Docente pendente",
@@ -273,8 +257,7 @@ class PreAuditoriaTests(TestCase):
         self.assertNotContains(generated, pending.enunciado)
 
     def test_stale_report_cannot_approve_changed_content(self):
-        report = executar_pre_auditoria(self.question, revisor=self.reviewer, semantica=False)
-        self._register_all_inconclusive_evidence(report)
+        executar_pre_auditoria(self.question, revisor=self.reviewer, semantica=False)
         self.question.enunciado = "Versão nova da questão?"
         self.question.save()
         self.client.force_login(self.reviewer)
@@ -283,9 +266,8 @@ class PreAuditoriaTests(TestCase):
         self.assertEqual(self.question.status, "PENDENTE")
         self.assertFalse(DecisaoPreAuditoria.objects.exists())
 
-    def test_batch_approval_is_bounded_and_records_partial_success(self):
-        report = executar_pre_auditoria(self.question, revisor=self.reviewer, semantica=False)
-        self._register_all_inconclusive_evidence(report)
+    def test_batch_approval_accepts_structurally_valid_reports(self):
+        executar_pre_auditoria(self.question, revisor=self.reviewer, semantica=False)
         second = Questao.objects.create(
             componente=self.component,
             professor_nome="Segundo docente",
@@ -306,8 +288,8 @@ class PreAuditoriaTests(TestCase):
         self.question.refresh_from_db()
         second.refresh_from_db()
         self.assertEqual(self.question.status, "APROVADA")
-        self.assertEqual(second.status, "PENDENTE")
-        self.assertEqual(DecisaoPreAuditoria.objects.count(), 1)
+        self.assertEqual(second.status, "APROVADA")
+        self.assertEqual(DecisaoPreAuditoria.objects.count(), 2)
 
     def test_signed_correction_link_is_single_use_and_cannot_approve(self):
         report = executar_pre_auditoria(self.question, revisor=self.reviewer, semantica=False)
@@ -357,8 +339,24 @@ class PreAuditoriaTests(TestCase):
 
     def test_semester_2026_2_single_answer_uses_four_options(self):
         report = executar_pre_auditoria(self.question, revisor=self.reviewer)
-        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.INCONCLUSIVA)
+        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.APROVADA)
         self.assertEqual(report.achados, [])
+
+    def test_historical_semester_keeps_five_single_answer_options(self):
+        historical_semester = Semestre.objects.create(nome="2026.1")
+        historical_period = Periodo.objects.create(nome="2º Período", semestre=historical_semester)
+        historical_component = ComponenteCurricular.objects.create(
+            nome="Clínica histórica", periodo=historical_period
+        )
+        self.question.componente = historical_component
+        self.question.save()
+        for index in range(4, 5):
+            Alternativa.objects.create(questao=self.question, texto=f"Opção {index + 1}", eh_correta=False)
+
+        report = executar_pre_auditoria(self.question, semantica=False)
+
+        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.APROVADA)
+        self.assertEqual(self.question.alternativas.count(), 5)
 
     def test_multiple_choice_requires_true_and_false_statements(self):
         self.question.tipo_questao = "MULTIPLA_ESCOLHA"
@@ -369,6 +367,34 @@ class PreAuditoriaTests(TestCase):
         report = executar_pre_auditoria(self.question)
         self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.PENDENCIAS)
         self.assertIn("resposta-multipla.distribuicao", {finding["criterio"] for finding in report.achados})
+
+    def test_single_answer_blocks_wrong_count_and_duplicate_options(self):
+        alternatives = list(self.question.alternativas.order_by("pk"))
+        alternatives[-1].texto = alternatives[0].texto
+        alternatives[-1].save()
+        Alternativa.objects.create(questao=self.question, texto="Opção extra", eh_correta=False)
+
+        report = executar_pre_auditoria(self.question, semantica=False)
+        finding_ids = {finding["criterio"] for finding in report.achados}
+
+        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.PENDENCIAS)
+        self.assertIn("alternativas", finding_ids)
+        self.assertIn("resposta-unica.quantidade", finding_ids)
+
+    def test_assertion_reason_blocks_missing_proposition_and_gabarito(self):
+        self.question.tipo_questao = "ASSERCAO_RAZAO"
+        self.question.proposicao_dois = ""
+        self.question.save()
+        self.question.alternativas.all().delete()
+        for letter, text in ASSERTION_ANSWERS.items():
+            Alternativa.objects.create(questao=self.question, texto=f"{letter}) {text}", eh_correta=False)
+
+        report = executar_pre_auditoria(self.question, semantica=False)
+        finding_ids = {finding["criterio"] for finding in report.achados}
+
+        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.PENDENCIAS)
+        self.assertIn("assercao-razao.proposicao", finding_ids)
+        self.assertIn("assercao-razao.gabarito", finding_ids)
 
     def test_audit_batch_persists_and_advances_one_question_per_request(self):
         second = Questao.objects.create(
@@ -395,6 +421,7 @@ class PreAuditoriaTests(TestCase):
         first = self.client.post(step_url)
         self.assertEqual(first.status_code, 200)
         self.assertEqual(first.json()["posicao"], 1)
+        self.assertEqual(first.json()["resultado"], "Apta para aprovação")
         batch.refresh_from_db()
         self.assertEqual(batch.status, LotePreAuditoria.Status.AGUARDANDO)
         self.assertEqual(ParecerPreAuditoria.objects.count(), 1)
@@ -417,68 +444,94 @@ class PreAuditoriaTests(TestCase):
         self.assertRedirects(response, reverse("pre_auditoria:lista"))
         self.assertFalse(LotePreAuditoria.objects.exists())
 
-    def test_semantic_response_with_unverifiable_evidence_is_inconclusive(self):
+    def test_semantic_analysis_is_not_requested_by_default(self):
         self.client.force_login(self.reviewer)
-        response = self.client.post(reverse("pre_auditoria:iniciar", args=[self.question.pk]))
+        with patch("pre_auditoria.services.generate_text") as generate:
+            response = self.client.post(reverse("pre_auditoria:iniciar", args=[self.question.pk]))
         self.assertEqual(response.status_code, 302)
         report = ParecerPreAuditoria.objects.get(questao=self.question)
-        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.INCONCLUSIVA)
+        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.APROVADA)
         self.assertFalse(report.indicadores["semantica_verificada"])
+        generate.assert_not_called()
 
     @override_settings(GEMINI_API_KEY="synthetic-test-key")
     @patch("pre_auditoria.services.generate_text")
     def test_direct_personal_identifiers_block_paid_semantic_call(self, generate):
         self.question.texto_base = "Paciente: Ana de Souza, CPF 123.456.789-00, apresenta febre."
         self.question.save()
-        report = executar_pre_auditoria(self.question)
+        report = executar_pre_auditoria(self.question, semantica=True)
         generate.assert_not_called()
         self.assertFalse(report.indicadores["semantica_verificada"])
         self.assertIn(
             "identificadores pessoais",
-            next(
-                item["reason"]
-                for item in report.indicadores["inconclusivos"]
-                if item["criterion_id"] == "semantica"
-            ),
+            report.indicadores["analise_semantica_aviso"],
         )
 
     @override_settings(GEMINI_API_KEY="synthetic-test-key")
     @patch("pre_auditoria.services.generate_text", side_effect=AIControlError("Cota de teste indisponível."))
-    def test_gemini_failure_is_persisted_as_inconclusive(self, generate):
-        report = executar_pre_auditoria(self.question)
+    def test_gemini_failure_warns_without_blocking_approval(self, generate):
+        report = executar_pre_auditoria(self.question, semantica=True)
         generate.assert_called_once()
         self.assertFalse(report.indicadores["semantica_verificada"])
-        self.assertTrue(
-            any(item["criterion_id"] == "semantica" for item in report.indicadores["inconclusivos"])
+        self.assertTrue(report.indicadores["analise_semantica_aviso"])
+        self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.APROVADA)
+        self.client.force_login(self.reviewer)
+        self.client.post(reverse("pre_auditoria:aprovar", args=[self.question.pk]))
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, "APROVADA")
+
+    def test_historical_report_is_preserved_and_requires_a_new_audit(self):
+        historical = ParecerPreAuditoria.objects.create(
+            questao=self.question,
+            resultado=ParecerPreAuditoria.Resultado.INCONCLUSIVA,
+            fingerprint=fingerprint_questao(self.question),
+            achados=[{"criterio": "manual.10", "gravidade": "mandatory"}],
+            indicadores={"inconclusivos": [{"criterion_id": "10", "reason": "Conferência anterior"}]},
         )
+        evidence = EvidenciaRevisor.objects.create(
+            parecer=historical,
+            criterio_id="10",
+            evidencia="Registro histórico de conferência bibliográfica.",
+            referencia="Acervo consultado na revisão anterior.",
+            revisor=self.reviewer,
+        )
+        self.client.force_login(self.reviewer)
+        self.client.post(reverse("pre_auditoria:aprovar", args=[self.question.pk]))
+        self.question.refresh_from_db()
+        historical.refresh_from_db()
         self.assertEqual(self.question.status, "PENDENTE")
+        self.assertEqual(historical.resultado, ParecerPreAuditoria.Resultado.INCONCLUSIVA)
+        self.assertTrue(EvidenciaRevisor.objects.filter(pk=evidence.pk).exists())
+
+        current = executar_pre_auditoria(self.question, revisor=self.reviewer)
+        self.assertEqual(current.resultado, ParecerPreAuditoria.Resultado.APROVADA)
+        response = self.client.get(reverse("pre_auditoria:detalhe", args=[self.question.pk]))
+        self.assertContains(response, "Política anterior")
+        self.client.post(reverse("pre_auditoria:aprovar", args=[self.question.pk]))
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, "APROVADA")
 
     @override_settings(GEMINI_API_KEY="synthetic-test-key")
     @patch(
         "pre_auditoria.services.generate_text",
-        return_value='{"findings":[{"criterion_id":"05","evidence":"texto inventado","reason":"achado","recommendation":"rever","severity":"mandatory"}],"inconclusive":[]}',
+        return_value='{"recommendations":[{"criterion_id":"alternativas","evidence":"texto inventado","reason":"achado","recommendation":"rever"}]}',
     )
     def test_unverifiable_ai_evidence_invalidates_the_semantic_response(self, generate):
-        report = executar_pre_auditoria(self.question)
+        report = executar_pre_auditoria(self.question, semantica=True)
         generate.assert_called_once()
         self.assertFalse(report.indicadores["semantica_verificada"])
-        self.assertFalse(any(finding["criterio"] == "manual.05" for finding in report.achados))
-        self.assertTrue(
-            any(item["criterion_id"] == "semantica" for item in report.indicadores["inconclusivos"])
-        )
+        self.assertFalse(report.achados)
+        self.assertTrue(report.indicadores["analise_semantica_aviso"])
 
     @override_settings(GEMINI_API_KEY="synthetic-test-key")
-    @patch(
-        "pre_auditoria.services.generate_text",
-        return_value='{"findings":[{"criterion_id":"tipo","evidence":"Opção 1","reason":"A estrutura não corresponde ao tipo declarado.","recommendation":"Revise o tipo ou o conteúdo.","severity":"mandatory"}],"inconclusive":[]}',
-    )
-    def test_semantic_contract_can_flag_declared_type_mismatch(self, generate):
+    @patch("pre_auditoria.services.generate_text")
+    def test_ai_is_skipped_when_structural_failures_exist(self, generate):
         self.question.tipo_questao = "ASSERCAO_RAZAO"
         self.question.proposicao_dois = ""
         self.question.save()
-        report = executar_pre_auditoria(self.question)
-        generate.assert_called_once()
-        self.assertIn("manual.tipo", {finding["criterio"] for finding in report.achados})
+        report = executar_pre_auditoria(self.question, semantica=True)
+        generate.assert_not_called()
+        self.assertIn("assercao-razao.proposicao", {finding["criterio"] for finding in report.achados})
         self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.PENDENCIAS)
 
     def test_assertion_reason_requires_the_canonical_five_response_key(self):
