@@ -5,6 +5,7 @@ from .models import (
     DecisaoPreAuditoria,
     EvidenciaRevisor,
     LotePreAuditoria,
+    OperacaoLimpezaPreAuditoria,
     ParecerPreAuditoria,
     SolicitacaoCorrecao,
 )
@@ -23,7 +24,7 @@ class ImmutableAuditAdminMixin:
 
 @admin.register(ParecerPreAuditoria)
 class ParecerPreAuditoriaAdmin(ImmutableAuditAdminMixin, admin.ModelAdmin):
-    list_display = ("questao", "resultado", "criado_em", "revisor")
+    list_display = ("questao", "resultado", "criado_em", "revisor", "arquivado_em", "arquivado_por")
     list_filter = ("resultado", "criado_em")
     search_fields = ("questao__enunciado", "questao__professor_nome", "questao__professor_email")
     readonly_fields = (
@@ -34,6 +35,8 @@ class ParecerPreAuditoriaAdmin(ImmutableAuditAdminMixin, admin.ModelAdmin):
         "indicadores",
         "criado_em",
         "revisor",
+        "arquivado_em",
+        "arquivado_por",
     )
     ordering = ("-criado_em",)
 
@@ -64,6 +67,7 @@ class DecisaoPreAuditoriaAdmin(ImmutableAuditAdminMixin, admin.ModelAdmin):
         "acao",
         "fingerprint",
         "justificativa",
+        "aprovacao_excepcional",
         "criada_em",
     )
 
@@ -101,4 +105,20 @@ class LotePreAuditoriaAdmin(ImmutableAuditAdminMixin, admin.ModelAdmin):
         "iniciado_em",
         "criado_em",
         "atualizado_em",
+    )
+
+
+@admin.register(OperacaoLimpezaPreAuditoria)
+class OperacaoLimpezaPreAuditoriaAdmin(ImmutableAuditAdminMixin, admin.ModelAdmin):
+    list_display = ("revisor_nome", "criada_em", "nao_elegiveis")
+    list_filter = ("criada_em",)
+    readonly_fields = (
+        "revisor",
+        "revisor_nome",
+        "questao_ids",
+        "pareceres_solicitados",
+        "pareceres_excluidos",
+        "pareceres_arquivados",
+        "nao_elegiveis",
+        "criada_em",
     )

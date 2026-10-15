@@ -9,16 +9,19 @@ from django.core import signing
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
-from django.db import transaction
-from django.db.models import OuterRef, Subquery
+from django.db import DatabaseError, transaction
+from django.db.models import Count, OuterRef, Subquery
+from django.db.models.deletion import ProtectedError
 from django.http import HttpResponseGone, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
 
 from questoes.models import ComponenteCurricular, Periodo, Questao, Semestre
 from questoes.utils import enviar_email_status
+from questoes.views import gerar_alternativas_multipla_escolha
 
 from .forms import (
     AlternativasRevisaoFormSet,
@@ -33,21 +36,174 @@ from .models import (
     DecisaoPreAuditoria,
     EvidenciaRevisor,
     LotePreAuditoria,
+    OperacaoLimpezaPreAuditoria,
     ParecerPreAuditoria,
     SolicitacaoCorrecao,
 )
 from .services import (
     POLICY_VERSION,
+    checklist_estrutural,
     executar_pre_auditoria,
     fingerprint_questao,
     snapshot_questao,
+    tem_pendencias_obrigatorias,
     validar_aprovacao,
 )
 
 logger = logging.getLogger(__name__)
 CORRECTION_SIGNING_SALT = "pre_auditoria.correcao.v1"
 MAX_APPROVAL_BATCH = 25
+MAX_CLEANUP_QUESTIONS = 25
+MAX_CLEANUP_REPORTS = 500
 AUDIT_CLAIM_TIMEOUT = timedelta(minutes=2)
+CLEANUP_CONFIRMATION_SALT = "pre_auditoria.limpeza.v1"
+
+
+def _safe_next(request, candidate, fallback):
+    if candidate and url_has_allowed_host_and_scheme(
+        candidate, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return candidate
+    return fallback
+
+
+def _prepare_question(question):
+    alternatives = question.alternativas.all().order_by("pk")
+    if question.tipo_questao == "MULTIPLA_ESCOLHA":
+        question.alternativas_finais_preview = gerar_alternativas_multipla_escolha(question)
+    else:
+        question.alternativas_finais_preview = list(alternatives)
+
+    question.preview_image_available = False
+    question.preview_image_url = ""
+    if question.imagem:
+        try:
+            question.preview_image_available = question.imagem.storage.exists(question.imagem.name)
+            if question.preview_image_available:
+                question.preview_image_url = question.imagem.url
+        except (OSError, ValueError):
+            logger.warning("Question image unavailable for preview: %s", question.pk)
+
+
+def _mark_audit_state(question, report):
+    question.latest_audit = report
+    question.audit_is_current = bool(
+        report
+        and report.arquivado_em is None
+        and report.fingerprint == fingerprint_questao(question)
+        and report.indicadores.get("politica") == POLICY_VERSION
+    )
+    question.audit_is_historical = bool(report and report.indicadores.get("politica") != POLICY_VERSION)
+    question.approval_exception_needed = bool(
+        question.audit_is_current and tem_pendencias_obrigatorias(report)
+    )
+    stored_checklist = (
+        report.indicadores.get("validacoes_estruturais")
+        if report and isinstance(report.indicadores, dict)
+        else None
+    )
+    question.audit_checklist = (
+        stored_checklist if isinstance(stored_checklist, list) else checklist_estrutural(question)
+    )
+    question.audit_findings = report.achados if report and isinstance(report.achados, list) else []
+
+
+def _parse_cleanup_selection(post_data):
+    raw_report_ids = post_data.getlist("parecer_ids")
+    raw_question_ids = post_data.getlist("questao_ids")
+    if (
+        len(raw_report_ids) > MAX_CLEANUP_REPORTS
+        or len(raw_question_ids) > MAX_CLEANUP_QUESTIONS
+        or any(not value.isdigit() for value in raw_report_ids + raw_question_ids)
+    ):
+        raise ValidationError("A seleção de pareceres ou questões é inválida ou excede o limite.")
+    return list(dict.fromkeys(map(int, raw_report_ids))), list(dict.fromkeys(map(int, raw_question_ids)))
+
+
+def _cleanup_report_ids(report_ids, question_ids):
+    if question_ids and Questao.objects.filter(pk__in=question_ids).count() != len(question_ids):
+        raise ValidationError("Uma ou mais questões selecionadas não estão disponíveis.")
+    if report_ids and ParecerPreAuditoria.objects.filter(pk__in=report_ids).count() != len(report_ids):
+        raise ValidationError("Um ou mais pareceres selecionados não estão disponíveis.")
+
+    candidate_ids = set(report_ids)
+    if question_ids:
+        latest_ids = {
+            ParecerPreAuditoria.objects.filter(questao_id=question_id)
+            .order_by("-criado_em", "-pk")
+            .values_list("pk", flat=True)
+            .first()
+            for question_id in question_ids
+        }
+        candidate_ids.update(
+            ParecerPreAuditoria.objects.filter(questao_id__in=question_ids)
+            .exclude(pk__in=[pk for pk in latest_ids if pk is not None])
+            .values_list("pk", flat=True)
+        )
+    if len(candidate_ids) > MAX_CLEANUP_REPORTS:
+        raise ValidationError(
+            f"A seleção inclui mais de {MAX_CLEANUP_REPORTS} pareceres. Reduza a quantidade de questões."
+        )
+    return sorted(candidate_ids)
+
+
+def _cleanup_plan(report_ids, question_ids, lock=False):
+    ids = _cleanup_report_ids(report_ids, question_ids)
+    reports = ParecerPreAuditoria.objects.filter(pk__in=ids).order_by("pk")
+    if lock:
+        reports = reports.select_for_update()
+    report_list = list(reports)
+    latest_by_question = {}
+    for report in ParecerPreAuditoria.objects.filter(
+        questao_id__in={item.questao_id for item in report_list}
+    ):
+        current = latest_by_question.get(report.questao_id)
+        if current is None or (report.criado_em, report.pk) > (current.criado_em, current.pk):
+            latest_by_question[report.questao_id] = report
+    latest_ids = {report.pk for report in latest_by_question.values()}
+
+    deletable = []
+    archivable = []
+    not_eligible = []
+    for report in report_list:
+        if report.pk in latest_ids or report.arquivado_em is not None:
+            not_eligible.append(report.pk)
+            continue
+        has_history = (
+            report.evidencias.exists() or report.decisoes.exists() or report.solicitacoes_correcao.exists()
+        )
+        (archivable if has_history else deletable).append(report.pk)
+    return {
+        "requested_ids": ids,
+        "deletable_ids": deletable,
+        "archivable_ids": archivable,
+        "not_eligible_ids": not_eligible,
+        "not_eligible": len(not_eligible),
+        "question_ids": question_ids,
+    }
+
+
+def _cleanup_confirmation(request, plan, return_to, status=200):
+    confirmation = signing.dumps(
+        {
+            "requested_ids": plan["requested_ids"],
+            "deletable_ids": plan["deletable_ids"],
+            "archivable_ids": plan["archivable_ids"],
+            "not_eligible_ids": plan["not_eligible_ids"],
+            "question_ids": plan["question_ids"],
+        },
+        salt=CLEANUP_CONFIRMATION_SALT,
+    )
+    return render(
+        request,
+        "pre_auditoria/confirmar_limpeza.html",
+        {
+            "plano": plan,
+            "confirmacao": confirmation,
+            "return_to": return_to,
+        },
+        status=status,
+    )
 
 
 def reviewer_required(view):
@@ -98,23 +254,21 @@ def lista(request):
     pending_count = questions.filter(status="PENDENTE").count()
     approved_count = questions.filter(status="APROVADA").count()
 
-    latest_audit = ParecerPreAuditoria.objects.filter(questao_id=OuterRef("pk")).order_by("-criado_em", "-pk")
-    questions = questions.annotate(latest_audit_id=Subquery(latest_audit.values("pk")[:1])).order_by("-pk")
+    latest_audit = ParecerPreAuditoria.objects.filter(
+        questao_id=OuterRef("pk"), arquivado_em__isnull=True
+    ).order_by("-criado_em", "-pk")
+    questions = questions.annotate(
+        latest_audit_id=Subquery(latest_audit.values("pk")[:1]),
+        audit_count=Count("pareceres_pre_auditoria"),
+    ).order_by("-pk")
     page = Paginator(questions.filter(status="PENDENTE"), 25).get_page(request.GET.get("page"))
     audits = ParecerPreAuditoria.objects.filter(
         pk__in=[q.latest_audit_id for q in page.object_list if q.latest_audit_id]
     )
     audit_map = {audit.pk: audit for audit in audits}
     for question in page.object_list:
-        question.latest_audit = audit_map.get(question.latest_audit_id)
-        question.audit_is_current = bool(
-            question.latest_audit
-            and question.latest_audit.fingerprint == fingerprint_questao(question)
-            and question.latest_audit.indicadores.get("politica") == POLICY_VERSION
-        )
-        question.audit_is_historical = bool(
-            question.latest_audit and question.latest_audit.indicadores.get("politica") != POLICY_VERSION
-        )
+        _mark_audit_state(question, audit_map.get(question.latest_audit_id))
+        _prepare_question(question)
 
     return render(
         request,
@@ -130,6 +284,7 @@ def lista(request):
             "total_submetidas": total_submitted,
             "pendentes": pending_count,
             "aprovadas": approved_count,
+            "return_to": request.get_full_path(),
         },
     )
 
@@ -140,8 +295,18 @@ def detalhe(request, questao_id):
         Questao.objects.select_related("componente__periodo__semestre").prefetch_related("alternativas"),
         pk=questao_id,
     )
-    audits = question.pareceres_pre_auditoria.all()
-    latest_audit = audits.first()
+    audits = question.pareceres_pre_auditoria.select_related("revisor", "arquivado_por").all()
+    latest_audit = audits.filter(arquivado_em__isnull=True).first()
+    _mark_audit_state(question, latest_audit)
+    _prepare_question(question)
+    for report in audits:
+        report.is_latest_unarchived = bool(latest_audit and report.pk == latest_audit.pk)
+        report.audit_is_current = bool(
+            report.is_latest_unarchived
+            and report.fingerprint == fingerprint_questao(question)
+            and report.indicadores.get("politica") == POLICY_VERSION
+        )
+        report.has_obligatory_findings = tem_pendencias_obrigatorias(report)
     changes = question.alteracoes_pre_auditoria.select_related("revisor")
     decisions = question.decisoes_pre_auditoria.select_related("revisor", "parecer")
     return render(
@@ -152,15 +317,112 @@ def detalhe(request, questao_id):
             "pareceres": audits,
             "ultimo_parecer_id": latest_audit.pk if latest_audit else None,
             "politica_atual": POLICY_VERSION,
-            "parecer_atual": bool(
-                latest_audit
-                and latest_audit.fingerprint == fingerprint_questao(question)
-                and latest_audit.indicadores.get("politica") == POLICY_VERSION
-            ),
+            "parecer_atual": question.audit_is_current,
             "alteracoes": changes,
             "decisoes": decisions,
         },
     )
+
+
+@reviewer_write_required
+@require_POST
+def excluir_auditorias(request):
+    fallback = reverse("pre_auditoria:lista")
+    return_to = _safe_next(request, request.POST.get("next", ""), fallback)
+    signed_plan = request.POST.get("plano_assinado", "")
+
+    if signed_plan:
+        if request.POST.get("confirmar_operacao") != "on":
+            messages.error(request, "Marque a confirmação explícita antes de excluir ou arquivar pareceres.")
+            return redirect(return_to)
+        try:
+            payload = signing.loads(signed_plan, salt=CLEANUP_CONFIRMATION_SALT, max_age=900)
+            if not isinstance(payload, dict) or set(payload) != {
+                "requested_ids",
+                "deletable_ids",
+                "archivable_ids",
+                "not_eligible_ids",
+                "question_ids",
+            }:
+                raise signing.BadSignature
+        except signing.BadSignature:
+            messages.error(
+                request, "A confirmação expirou ou não é válida. Selecione os pareceres novamente."
+            )
+            return redirect(return_to)
+
+        try:
+            with transaction.atomic():
+                question_ids = payload["question_ids"]
+                if question_ids:
+                    locked_questions = list(
+                        Questao.objects.select_for_update()
+                        .filter(pk__in=question_ids)
+                        .values_list("pk", flat=True)
+                    )
+                    if len(locked_questions) != len(set(question_ids)):
+                        raise ValidationError("Uma ou mais questões selecionadas não estão disponíveis.")
+                plan = _cleanup_plan(payload["requested_ids"], payload["question_ids"], lock=True)
+                for key in ("requested_ids", "deletable_ids", "archivable_ids", "not_eligible_ids"):
+                    if plan[key] != payload[key]:
+                        return _cleanup_confirmation(request, plan, return_to, status=409)
+                archived_at = timezone.now()
+                for report_id in plan["archivable_ids"]:
+                    ParecerPreAuditoria.objects.filter(pk=report_id).update(
+                        arquivado_em=archived_at,
+                        arquivado_por=request.user,
+                    )
+                if plan["deletable_ids"]:
+                    ParecerPreAuditoria.objects.filter(pk__in=plan["deletable_ids"]).delete()
+                OperacaoLimpezaPreAuditoria.objects.create(
+                    revisor=request.user,
+                    revisor_nome=request.user.get_username(),
+                    questao_ids=plan["question_ids"],
+                    pareceres_solicitados=plan["requested_ids"],
+                    pareceres_excluidos=plan["deletable_ids"],
+                    pareceres_arquivados=plan["archivable_ids"],
+                    nao_elegiveis=plan["not_eligible"],
+                )
+        except ValidationError as error:
+            messages.error(request, "; ".join(error.messages))
+            return redirect(return_to)
+        except ProtectedError:
+            logger.warning("Protected pre-audit report deletion rejected for reviewer %s", request.user.pk)
+            messages.error(
+                request,
+                "Um parecer ganhou um registro administrativo durante a confirmação e foi preservado. Revise a seleção.",
+            )
+            return redirect(return_to)
+        except DatabaseError as error:
+            logger.error(
+                "Pre-audit cleanup failed for reviewer %s: %s",
+                request.user.pk,
+                type(error).__name__,
+            )
+            messages.error(
+                request,
+                "Não foi possível concluir a limpeza com segurança. Nenhum parecer foi removido; revise e tente novamente.",
+            )
+            return redirect(return_to)
+
+        messages.success(
+            request,
+            f"Limpeza concluída: {len(plan['deletable_ids'])} parecer(es) excluído(s) fisicamente, "
+            f"{len(plan['archivable_ids'])} arquivado(s) para preservar histórico e "
+            f"{plan['not_eligible']} não elegível(is) mantido(s).",
+        )
+        return redirect(return_to)
+
+    try:
+        report_ids, question_ids = _parse_cleanup_selection(request.POST)
+        plan = _cleanup_plan(report_ids, question_ids)
+    except ValidationError as error:
+        messages.error(request, "; ".join(error.messages))
+        return redirect(return_to)
+    if not plan["requested_ids"]:
+        messages.error(request, "Selecione pareceres anteriores ou questões para limpar.")
+        return redirect(return_to)
+    return _cleanup_confirmation(request, plan, return_to)
 
 
 @reviewer_write_required
@@ -443,12 +705,6 @@ def _aprovar_questao(questao_id, revisor, justificativa=""):
         if report is None:
             raise ValidationError("A questão ainda não tem parecer de pré-auditoria.")
         fingerprint = validar_aprovacao(question, report, justificativa)
-        report.resultado = ParecerPreAuditoria.Resultado.APROVADA
-        report.indicadores = {
-            **report.indicadores,
-            "confirmado_por_revisor": True,
-        }
-        report.save(update_fields=["resultado", "indicadores"])
         question.status = "APROVADA"
         question.save(update_fields=["status"])
         decision = DecisaoPreAuditoria.objects.create(
@@ -459,6 +715,7 @@ def _aprovar_questao(questao_id, revisor, justificativa=""):
             acao=DecisaoPreAuditoria.Acao.APROVADA,
             fingerprint=fingerprint,
             justificativa=justificativa,
+            aprovacao_excepcional=tem_pendencias_obrigatorias(report),
         )
         transaction.on_commit(lambda: _notificar_aprovacao(question.pk))
         return decision
@@ -481,8 +738,15 @@ def _notificar_aprovacao(question_id):
 def aprovar(request, questao_id):
     form = DecisaoForm(request.POST)
     if not form.is_valid():
-        messages.error(request, "Justificativa inválida.")
-        return redirect("pre_auditoria:detalhe", questao_id=questao_id)
+        errors = "; ".join(str(error) for values in form.errors.values() for error in values)
+        messages.error(request, errors or "Confirme a aprovação.")
+        return redirect(
+            _safe_next(
+                request,
+                request.POST.get("next", ""),
+                reverse("pre_auditoria:detalhe", args=[questao_id]),
+            )
+        )
     try:
         _aprovar_questao(questao_id, request.user, form.cleaned_data["justificativa"])
     except (ValidationError, Questao.DoesNotExist) as error:
@@ -494,7 +758,13 @@ def aprovar(request, questao_id):
         )
     else:
         messages.success(request, "Aprovação confirmada; o status oficial da questão foi atualizado.")
-    return redirect("pre_auditoria:detalhe", questao_id=questao_id)
+    return redirect(
+        _safe_next(
+            request,
+            request.POST.get("next", ""),
+            reverse("pre_auditoria:detalhe", args=[questao_id]),
+        )
+    )
 
 
 @reviewer_write_required

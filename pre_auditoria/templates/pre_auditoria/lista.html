@@ -1,7 +1,11 @@
 {% extends "pre_auditoria/base.html" %}
 {% block content %}
 <main>
-  <header class="audit-heading"><p class="eyebrow">QUESTÕES MEDICINA · REVISÃO</p><h1>Pré-auditoria</h1><p>Fila de questões submetidas nos períodos ativos.</p></header>
+  <header class="audit-heading">
+    <p class="eyebrow">QUESTÕES MEDICINA · REVISÃO</p>
+    <h1>Painel de pré-auditoria</h1>
+    <p>Revise a questão no formato de prova, confira os critérios estruturais e registre a decisão do gestor.</p>
+  </header>
   <section aria-label="Indicadores" class="audit-metrics">
     <div class="audit-metric"><span>Submetidas</span><strong>{{ total_submetidas }}</strong></div>
     <div class="audit-metric"><span>Pendentes</span><strong>{{ pendentes }}</strong></div>
@@ -27,26 +31,110 @@
       </select>
     </label>
   </form>
-  <section class="audit-section">
-    {% if perms.pre_auditoria.review_parecerpreauditoria %}<form method="post" action="{% url 'pre_auditoria:aprovar_lote' %}">{% csrf_token %}{% endif %}
-    <div class="audit-table-scroll"><table class="audit-table">
-      <thead><tr><th>Selecionar</th><th>Questão</th><th>Professor</th><th>Componente</th><th>Tipo</th><th>Última verificação</th><th></th></tr></thead>
-      <tbody>
-      {% for question in questoes %}
-        <tr>
-          <td>{% if perms.pre_auditoria.review_parecerpreauditoria %}<input type="checkbox" name="questoes" value="{{ question.pk }}" aria-label="Selecionar questão {{ question.pk }}">{% endif %}</td>
-          <td>{{ question.enunciado|truncatechars:100 }}</td><td>{{ question.professor_nome }}</td>
-          <td>{{ question.componente.nome }}</td><td>{{ question.get_tipo_questao_display }}</td>
-          <td>{% if question.latest_audit %}{% if question.audit_is_current %}{% if question.latest_audit.resultado == "APROVADA" %}Apta para aprovação{% else %}{{ question.latest_audit.get_resultado_display }}{% endif %}{% elif question.audit_is_historical %}Histórica (política anterior){% else %}Desatualizada{% endif %}{% else %}Não iniciada{% endif %}</td>
-          <td><a href="{% url 'pre_auditoria:detalhe' question.pk %}">Revisar</a></td>
-        </tr>
-      {% empty %}<tr><td colspan="7">Nenhuma questão pendente neste filtro.</td></tr>{% endfor %}
-      </tbody>
-    </table></div>
-    {% if perms.pre_auditoria.review_parecerpreauditoria %}<div class="audit-batch"><div><button type="submit" formaction="{% url 'pre_auditoria:criar_lote' %}">INICIAR PRÉ-AUDITORIA (máx. 25)</button><button type="submit">CONFIRMAR APROVAÇÃO DO LOTE (máx. 25)</button></div></div></form>{% endif %}
-    <div class="audit-pagination">{% if questoes.has_previous %}<a href="?page={{ questoes.previous_page_number }}&semestre={{ semestre_selecionado }}&periodo={{ periodo_selecionado }}&componente={{ componente_selecionado }}">Anterior</a>{% endif %}
-    <span>Página {{ questoes.number }} de {{ questoes.paginator.num_pages }}</span>
-    {% if questoes.has_next %}<a href="?page={{ questoes.next_page_number }}&semestre={{ semestre_selecionado }}&periodo={{ periodo_selecionado }}&componente={{ componente_selecionado }}">Próxima</a>{% endif %}</div>
+
+  {% if perms.pre_auditoria.review_parecerpreauditoria %}
+    <form id="audit-batch" method="post" action="{% url 'pre_auditoria:aprovar_lote' %}">{% csrf_token %}</form>
+    <form id="audit-cleanup" method="post" action="{% url 'pre_auditoria:excluir_auditorias' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ return_to }}"></form>
+    <section class="audit-batch audit-section" aria-label="Operações em lote">
+      <button form="audit-cleanup" type="submit">EXCLUIR AUDITORIAS ANTERIORES</button>
+      <button form="audit-batch" type="submit" formaction="{% url 'pre_auditoria:criar_lote' %}">INICIAR PRÉ-AUDITORIA (máx. 25)</button>
+      <button form="audit-batch" type="submit">CONFIRMAR APROVAÇÃO DO LOTE (máx. 25)</button>
+      <p>Para limpar históricos, selecione as questões abaixo; o parecer mais recente será mantido.</p>
+    </section>
+  {% endif %}
+
+  <section class="audit-cards" aria-label="Questões pendentes">
+    {% for question in questoes %}
+      <article class="audit-review-card">
+        <header class="audit-card-heading">
+          <div>
+            <p class="eyebrow">QUESTÃO {{ question.pk }} · {{ question.get_tipo_questao_display }}</p>
+            <h2>{{ question.componente.nome }}</h2>
+            <p>{{ question.componente.periodo.semestre }} · {{ question.componente.periodo }}</p>
+          </div>
+          <div class="audit-card-selectors">
+            {% if perms.pre_auditoria.review_parecerpreauditoria %}
+              <label><input form="audit-batch" type="checkbox" name="questoes" value="{{ question.pk }}"> Selecionar para auditoria em lote</label>
+              {% if question.audit_count > 1 %}<label><input form="audit-cleanup" type="checkbox" name="questao_ids" value="{{ question.pk }}"> Selecionar pareceres anteriores</label>{% endif %}
+            {% endif %}
+          </div>
+        </header>
+        <div class="audit-review-grid">
+          <div>{% include "pre_auditoria/partials/questao_previa.html" with questao=question %}</div>
+          <aside class="audit-review-sidebar">
+            <section class="audit-status-panel">
+              <h3>Status oficial da questão</h3>
+              <p><span class="audit-status">{{ question.get_status_display }}</span></p>
+              <h3>RESULTADO DA PRÉ-AUDITORIA</h3>
+              {% if question.latest_audit %}
+                {% if question.audit_is_current %}
+                  <p><strong>{% if question.latest_audit.resultado == "APROVADA" %}Apta para aprovação{% else %}Pendências estruturais{% endif %}</strong></p>
+                  <ul class="audit-checklist">
+                    {% for item in question.audit_checklist %}
+                      <li class="{% if item.conforme %}is-compliant{% else %}is-pending{% endif %}"><strong>{% if item.conforme %}✓ Conforme{% else %}! Pendente{% endif %}</strong> — {{ item.criterio }}</li>
+                    {% empty %}<li>— Não avaliado: parecer sem checklist estrutural.</li>{% endfor %}
+                  </ul>
+                  {% for finding in question.audit_findings %}
+                    {% if finding.gravidade == "obrigatoria" or finding.gravidade == "mandatory" %}
+                      <div class="audit-finding"><strong>{{ finding.criterio }}</strong><p>{{ finding.evidencia }}</p><p><strong>Recomendação:</strong> {{ finding.recomendacao }}</p></div>
+                    {% elif finding.gravidade == "recomendacao" %}
+                      <details class="audit-finding"><summary>Recomendação opcional: {{ finding.criterio }}</summary><p>{{ finding.evidencia }}</p><p>{{ finding.recomendacao }}</p></details>
+                    {% endif %}
+                  {% endfor %}
+                {% else %}
+                  <p class="audit-message" role="status">{% if question.audit_is_historical %}Auditoria desatualizada — Reavaliar (política anterior).{% else %}Auditoria desatualizada — Reavaliar.{% endif %}</p>
+                  <ul class="audit-checklist">{% for item in question.audit_checklist %}<li>— Não avaliado: {{ item.criterio }}</li>{% empty %}<li>— Não avaliado nesta versão.</li>{% endfor %}</ul>
+                {% endif %}
+              {% else %}
+                <p class="audit-message" role="status">Questão não auditada — Iniciar auditoria</p>
+                <ul class="audit-checklist">{% for item in question.audit_checklist %}<li>— Não avaliado: {{ item.criterio }}</li>{% endfor %}</ul>
+              {% endif %}
+              <p class="audit-note">Apta para aprovação indica resultado estrutural. Aprovada é o status oficial confirmado pelo gestor.</p>
+            </section>
+            {% if perms.pre_auditoria.review_parecerpreauditoria %}
+              <nav class="audit-actions" aria-label="Ações da questão">
+                <a href="{% url 'pre_auditoria:detalhe' question.pk %}">HISTÓRICO E DETALHES</a>
+                {% if question.status == "PENDENTE" %}
+                  <a href="{% url 'pre_auditoria:editar' question.pk %}">EDITAR</a>
+                  {% if question.audit_is_current %}
+                    <form method="post" action="{% url 'pre_auditoria:aprovar' question.pk %}">
+                      {% csrf_token %}<input type="hidden" name="next" value="{{ return_to }}">
+                      {% if question.approval_exception_needed %}
+                        <h3>APROVAÇÃO COM PENDÊNCIAS</h3>
+                        <p>Esta questão apresenta pendências identificadas pela Pré-Auditoria. Você confirma que realizou a inspeção visual e assume a decisão de aprová-la mesmo assim?</p>
+                        <label>Justificativa breve e objetiva
+                          <textarea name="justificativa" minlength="20" maxlength="2000" rows="3" required></textarea>
+                        </label>
+                      {% endif %}
+                      <label><input type="checkbox" name="confirmar_aprovacao" required> Confirmo a aprovação desta questão.</label>
+                      <button class="audit-action-button" type="submit">APROVAR QUESTÃO</button>
+                    </form>
+                  {% else %}
+                    <form method="post" action="{% url 'pre_auditoria:iniciar' question.pk %}">{% csrf_token %}<button type="submit">{% if question.latest_audit %}REAVALIAR{% else %}INICIAR AUDITORIA{% endif %}</button></form>
+                  {% endif %}
+                {% endif %}
+              </nav>
+              {% if question.audit_is_current and question.status == "PENDENTE" %}
+                <details class="audit-correction-control">
+                  <summary>SOLICITAR CORREÇÃO</summary>
+                  <form class="audit-inline-form" method="post" action="{% url 'pre_auditoria:solicitar_correcao' question.pk %}">
+                    {% csrf_token %}
+                    <label>Orientações ao professor <textarea name="mensagem" minlength="20" maxlength="2000" required rows="3"></textarea></label>
+                    <button type="submit">SOLICITAR CORREÇÃO</button>
+                  </form>
+                </details>
+              {% endif %}
+            {% endif %}
+          </aside>
+        </div>
+      </article>
+    {% empty %}<p>Nenhuma questão pendente neste filtro.</p>{% endfor %}
   </section>
+
+  <nav class="audit-pagination" aria-label="Paginação">
+    {% if questoes.has_previous %}<a href="?page={{ questoes.previous_page_number }}&semestre={{ semestre_selecionado }}&periodo={{ periodo_selecionado }}&componente={{ componente_selecionado }}">Anterior</a>{% endif %}
+    <span>Página {{ questoes.number }} de {{ questoes.paginator.num_pages }}</span>
+    {% if questoes.has_next %}<a href="?page={{ questoes.next_page_number }}&semestre={{ semestre_selecionado }}&periodo={{ periodo_selecionado }}&componente={{ componente_selecionado }}">Próxima</a>{% endif %}
+  </nav>
 </main>
 {% endblock %}

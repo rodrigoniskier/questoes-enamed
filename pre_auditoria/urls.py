@@ -10,6 +10,7 @@ urlpatterns = [
     path("questao/<int:questao_id>/editar/", views.editar, name="editar"),
     path("questao/<int:questao_id>/iniciar/", views.iniciar, name="iniciar"),
     path("questao/<int:questao_id>/aprovar/", views.aprovar, name="aprovar"),
+    path("auditorias/excluir/", views.excluir_auditorias, name="excluir_auditorias"),
     path(
         "questao/<int:questao_id>/solicitar-correcao/",
         views.solicitar_correcao,

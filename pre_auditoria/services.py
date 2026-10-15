@@ -30,6 +30,35 @@ SEMANTIC_CRITERIA = {
     "proposicoes": "Clareza e concisão das proposições de asserção-razão.",
     "justificativa": "Coerência aparente da justificativa com o gabarito informado.",
 }
+STRUCTURAL_CHECKS = {
+    "RESPOSTA_UNICA": (
+        ("Texto-base preenchido", ("texto-base",)),
+        ("Enunciado preenchido", ("comando",)),
+        ("Alternativas completas e sem duplicação", ("alternativas",)),
+        ("Quantidade conforme o componente", ("resposta-unica.quantidade",)),
+        ("Gabarito válido", ("resposta-unica.gabarito",)),
+        ("Justificativa preenchida", ("justificativa",)),
+        ("Estrutura compatível com resposta única", ("tipo",)),
+    ),
+    "MULTIPLA_ESCOLHA": (
+        ("Texto-base preenchido", ("texto-base",)),
+        ("Comando preenchido", ("comando",)),
+        ("Afirmativas completas e sem duplicação", ("alternativas",)),
+        ("Quantidade de afirmativas (3–5)", ("resposta-multipla.quantidade",)),
+        ("Distribuição de afirmativas verdadeiras e falsas", ("resposta-multipla.distribuicao",)),
+        ("Justificativa preenchida", ("justificativa",)),
+        ("Estrutura compatível com resposta múltipla", ("tipo",)),
+    ),
+    "ASSERCAO_RAZAO": (
+        ("Texto-base preenchido", ("texto-base",)),
+        ("Proposição I preenchida", ("comando",)),
+        ("Proposição II preenchida", ("assercao-razao.proposicao",)),
+        ("Cinco alternativas padronizadas", ("assercao-razao.chave", "assercao-razao.chave-padrao")),
+        ("Gabarito válido", ("assercao-razao.gabarito",)),
+        ("Justificativa preenchida", ("justificativa",)),
+        ("Estrutura compatível com asserção-razão", ("tipo",)),
+    ),
+}
 
 
 def snapshot_questao(questao):
@@ -73,6 +102,25 @@ def _achado(criterio, evidencia, fundamentacao, recomendacao, gravidade="obrigat
         "recomendacao": recomendacao,
         "validacao": "deterministica",
     }
+
+
+def checklist_estrutural(questao, findings=None):
+    checks = STRUCTURAL_CHECKS.get(
+        questao.tipo_questao,
+        (
+            ("Texto-base preenchido", ("texto-base",)),
+            ("Enunciado preenchido", ("comando",)),
+            ("Alternativas completas e sem duplicação", ("alternativas",)),
+            ("Justificativa preenchida", ("justificativa",)),
+            ("Estrutura compatível com o tipo", ("tipo",)),
+        ),
+    )
+    if findings is None:
+        return [{"criterio": label, "conforme": None} for label, _ in checks]
+    finding_ids = {finding.get("criterio") for finding in findings if isinstance(finding, dict)}
+    return [
+        {"criterio": label, "conforme": not any(key in finding_ids for key in keys)} for label, keys in checks
+    ]
 
 
 def validar_estrutura(questao):
@@ -325,36 +373,13 @@ def executar_pre_auditoria(questao, revisor=None, semantica=False, request_id=No
         if any(finding["gravidade"] in ("obrigatoria", "mandatory") for finding in findings)
         else "APROVADA"
     )
-    finding_ids = {finding["criterio"] for finding in findings}
     indicators = {
         "politica": POLICY_VERSION,
         "estruturais_verificados": True,
         "semantica_verificada": semantic_checked,
         "analise_semantica_aviso": semantic_warning,
         "tem_recomendacoes": any(finding["gravidade"] == "recomendacao" for finding in findings),
-        "validacoes_estruturais": [
-            {"criterio": label, "conforme": not any(key in finding_ids for key in keys)}
-            for label, keys in (
-                ("Texto-base preenchido", ("texto-base",)),
-                ("Enunciado ou proposições preenchidos", ("comando", "assercao-razao.proposicao")),
-                ("Alternativas ou afirmativas completas e sem duplicação", ("alternativas",)),
-                (
-                    "Quantidade conforme o tipo",
-                    (
-                        "resposta-unica.quantidade",
-                        "resposta-multipla.quantidade",
-                        "assercao-razao.chave",
-                        "assercao-razao.chave-padrao",
-                    ),
-                ),
-                (
-                    "Gabarito válido",
-                    ("resposta-unica.gabarito", "resposta-multipla.distribuicao", "assercao-razao.gabarito"),
-                ),
-                ("Justificativa preenchida", ("justificativa",)),
-                ("Estrutura compatível com o tipo", ("tipo",)),
-            )
-        ],
+        "validacoes_estruturais": checklist_estrutural(questao, findings),
         "nota": "A pré-auditoria verifica a estrutura; a decisão técnica, científica e pedagógica é do gestor.",
     }
 
@@ -381,17 +406,50 @@ def executar_pre_auditoria(questao, revisor=None, semantica=False, request_id=No
 
 def validar_aprovacao(questao, parecer, justificativa=""):
     current_fingerprint = fingerprint_questao(questao)
-    if parecer.questao_id != questao.pk or parecer.fingerprint != current_fingerprint:
+    if (
+        parecer.questao_id != questao.pk
+        or parecer.fingerprint != current_fingerprint
+        or parecer.arquivado_em is not None
+    ):
         raise ValidationError(
             "O parecer não corresponde à versão atual da questão. Reavalie antes de aprovar."
         )
     if parecer.indicadores.get("politica") != POLICY_VERSION:
         raise ValidationError("Este parecer é histórico. Execute uma nova pré-auditoria antes de aprovar.")
 
-    mandatory = [
-        finding for finding in parecer.achados if finding.get("gravidade") in ("obrigatoria", "mandatory")
-    ]
-    if mandatory:
-        raise ValidationError("Há pendências obrigatórias. Corrija a questão e execute nova pré-auditoria.")
+    mandatory = tem_pendencias_obrigatorias(parecer)
+    if mandatory and len(justificativa.strip()) < 20:
+        raise ValidationError(
+            "A aprovação com pendências exige uma justificativa objetiva com pelo menos 20 caracteres."
+        )
+
+    alternatives = list(questao.alternativas.order_by("pk"))
+    if questao.tipo_questao not in {"RESPOSTA_UNICA", "MULTIPLA_ESCOLHA", "ASSERCAO_RAZAO"}:
+        raise ValidationError("O tipo da questão não é compatível com o Gerador de Provas.")
+    if any(not (alternative.texto or "").strip() for alternative in alternatives):
+        raise ValidationError("A questão contém alternativa sem texto e não pode ser representada na prova.")
+    if questao.tipo_questao == "RESPOSTA_UNICA" and not 1 <= len(alternatives) <= 5:
+        raise ValidationError("A questão não possui uma quantidade de alternativas suportada pela prova.")
+    if questao.tipo_questao == "ASSERCAO_RAZAO" and len(alternatives) != 5:
+        raise ValidationError("A asserção-razão precisa das cinco alternativas padronizadas para a prova.")
+    if questao.tipo_questao == "MULTIPLA_ESCOLHA":
+        from questoes.views import gerar_alternativas_multipla_escolha
+
+        generated = gerar_alternativas_multipla_escolha(questao)
+        if (
+            len(generated) != 4
+            or not any(item.get("eh_correta") for item in generated)
+            or any("Questão com afirmativas inválidas" in item.get("texto", "") for item in generated)
+        ):
+            raise ValidationError(
+                "As afirmativas não podem ser convertidas nas alternativas finais do Gerador de Provas."
+            )
 
     return current_fingerprint
+
+
+def tem_pendencias_obrigatorias(parecer):
+    return any(
+        isinstance(finding, dict) and finding.get("gravidade") in ("obrigatoria", "mandatory")
+        for finding in parecer.achados
+    )

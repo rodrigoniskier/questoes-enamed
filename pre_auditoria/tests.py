@@ -1,11 +1,17 @@
 import uuid
+from datetime import timedelta
+from io import BytesIO
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core import mail
-from django.test import TestCase, override_settings
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
+from PIL import Image
 
 from questoes.ai_control import AIControlError
 from questoes.models import Alternativa, ComponenteCurricular, Periodo, Questao, Semestre
@@ -16,6 +22,7 @@ from .models import (
     DecisaoPreAuditoria,
     EvidenciaRevisor,
     LotePreAuditoria,
+    OperacaoLimpezaPreAuditoria,
     ParecerPreAuditoria,
     SolicitacaoCorrecao,
 )
@@ -72,6 +79,34 @@ class PreAuditoriaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Qual a conduta?")
         self.assertNotContains(response, "Questão arquivada")
+        self.assertContains(response, "Questão não auditada")
+
+    def test_dashboard_filters_and_paginates_question_cards(self):
+        for index in range(26):
+            Questao.objects.create(
+                componente=self.component,
+                professor_nome="Docente de teste",
+                professor_email="docente@example.com",
+                texto_base="Contexto de teste.",
+                enunciado=f"Questão paginada {index}.",
+                justificativa="Justificativa.",
+            )
+        self.client.force_login(self.reviewer)
+        response = self.client.get(
+            reverse("pre_auditoria:lista"),
+            {
+                "semestre": self.component.periodo.semestre_id,
+                "periodo": self.component.periodo_id,
+                "componente": self.component.pk,
+                "page": 2,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["questoes"].number, 2)
+        self.assertEqual(len(response.context["questoes"].object_list), 2)
+        self.assertEqual(response.context["total_submetidas"], 27)
+        self.assertContains(response, f"semestre={self.component.periodo.semestre_id}")
+        self.assertContains(response, "Selecionar para auditoria em lote")
 
     def test_clean_structural_result_is_ready_without_gemini(self):
         self.client.force_login(self.reviewer)
@@ -84,12 +119,131 @@ class PreAuditoriaTests(TestCase):
         self.assertNotIn("inconclusivos", report.indicadores)
         self.assertEqual(self.question.status, "PENDENTE")
 
+    def test_preview_single_answer_matches_print_letters_without_exposing_key(self):
+        self.client.force_login(self.reviewer)
+        response = self.client.get(reverse("pre_auditoria:detalhe", args=[self.question.pk]))
+        self.assertEqual(response.status_code, 200)
+        preview = (
+            response.content.decode()
+            .split('<section class="question-print-preview"', 1)[1]
+            .split("</section>", 1)[0]
+        )
+        for letter in ("A)", "B)", "C)", "D)"):
+            self.assertIn(letter, preview)
+        self.assertNotIn("gabarito cadastrado", preview)
+        self.assertNotIn("(gabarito)", preview)
+
+    def test_preview_multiple_choice_includes_stable_generated_final_options(self):
+        self.question.tipo_questao = "MULTIPLA_ESCOLHA"
+        self.question.save()
+        self.question.alternativas.all().delete()
+        for index in range(3):
+            Alternativa.objects.create(
+                questao=self.question,
+                texto=f"{'I' if index == 0 else 'II' if index == 1 else 'III'}. Afirmação {index + 1}",
+                eh_correta=index == 0,
+            )
+        self.client.force_login(self.reviewer)
+        first = self.client.get(reverse("pre_auditoria:detalhe", args=[self.question.pk]))
+        second = self.client.get(reverse("pre_auditoria:detalhe", args=[self.question.pk]))
+        self.assertEqual(first.status_code, 200)
+        preview = (
+            first.content.decode()
+            .split('<section class="question-print-preview"', 1)[1]
+            .split("</section>", 1)[0]
+        )
+        self.assertIn("Considerando o texto apresentado", preview)
+        self.assertIn("I.", preview)
+        self.assertIn("Apenas a afirmativa I está correta.", preview)
+        self.assertEqual(
+            first.context["questao"].alternativas_finais_preview,
+            second.context["questao"].alternativas_finais_preview,
+        )
+        self.assertEqual(len(first.context["questao"].alternativas_finais_preview), 4)
+        self.assertNotIn("gabarito cadastrado", preview)
+
+    def test_preview_assertion_reason_uses_two_propositions_and_five_options(self):
+        self.question.tipo_questao = "ASSERCAO_RAZAO"
+        self.question.proposicao_dois = "A proposição II explica a proposição I."
+        self.question.save()
+        self.question.alternativas.all().delete()
+        for letter, text in ASSERTION_ANSWERS.items():
+            Alternativa.objects.create(
+                questao=self.question,
+                texto=f"{letter}) {text}",
+                eh_correta=letter == "B",
+            )
+        self.client.force_login(self.reviewer)
+        response = self.client.get(reverse("pre_auditoria:detalhe", args=[self.question.pk]))
+        preview = (
+            response.content.decode()
+            .split('<section class="question-print-preview"', 1)[1]
+            .split("</section>", 1)[0]
+        )
+        self.assertIn("PORQUE", preview)
+        self.assertIn("<strong>II.</strong>", preview)
+        self.assertIn("A proposição II explica a proposição I.", preview)
+        self.assertEqual(len(response.context["questao"].alternativas_finais_preview), 5)
+        self.assertNotIn("gabarito cadastrado", preview)
+
+    def test_preview_shows_existing_image_and_reports_missing_image(self):
+        image_buffer = BytesIO()
+        Image.new("RGB", (2, 2), color="white").save(image_buffer, format="PNG")
+        image = SimpleUploadedFile("tiny.png", image_buffer.getvalue(), content_type="image/png")
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            self.question.imagem = image
+            self.question.save()
+            self.client.force_login(self.reviewer)
+            available = self.client.get(reverse("pre_auditoria:detalhe", args=[self.question.pk]))
+            self.assertContains(available, "Imagem vinculada à questão")
+            self.assertTrue(available.context["questao"].preview_image_available)
+
+            Questao.objects.filter(pk=self.question.pk).update(imagem="imagens_questoes/arquivo-ausente.png")
+            missing = self.client.get(reverse("pre_auditoria:detalhe", args=[self.question.pk]))
+            self.assertContains(missing, "Imagem indisponível")
+            self.assertFalse(missing.context["questao"].preview_image_available)
+
+    def test_checklist_uses_audit_data_for_conforming_and_pending_criteria(self):
+        self.client.force_login(self.reviewer)
+        report = executar_pre_auditoria(self.question, revisor=self.reviewer)
+        response = self.client.get(reverse("pre_auditoria:detalhe", args=[self.question.pk]))
+        self.assertContains(response, "✓ Conforme")
+        self.assertEqual(
+            response.context["questao"].audit_checklist,
+            report.indicadores["validacoes_estruturais"],
+        )
+
+        self.question.justificativa = ""
+        self.question.save()
+        pending_report = executar_pre_auditoria(self.question, revisor=self.reviewer)
+        pending = self.client.get(reverse("pre_auditoria:detalhe", args=[self.question.pk]))
+        self.assertContains(pending, "! Pendente")
+        self.assertContains(pending, "justificativa")
+        self.assertTrue(
+            any(not item["conforme"] for item in pending_report.indicadores["validacoes_estruturais"])
+        )
+
     def test_read_only_reviewer_cannot_start_audit(self):
         self.reviewer.user_permissions.remove(Permission.objects.get(codename="review_parecerpreauditoria"))
         self.client.force_login(self.reviewer)
         response = self.client.post(reverse("pre_auditoria:iniciar", args=[self.question.pk]))
         self.assertEqual(response.status_code, 403)
         self.assertFalse(ParecerPreAuditoria.objects.exists())
+        cleanup = self.client.post(
+            reverse("pre_auditoria:excluir_auditorias"),
+            {"questao_ids": str(self.question.pk)},
+        )
+        self.assertEqual(cleanup.status_code, 403)
+        self.assertFalse(OperacaoLimpezaPreAuditoria.objects.exists())
+
+    def test_cleanup_requires_csrf_token(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.reviewer)
+        response = client.post(
+            reverse("pre_auditoria:excluir_auditorias"),
+            {"parecer_ids": "1"},
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_fingerprint_changes_when_question_content_changes(self):
         before = fingerprint_questao(self.question)
@@ -193,7 +347,10 @@ class PreAuditoriaTests(TestCase):
         self.assertEqual(report.achados[0]["gravidade"], "recomendacao")
         generate.assert_called_once()
         self.client.force_login(self.reviewer)
-        self.client.post(reverse("pre_auditoria:aprovar", args=[self.question.pk]))
+        self.client.post(
+            reverse("pre_auditoria:aprovar", args=[self.question.pk]),
+            {"confirmar_aprovacao": "on"},
+        )
         self.question.refresh_from_db()
         self.assertEqual(self.question.status, "APROVADA")
 
@@ -207,15 +364,73 @@ class PreAuditoriaTests(TestCase):
         self.client.force_login(self.reviewer)
         url = reverse("pre_auditoria:aprovar", args=[self.question.pk])
         with self.captureOnCommitCallbacks(execute=True):
-            approved = self.client.post(url)
+            approved = self.client.post(url, {"confirmar_aprovacao": "on"})
         self.assertRedirects(approved, reverse("pre_auditoria:detalhe", args=[self.question.pk]))
         self.question.refresh_from_db()
         report.refresh_from_db()
         self.assertEqual(self.question.status, "APROVADA")
         self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.APROVADA)
-        self.assertEqual(DecisaoPreAuditoria.objects.get().revisor, self.reviewer)
+        decision = DecisaoPreAuditoria.objects.get()
+        self.assertEqual(decision.revisor, self.reviewer)
+        self.assertFalse(decision.aprovacao_excepcional)
         self.question.refresh_from_db()
         self.assertEqual(self.question.notified_status, "APROVADA")
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_exceptional_approval_requires_justification_and_preserves_audit(self):
+        self.question.justificativa = ""
+        self.question.save()
+        report = executar_pre_auditoria(self.question, revisor=self.reviewer)
+        original_result = report.resultado
+        original_findings = report.achados
+        original_indicators = report.indicadores
+        self.assertEqual(original_result, ParecerPreAuditoria.Resultado.PENDENCIAS)
+        self.client.force_login(self.reviewer)
+        url = reverse("pre_auditoria:aprovar", args=[self.question.pk])
+
+        missing_reason = self.client.post(url, {"confirmar_aprovacao": "on"}, follow=True)
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, "PENDENTE")
+        self.assertFalse(DecisaoPreAuditoria.objects.exists())
+        self.assertContains(missing_reason, "justificativa objetiva", status_code=200)
+
+        reason = (
+            "Pendências verificadas manualmente; a apresentação e o conteúdo foram considerados adequados."
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            approved = self.client.post(
+                url,
+                {"confirmar_aprovacao": "on", "justificativa": reason},
+            )
+        self.assertRedirects(approved, reverse("pre_auditoria:detalhe", args=[self.question.pk]))
+        self.question.refresh_from_db()
+        report.refresh_from_db()
+        decision = DecisaoPreAuditoria.objects.get()
+        self.assertEqual(self.question.status, "APROVADA")
+        self.assertTrue(decision.aprovacao_excepcional)
+        self.assertEqual(decision.revisor, self.reviewer)
+        self.assertEqual(decision.revisor_nome, self.reviewer.get_username())
+        self.assertEqual(decision.justificativa, reason)
+        self.assertEqual(report.resultado, original_result)
+        self.assertEqual(report.achados, original_findings)
+        self.assertEqual(report.indicadores, original_indicators)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_approval_requires_explicit_confirmation_and_is_not_duplicated(self):
+        executar_pre_auditoria(self.question, revisor=self.reviewer)
+        self.client.force_login(self.reviewer)
+        url = reverse("pre_auditoria:aprovar", args=[self.question.pk])
+        self.client.post(url)
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, "PENDENTE")
+        self.assertFalse(DecisaoPreAuditoria.objects.exists())
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(url, {"confirmar_aprovacao": "on"})
+        self.client.post(url, {"confirmar_aprovacao": "on"})
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, "APROVADA")
+        self.assertEqual(DecisaoPreAuditoria.objects.count(), 1)
         self.assertEqual(len(mail.outbox), 1)
 
     def test_approved_question_is_visible_to_admin_submeter_and_generator(self):
@@ -231,7 +446,10 @@ class PreAuditoriaTests(TestCase):
         for index in range(4):
             Alternativa.objects.create(questao=pending, texto=f"Pendente {index}", eh_correta=index == 0)
         self.client.force_login(self.reviewer)
-        self.client.post(reverse("pre_auditoria:aprovar", args=[self.question.pk]))
+        self.client.post(
+            reverse("pre_auditoria:aprovar", args=[self.question.pk]),
+            {"confirmar_aprovacao": "on"},
+        )
         self.question.refresh_from_db()
         self.assertEqual(self.question.status, "APROVADA")
 
@@ -261,7 +479,12 @@ class PreAuditoriaTests(TestCase):
         self.question.enunciado = "Versão nova da questão?"
         self.question.save()
         self.client.force_login(self.reviewer)
-        self.client.post(reverse("pre_auditoria:aprovar", args=[self.question.pk]))
+        detail = self.client.get(reverse("pre_auditoria:detalhe", args=[self.question.pk]))
+        self.assertContains(detail, "Auditoria desatualizada — Reavaliar")
+        self.client.post(
+            reverse("pre_auditoria:aprovar", args=[self.question.pk]),
+            {"confirmar_aprovacao": "on"},
+        )
         self.question.refresh_from_db()
         self.assertEqual(self.question.status, "PENDENTE")
         self.assertFalse(DecisaoPreAuditoria.objects.exists())
@@ -476,7 +699,10 @@ class PreAuditoriaTests(TestCase):
         self.assertTrue(report.indicadores["analise_semantica_aviso"])
         self.assertEqual(report.resultado, ParecerPreAuditoria.Resultado.APROVADA)
         self.client.force_login(self.reviewer)
-        self.client.post(reverse("pre_auditoria:aprovar", args=[self.question.pk]))
+        self.client.post(
+            reverse("pre_auditoria:aprovar", args=[self.question.pk]),
+            {"confirmar_aprovacao": "on"},
+        )
         self.question.refresh_from_db()
         self.assertEqual(self.question.status, "APROVADA")
 
@@ -496,7 +722,10 @@ class PreAuditoriaTests(TestCase):
             revisor=self.reviewer,
         )
         self.client.force_login(self.reviewer)
-        self.client.post(reverse("pre_auditoria:aprovar", args=[self.question.pk]))
+        self.client.post(
+            reverse("pre_auditoria:aprovar", args=[self.question.pk]),
+            {"confirmar_aprovacao": "on"},
+        )
         self.question.refresh_from_db()
         historical.refresh_from_db()
         self.assertEqual(self.question.status, "PENDENTE")
@@ -507,9 +736,170 @@ class PreAuditoriaTests(TestCase):
         self.assertEqual(current.resultado, ParecerPreAuditoria.Resultado.APROVADA)
         response = self.client.get(reverse("pre_auditoria:detalhe", args=[self.question.pk]))
         self.assertContains(response, "Política anterior")
-        self.client.post(reverse("pre_auditoria:aprovar", args=[self.question.pk]))
+        self.client.post(
+            reverse("pre_auditoria:aprovar", args=[self.question.pk]),
+            {"confirmar_aprovacao": "on"},
+        )
         self.question.refresh_from_db()
         self.assertEqual(self.question.status, "APROVADA")
+
+    def test_individual_historical_report_is_deleted_only_after_count_confirmation(self):
+        historical = ParecerPreAuditoria.objects.create(
+            questao=self.question,
+            resultado=ParecerPreAuditoria.Resultado.PENDENCIAS,
+            fingerprint=fingerprint_questao(self.question),
+            achados=[{"criterio": "manual.antigo", "gravidade": "mandatory"}],
+            indicadores={"politica": "submeter-basica-v0"},
+        )
+        latest = executar_pre_auditoria(self.question, revisor=self.reviewer)
+        self.client.force_login(self.reviewer)
+        detail_url = reverse("pre_auditoria:detalhe", args=[self.question.pk])
+        cleanup_url = reverse("pre_auditoria:excluir_auditorias")
+
+        preview = self.client.post(cleanup_url, {"parecer_ids": str(historical.pk), "next": detail_url})
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(len(preview.context["plano"]["deletable_ids"]), 1)
+        self.assertEqual(preview.context["plano"]["not_eligible"], 0)
+        confirm = self.client.post(
+            cleanup_url,
+            {
+                "plano_assinado": preview.context["confirmacao"],
+                "confirmar_operacao": "on",
+                "next": detail_url,
+            },
+        )
+        self.assertRedirects(confirm, detail_url)
+        self.assertFalse(ParecerPreAuditoria.objects.filter(pk=historical.pk).exists())
+        self.assertTrue(ParecerPreAuditoria.objects.filter(pk=latest.pk).exists())
+        self.assertTrue(Questao.objects.filter(pk=self.question.pk).exists())
+        self.assertEqual(self.question.alternativas.count(), 4)
+        operation = OperacaoLimpezaPreAuditoria.objects.get()
+        self.assertEqual(operation.revisor, self.reviewer)
+        self.assertEqual(operation.pareceres_excluidos, [historical.pk])
+
+    def test_bulk_cleanup_archives_protected_history_and_preserves_questions(self):
+        historical_delete = ParecerPreAuditoria.objects.create(
+            questao=self.question,
+            resultado=ParecerPreAuditoria.Resultado.PENDENCIAS,
+            fingerprint=fingerprint_questao(self.question),
+            achados=[],
+            indicadores={"politica": "submeter-basica-v0"},
+        )
+        historical_protected = ParecerPreAuditoria.objects.create(
+            questao=self.question,
+            resultado=ParecerPreAuditoria.Resultado.INCONCLUSIVA,
+            fingerprint=fingerprint_questao(self.question),
+            achados=[],
+            indicadores={"politica": "submeter-basica-v0"},
+        )
+        evidence = EvidenciaRevisor.objects.create(
+            parecer=historical_protected,
+            criterio_id="10",
+            evidencia="Evidência humana que precisa permanecer no histórico.",
+            revisor=self.reviewer,
+        )
+        decision = DecisaoPreAuditoria.objects.create(
+            questao=self.question,
+            parecer=historical_protected,
+            revisor=self.reviewer,
+            revisor_nome=self.reviewer.get_username(),
+            acao=DecisaoPreAuditoria.Acao.CORRECAO,
+            fingerprint=historical_protected.fingerprint,
+            justificativa="Decisão administrativa anterior.",
+        )
+        correction = SolicitacaoCorrecao.objects.create(
+            questao=self.question,
+            parecer=historical_protected,
+            revisor=self.reviewer,
+            revisor_nome=self.reviewer.get_username(),
+            mensagem="Pedido de correção preservado para rastreabilidade.",
+            expira_em=timezone.now() + timedelta(days=7),
+        )
+        latest = executar_pre_auditoria(self.question, revisor=self.reviewer)
+
+        second = Questao.objects.create(
+            componente=self.component,
+            professor_nome="Segundo docente",
+            professor_email="segundo@example.com",
+            texto_base="Outro contexto.",
+            enunciado="Questão secundária?",
+            justificativa="Justificativa secundária.",
+        )
+        for index in range(4):
+            Alternativa.objects.create(
+                questao=second, texto=f"Resposta secundária {index}", eh_correta=index == 0
+            )
+        second_historical = ParecerPreAuditoria.objects.create(
+            questao=second,
+            resultado=ParecerPreAuditoria.Resultado.PENDENCIAS,
+            fingerprint=fingerprint_questao(second),
+            achados=[],
+            indicadores={"politica": "submeter-basica-v0"},
+        )
+        second_latest = executar_pre_auditoria(second, revisor=self.reviewer)
+
+        self.client.force_login(self.reviewer)
+        cleanup_url = reverse("pre_auditoria:excluir_auditorias")
+        preview = self.client.post(
+            cleanup_url,
+            {"questao_ids": [str(self.question.pk), str(second.pk)]},
+        )
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(len(preview.context["plano"]["deletable_ids"]), 2)
+        self.assertEqual(len(preview.context["plano"]["archivable_ids"]), 1)
+        confirm = self.client.post(
+            cleanup_url,
+            {
+                "plano_assinado": preview.context["confirmacao"],
+                "confirmar_operacao": "on",
+            },
+        )
+        self.assertRedirects(confirm, reverse("pre_auditoria:lista"))
+        self.assertFalse(ParecerPreAuditoria.objects.filter(pk=historical_delete.pk).exists())
+        self.assertFalse(ParecerPreAuditoria.objects.filter(pk=second_historical.pk).exists())
+        historical_protected.refresh_from_db()
+        self.assertIsNotNone(historical_protected.arquivado_em)
+        self.assertEqual(historical_protected.arquivado_por, self.reviewer)
+        self.assertTrue(EvidenciaRevisor.objects.filter(pk=evidence.pk).exists())
+        self.assertTrue(DecisaoPreAuditoria.objects.filter(pk=decision.pk).exists())
+        self.assertTrue(SolicitacaoCorrecao.objects.filter(pk=correction.pk).exists())
+        self.assertEqual(ParecerPreAuditoria.objects.filter(pk__in=[latest.pk, second_latest.pk]).count(), 2)
+        self.assertEqual(Questao.objects.filter(pk__in=[self.question.pk, second.pk]).count(), 2)
+        self.assertEqual(self.question.alternativas.count(), 4)
+        operation = OperacaoLimpezaPreAuditoria.objects.get()
+        self.assertEqual(operation.pareceres_excluidos, sorted([historical_delete.pk, second_historical.pk]))
+        self.assertEqual(operation.pareceres_arquivados, [historical_protected.pk])
+        self.assertEqual(operation.nao_elegiveis, 0)
+
+    def test_cleanup_rechecks_dependencies_before_final_confirmation(self):
+        historical = ParecerPreAuditoria.objects.create(
+            questao=self.question,
+            resultado=ParecerPreAuditoria.Resultado.PENDENCIAS,
+            fingerprint=fingerprint_questao(self.question),
+            achados=[],
+            indicadores={"politica": "submeter-basica-v0"},
+        )
+        executar_pre_auditoria(self.question, revisor=self.reviewer)
+        self.client.force_login(self.reviewer)
+        url = reverse("pre_auditoria:excluir_auditorias")
+        preview = self.client.post(url, {"parecer_ids": str(historical.pk)})
+        EvidenciaRevisor.objects.create(
+            parecer=historical,
+            criterio_id="10",
+            evidencia="A evidência foi registrada após a tela de confirmação.",
+            revisor=self.reviewer,
+        )
+        stale_confirmation = self.client.post(
+            url,
+            {
+                "plano_assinado": preview.context["confirmacao"],
+                "confirmar_operacao": "on",
+            },
+        )
+        self.assertEqual(stale_confirmation.status_code, 409)
+        self.assertEqual(len(stale_confirmation.context["plano"]["archivable_ids"]), 1)
+        self.assertTrue(ParecerPreAuditoria.objects.filter(pk=historical.pk).exists())
+        self.assertFalse(OperacaoLimpezaPreAuditoria.objects.exists())
 
     @override_settings(GEMINI_API_KEY="synthetic-test-key")
     @patch(

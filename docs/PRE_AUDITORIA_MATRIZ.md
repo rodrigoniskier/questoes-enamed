@@ -6,7 +6,7 @@ A pré-auditoria é uma verificação formal. Ela não substitui a avaliação t
 
 ## Nível A: falhas estruturais obrigatórias
 
-Uma falha estrutural aparece como pendência objetiva e deve ser corrigida antes da aprovação.
+Uma falha estrutural aparece como pendência objetiva, que normalmente deve ser corrigida antes da aprovação. O gestor pode, excepcionalmente, aprovar após inspeção visual e justificativa registrada; essa decisão não altera o resultado nem os achados do parecer.
 
 | Tipo | Validações estruturais |
 | --- | --- |
@@ -26,3 +26,7 @@ Recomendações não bloqueiam a aprovação e não exigem justificativa individ
 O parecer estrutural atual pode resultar em **Pendências** ou **Apta para aprovação**. Após a decisão do gestor, `Questao.status` é atualizado para `APROVADA`; o Gerador de Provas continua aplicando seus filtros normais. O gestor também pode editar, solicitar correção ao professor, reavaliar e consultar o histórico.
 
 Pareceres sem o marcador da política atual são históricos. Eles não são alterados nem reinterpretados e não habilitam aprovação sob a política nova. É necessária uma nova pré-auditoria, vinculada ao fingerprint atual da questão. Evidências, decisões e registros de edição antigos permanecem preservados.
+
+O gestor pode aprovar uma questão com pendências estruturais após confirmar a inspeção visual e informar uma justificativa objetiva (mínimo de 20 caracteres). O status oficial passa a `APROVADA`, mas o resultado, os indicadores e os achados do parecer permanecem intactos; a decisão registra o responsável, horário, justificativa e marcador de aprovação excepcional. Questões sem um formato suportado pelo Gerador de Provas, sem alternativas legíveis, com versão alterada, sem parecer atual ou fora da política vigente continuam bloqueadas.
+
+Na limpeza de históricos, o parecer mais recente não pode ser selecionado por padrão. Pareceres antigos sem dependências administrativas podem ser excluídos fisicamente após confirmação das contagens; os que tenham evidências, decisões ou solicitações de correção são arquivados, preservando seus relacionamentos. Cada operação registra o usuário, a data e os IDs afetados. A limpeza não exclui questões nem conteúdo acadêmico.
