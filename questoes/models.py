@@ -2,6 +2,7 @@
 
 from io import BytesIO
 
+from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db import models
 from PIL import Image
@@ -190,3 +191,41 @@ class SubmissionReceipt(models.Model):
         Questao, on_delete=models.SET_NULL, null=True, related_name="submission_receipt"
     )
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ImportacaoQuestao(models.Model):
+    """Recibo permanente: exclusões não apagam a identidade da importação."""
+
+    origem = models.ForeignKey(
+        Questao,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="importacoes",
+    )
+    origem_identificador = models.PositiveBigIntegerField(editable=False)
+    componente_origem = models.CharField(max_length=200, editable=False)
+    copia = models.OneToOneField(
+        Questao,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="importacao",
+    )
+    receptor = models.ForeignKey(ComponenteCurricular, on_delete=models.PROTECT)
+    semestre = models.ForeignKey(Semestre, on_delete=models.PROTECT)
+    responsavel = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    comentario_origem = models.TextField(blank=True, default="", editable=False)
+    criada_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "registro de importação"
+        verbose_name_plural = "registros de importação"
+        permissions = [("importar_questoes", "Pode importar questões entre componentes")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["origem_identificador", "receptor"],
+                name="questao_origem_receptor_unicos",
+            )
+        ]
+
+    def __str__(self):
+        return f"Questão {self.origem_identificador} → {self.receptor}"
