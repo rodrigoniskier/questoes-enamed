@@ -9,10 +9,12 @@ from django.db.models import Count, Q
 from django.forms import Textarea
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpResponse
+from django.urls import path
 from django.utils.html import format_html
 
 # Modelos e utils
-from .models import AIPrompt, Alternativa, ComponenteCurricular, Periodo, Questao, Semestre
+from .importacao_admin import importar_view
+from .models import AIPrompt, Alternativa, ComponenteCurricular, ImportacaoQuestao, Periodo, Questao, Semestre
 from .utils import avaliar_questao_com_ia, enviar_email_status
 
 
@@ -389,3 +391,30 @@ class AIPromptAdmin(admin.ModelAdmin):
 admin.site.register(Periodo, PeriodoAdmin)
 admin.site.register(ComponenteCurricular, ComponenteCurricularAdmin)
 admin.site.register(Questao, QuestaoAdmin)
+
+
+@admin.register(ImportacaoQuestao)
+class ImportacaoQuestaoAdmin(admin.ModelAdmin):
+    list_display = ("origem_identificador", "copia", "receptor", "semestre", "responsavel", "criada_em")
+    list_select_related = ("copia", "receptor__periodo", "semestre", "responsavel")
+    list_filter = ("semestre", "receptor")
+    readonly_fields = tuple(field.name for field in ImportacaoQuestao._meta.fields)
+    change_list_template = "admin/questoes/importacaoquestao/change_list.html"
+    actions = None
+
+    def get_urls(self):
+        return [
+            path("importar/", self.admin_site.admin_view(self.importar), name="questoes_importar")
+        ] + super().get_urls()
+
+    def importar(self, request):
+        return importar_view(request, admin_site=self.admin_site)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

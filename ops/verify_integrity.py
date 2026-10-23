@@ -5,20 +5,24 @@ import hashlib
 import json
 import sqlite3
 import tarfile
+from contextlib import closing
 from pathlib import Path
 
 
 def compare(baseline, current, media_archive=None, media_root=None):
     evidence = {}
     with (
-        sqlite3.connect(f"file:{baseline}?mode=ro", uri=True) as before,
-        sqlite3.connect(f"file:{current}?mode=ro", uri=True) as after,
+        closing(sqlite3.connect(f"file:{baseline}?mode=ro", uri=True)) as before,
+        closing(sqlite3.connect(f"file:{current}?mode=ro", uri=True)) as after,
     ):
         after.execute("BEGIN")
         assert after.execute("PRAGMA integrity_check").fetchone()[0] == "ok", "SQLite integrity failed"
         assert not after.execute("PRAGMA foreign_key_check").fetchall(), "Invalid foreign keys"
         for (table,) in before.execute("SELECT name FROM sqlite_master WHERE type='table'"):
-            if not (table.startswith("questoes_") or table in ("auth_user", "django_admin_log")):
+            if not (
+                table.startswith(("questoes_", "pre_auditoria_", "bulk_submit_"))
+                or table in ("auth_user", "django_admin_log")
+            ):
                 continue
             columns = [r[1] for r in before.execute(f'PRAGMA table_info("{table}")')]
             primary = next(r[1] for r in before.execute(f'PRAGMA table_info("{table}")') if r[5])
