@@ -24,7 +24,12 @@ jobs:
         with:
           python-version: '3.13'
       - run: python -m pip install -r requirements.txt playwright==1.64.1
-      - run: python -m playwright install --with-deps chromium
+      - name: Usar Chrome instalado no runner
+        run: |
+          import_browser_path="$(command -v google-chrome)"
+          test -x "$import_browser_path"
+          "$import_browser_path" --version
+          printf 'BROWSER_EXECUTABLE=%s\n' "$import_browser_path" >> "$GITHUB_ENV"
       - run: python manage.py test questoes.test_importacao_browser --settings=gerador_provas.test_settings
         env:
           RUN_BROWSER_TESTS: '1'
