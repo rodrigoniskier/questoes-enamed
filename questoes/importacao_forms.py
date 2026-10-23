@@ -24,6 +24,8 @@ class ContextoImportacaoForm(forms.Form):
 
     def __init__(self, *args, exigir_doador=True, **kwargs):
         super().__init__(*args, **kwargs)
+        for campo in self.fields.values():
+            campo.widget.attrs["class"] = "form-control"
         self.fields["doador"].required = exigir_doador
         self.fields["semestre"].queryset = Semestre.objects.filter(ativo=True)
         if self.is_bound:

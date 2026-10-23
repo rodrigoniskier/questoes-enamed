@@ -1,53 +1,131 @@
 {% extends "admin/base_site.html" %}
 {% load i18n static %}
-{% block extrastyle %}{{ block.super }}<style>
-.importacao {max-width:1100px;width:100%;min-width:0;padding:0 1em}.tabela-importacao{overflow-x:auto} .importacao table{width:100%;margin:1em 0}.importacao th,.importacao td{padding:.65em;vertical-align:top}.importacao label{display:inline-block;margin:.5em .3em}.importacao button{margin:.4em;padding:.5em}.importacao .erro{border:2px solid #c33;padding:1em}.importacao pre{white-space:pre-wrap;font:inherit}.importacao .preview{max-height:14em;overflow:auto;white-space:pre-wrap}.importacao select{max-width:100%}
-</style>{% endblock %}
-{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Início</a> › {{ title }}</div>{% endblock %}
-{% block content %}<div class="importacao">
-<p>Copie questões entre componentes do mesmo semestre letivo ativo. As originais permanecem intactas; as cópias entram pendentes de validação. Limite: 500 questões por operação.</p>
-{% if erros %}<div class="erro" role="alert">{{ erros }}</div>{% endif %}
-{% if resultado %}
-<h2>Importação concluída</h2><p>{{ resultado.importadas }} importadas; {{ resultado.ignoradas }} ignoradas (já importadas); 0 erros.</p>
-<a href="{% url 'admin:questoes_questao_changelist' %}">Consultar questões</a> · <a href="?">Nova importação</a>
-{% elif confirmacao %}
-<h2>Confirmar importação</h2>
-<p>Semestre: <strong>{{ escolha.semestre }}</strong>. Doador: <strong>{{ escolha.doador }}</strong>. Receptor: <strong>{{ escolha.receptor }}</strong>.</p>
-<p><strong>{{ selecionadas|length }} questões selecionadas.</strong> As que já tiverem recibo de importação para este receptor serão ignoradas, inclusive se a cópia anterior tiver sido excluída. Imagens serão copiadas para arquivos independentes.</p>
-<ul>{% for questao in exemplos %}<li>#{{ questao.pk }} — {{ questao.enunciado|truncatechars:180 }}</li>{% endfor %}</ul>
-{% if selecionadas|length > 50 %}<p>Mostrando as primeiras 50 questões selecionadas.</p>{% endif %}
-<form method="post">{% csrf_token %}
-<input type="hidden" name="semestre" value="{{ escolha.semestre.pk }}"><input type="hidden" name="doador" value="{{ escolha.doador.pk }}"><input type="hidden" name="receptor" value="{{ escolha.receptor.pk }}"><input type="hidden" name="estado" value="{{ estado }}">
-<button type="submit" name="acao" value="importar" class="default">Importar questões</button>
-<button type="submit" name="acao" value="voltar">Voltar à seleção</button>
-</form>
-{% else %}
-<details {% if not pagina_obj %}open{% endif %}><summary>1 e 2 — Semestre e componente doador</summary>
-<p>Carregue primeiro o semestre e depois escolha o doador. Alterar este contexto inicia uma nova seleção.</p>
-<form method="get" id="contexto-importacao">{{ contexto_form.semestre.errors }}{{ contexto_form.semestre.label_tag }} {{ contexto_form.semestre }}
-{{ contexto_form.doador.errors }}{{ contexto_form.doador.label_tag }} {{ contexto_form.doador }}
-<button type="submit">Carregar componentes / questões</button></form>
-<p>Somente semestres e períodos ativos com componentes não consolidados podem participar. Os links antigos de componentes consolidados continuam preservados.</p>
-</details>
-{% if reiniciar %}<a href="?">Recarregar seleção</a>{% endif %}
-{% if pagina_obj %}
-<h2>3 — Selecionar questões de {{ escolha.doador }}</h2><p>Semestre: {{ escolha.semestre }}.</p>
-<form method="post" id="selecao-importacao">{% csrf_token %}
-<input type="hidden" name="semestre" value="{{ escolha.semestre.pk }}"><input type="hidden" name="doador" value="{{ escolha.doador.pk }}"><input type="hidden" name="estado" value="{{ estado }}">
-<label for="busca">Buscar no enunciado ou texto-base</label><input id="busca" name="busca" maxlength="200" value="{{ busca }}">
-<label for="status">Status</label><select name="status" id="status"><option value="">Todos</option>{% for valor, rotulo in status_choices %}<option value="{{ valor }}" {% if status_filtro == valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}</select>
-<button type="submit" name="acao" value="filtrar">Filtrar e manter seleção</button>
-<p><button type="submit" name="acao" value="selecionar_filtradas">Selecionar todas do filtro (até 500)</button><button type="submit" name="acao" value="limpar_todas">Desmarcar todas, inclusive outras páginas</button></p>
-<p><button type="button" data-selecao="todas">Selecionar todas desta página</button><button type="button" data-selecao="nenhuma">Desmarcar todas desta página</button>
-<strong id="contador-selecao" aria-live="polite" data-fora="{{ selecionadas|length }}" data-visiveis="{{ selecionadas_visiveis }}">{{ selecionadas|length }} selecionadas</strong></p>
-<p>A seleção é preservada ao usar os botões de filtro e paginação deste formulário. Os botões de seleção atuam nas 25 questões da página atual.</p>
-<div class="tabela-importacao" role="region" aria-label="Questões disponíveis" tabindex="0"><table><thead><tr><th>Selecionar</th><th>ID</th><th>Enunciado / texto-base</th><th>Tipo</th><th>Status</th><th>Autor</th></tr></thead><tbody>
-{% for questao in pagina_obj %}<tr><td><input type="checkbox" name="marcadas" value="{{ questao.pk }}" aria-label="Selecionar questão {{ questao.pk }}" {% if questao.pk in selecionadas %}checked{% endif %}></td><td>#{{ questao.pk }}</td><td><div class="preview">{{ questao.enunciado }}</div>{% if questao.texto_base %}<details><summary>Texto-base</summary><div class="preview">{{ questao.texto_base }}</div></details>{% endif %}{% if questao.imagem %}<a href="{{ questao.imagem.url }}" target="_blank" rel="noopener">Ver imagem</a>{% endif %}</td><td>{{ questao.get_tipo_questao_display }}</td><td>{{ questao.get_status_display }}</td><td>{{ questao.professor_nome }}</td></tr>
-{% empty %}<tr><td colspan="6">Nenhuma questão encontrada.</td></tr>{% endfor %}</tbody></table></div>
-<p>{{ pagina_obj.paginator.count }} questões no filtro. Página {{ pagina_obj.number }} de {{ pagina_obj.paginator.num_pages }}.</p>
-<label for="pagina">Ir para página</label><input type="number" id="pagina" name="pagina" min="1" max="{{ pagina_obj.paginator.num_pages }}" value="{{ pagina_obj.number }}"><button type="submit" name="acao" value="pagina">Ir e manter seleção</button>
-<h2>4 — Componente receptor</h2>{{ contexto_form.receptor.errors }}{{ contexto_form.receptor.label_tag }} {{ contexto_form.receptor }}
-<h2>5 — Revisar a operação</h2><button type="submit" name="acao" value="confirmar" class="default">Revisar importação</button>
-</form>
-{% endif %}{% endif %}</div>{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .importacao-admin .content-wrapper h1 {min-width: 0; overflow-wrap: anywhere;}
+    .importacao-admin .content-wrapper > .content > .container-fluid > .row > .d-flex {min-width: 0; flex-wrap: wrap;}
+    .importacao {min-width: 0; overflow-wrap: anywhere;}
+    .importacao .card, .importacao .card-body {min-width: 0;}
+    .importacao .preview {max-height: 14em; overflow: auto; white-space: pre-wrap; min-width: 16rem;}
+    .importacao .table th, .importacao .table td {vertical-align: top;}
+    .importacao .acoes {display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;}
+    .importacao .form-control {max-width: 100%;}
+    .importacao .errorlist {margin-bottom: .5rem;}
+    .importacao .pagina-input {width: 6rem;}
+    @media (max-width: 575.98px) {
+        .importacao .acoes .btn {width: 100%; white-space: normal;}
+    }
+</style>
+{% endblock %}
+
+{% block bodyclass %}{{ block.super }} importacao-admin{% endblock %}
+{% block content_title %}{{ title }}{% endblock %}
+{% block breadcrumbs %}
+<ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'admin:index' %}">{% trans 'Home' %}</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin:app_list' app_label='questoes' %}">Questões</a></li>
+    <li class="breadcrumb-item active">Importação de questões</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div id="content-main" class="col-12 importacao">
+    <p class="mb-3">Copie questões entre componentes do mesmo semestre letivo ativo. As originais permanecem intactas; as cópias entram pendentes de validação. Limite: 500 questões por operação.</p>
+    {% if erros %}<div class="alert alert-danger" role="alert">{{ erros }}</div>{% endif %}
+
+    {% if resultado %}
+    <div class="card card-outline card-success">
+        <div class="card-header"><h2 class="card-title">Importação concluída</h2></div>
+        <div class="card-body">
+            <p>{{ resultado.importadas }} importadas; {{ resultado.ignoradas }} ignoradas (já importadas); 0 erros.</p>
+            <div class="acoes">
+                <a class="btn btn-primary" href="{% url 'admin:questoes_questao_changelist' %}">Consultar questões</a>
+                <a class="btn btn-secondary" href="?">Nova importação</a>
+            </div>
+        </div>
+    </div>
+    {% elif confirmacao %}
+    <div class="card card-outline card-primary">
+        <div class="card-header"><h2 class="card-title">Confirmar importação</h2></div>
+        <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-2">Semestre</dt><dd class="col-sm-10">{{ escolha.semestre }}</dd>
+                <dt class="col-sm-2">Doador</dt><dd class="col-sm-10">{{ escolha.doador }}</dd>
+                <dt class="col-sm-2">Receptor</dt><dd class="col-sm-10">{{ escolha.receptor }}</dd>
+            </dl>
+            <p><strong>{{ selecionadas|length }} questões selecionadas.</strong> As que já tiverem recibo de importação para este receptor serão ignoradas, inclusive se a cópia anterior tiver sido excluída. Imagens serão copiadas para arquivos independentes.</p>
+            <ul class="pl-3">{% for questao in exemplos %}<li>#{{ questao.pk }} — {{ questao.enunciado|truncatechars:180 }}</li>{% endfor %}</ul>
+            {% if selecionadas|length > 50 %}<p>Mostrando as primeiras 50 questões selecionadas.</p>{% endif %}
+        </div>
+        <div class="card-footer">
+            <form method="post" class="acoes">{% csrf_token %}
+                <input type="hidden" name="semestre" value="{{ escolha.semestre.pk }}"><input type="hidden" name="doador" value="{{ escolha.doador.pk }}"><input type="hidden" name="receptor" value="{{ escolha.receptor.pk }}"><input type="hidden" name="estado" value="{{ estado }}">
+                <button type="submit" name="acao" value="importar" class="btn btn-success">Importar questões</button>
+                <button type="submit" name="acao" value="voltar" class="btn btn-secondary">Voltar à seleção</button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <div class="card card-outline card-primary">
+        <div class="card-header"><h2 class="card-title">1 e 2 — Semestre e componente doador</h2></div>
+        <div class="card-body">
+            <p>Carregue primeiro o semestre e depois escolha o doador. Alterar este contexto inicia uma nova seleção.</p>
+            <form method="get" id="contexto-importacao">
+                <div class="row">
+                    <div class="form-group col-12 col-lg-4">{{ contexto_form.semestre.label_tag }}{{ contexto_form.semestre }}{{ contexto_form.semestre.errors }}</div>
+                    <div class="form-group col-12 col-lg-8">{{ contexto_form.doador.label_tag }}{{ contexto_form.doador }}{{ contexto_form.doador.errors }}</div>
+                </div>
+                <div class="acoes"><button type="submit" class="btn btn-primary">Carregar componentes / questões</button></div>
+            </form>
+            <p class="text-muted mt-3 mb-0">Somente semestres e períodos ativos com componentes não consolidados podem participar. Os links antigos de componentes consolidados continuam preservados.</p>
+        </div>
+    </div>
+    {% if reiniciar %}<p><a href="?" class="btn btn-secondary">Recarregar seleção</a></p>{% endif %}
+    {% if pagina_obj %}
+    <form method="post" id="selecao-importacao">{% csrf_token %}
+        <input type="hidden" name="semestre" value="{{ escolha.semestre.pk }}"><input type="hidden" name="doador" value="{{ escolha.doador.pk }}"><input type="hidden" name="estado" value="{{ estado }}">
+        <div class="card">
+            <div class="card-header"><h2 class="card-title">3 — Selecionar questões de {{ escolha.doador }}</h2></div>
+            <div class="card-body">
+                <p>Semestre: {{ escolha.semestre }}.</p>
+                <div class="row">
+                    <div class="form-group col-12 col-lg-8"><label for="busca">Buscar no enunciado ou texto-base</label><input class="form-control" id="busca" name="busca" maxlength="200" value="{{ busca }}"></div>
+                    <div class="form-group col-12 col-lg-4"><label for="status">Status</label><select class="form-control" name="status" id="status"><option value="">Todos</option>{% for valor, rotulo in status_choices %}<option value="{{ valor }}" {% if status_filtro == valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}</select></div>
+                </div>
+                <div class="acoes mb-3">
+                    <button type="submit" name="acao" value="filtrar" class="btn btn-primary">Filtrar e manter seleção</button>
+                    <button type="submit" name="acao" value="selecionar_filtradas" class="btn btn-secondary">Selecionar todas do filtro (até 500)</button>
+                    <button type="submit" name="acao" value="limpar_todas" class="btn btn-secondary">Desmarcar todas, inclusive outras páginas</button>
+                </div>
+                <div class="acoes mb-3">
+                    <button type="button" data-selecao="todas" class="btn btn-secondary">Selecionar todas desta página</button>
+                    <button type="button" data-selecao="nenhuma" class="btn btn-secondary">Desmarcar todas desta página</button>
+                    <strong class="badge badge-info p-2" id="contador-selecao" aria-live="polite" data-fora="{{ selecionadas|length }}" data-visiveis="{{ selecionadas_visiveis }}">{{ selecionadas|length }} selecionadas</strong>
+                </div>
+                <p class="text-muted">A seleção é preservada ao usar os botões de filtro e paginação deste formulário. Os botões de seleção atuam nas 25 questões da página atual.</p>
+                <div class="table-responsive tabela-importacao" role="region" aria-label="Questões disponíveis" tabindex="0">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead><tr><th scope="col">Selecionar</th><th scope="col">ID</th><th scope="col">Enunciado / texto-base</th><th scope="col">Tipo</th><th scope="col">Status</th><th scope="col">Autor</th></tr></thead>
+                        <tbody>{% for questao in pagina_obj %}<tr><td><input type="checkbox" name="marcadas" value="{{ questao.pk }}" aria-label="Selecionar questão {{ questao.pk }}" {% if questao.pk in selecionadas %}checked{% endif %}></td><td>#{{ questao.pk }}</td><td><div class="preview">{{ questao.enunciado }}</div>{% if questao.texto_base %}<details><summary>Texto-base</summary><div class="preview">{{ questao.texto_base }}</div></details>{% endif %}{% if questao.imagem %}<a href="{{ questao.imagem.url }}" target="_blank" rel="noopener">Ver imagem</a>{% endif %}</td><td>{{ questao.get_tipo_questao_display }}</td><td>{{ questao.get_status_display }}</td><td>{{ questao.professor_nome }}</td></tr>
+                        {% empty %}<tr><td colspan="6">Nenhuma questão encontrada.</td></tr>{% endfor %}</tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer">
+                <p>{{ pagina_obj.paginator.count }} questões no filtro. Página {{ pagina_obj.number }} de {{ pagina_obj.paginator.num_pages }}.</p>
+                <div class="acoes"><label for="pagina" class="mb-0">Ir para página</label><input class="form-control pagina-input" type="number" id="pagina" name="pagina" min="1" max="{{ pagina_obj.paginator.num_pages }}" value="{{ pagina_obj.number }}"><button type="submit" name="acao" value="pagina" class="btn btn-secondary">Ir e manter seleção</button></div>
+            </div>
+        </div>
+        <div class="card card-outline card-primary">
+            <div class="card-header"><h2 class="card-title">4 — Componente receptor</h2></div>
+            <div class="card-body"><div class="form-group mb-0">{{ contexto_form.receptor.label_tag }}{{ contexto_form.receptor }}{{ contexto_form.receptor.errors }}</div></div>
+            <div class="card-footer"><div class="acoes"><button type="submit" name="acao" value="confirmar" class="btn btn-success">Revisar importação</button></div></div>
+        </div>
+    </form>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}
 {% block extrajs %}{{ block.super }}<script src="{% static 'questoes/importacao.js' %}" defer></script>{% endblock %}
