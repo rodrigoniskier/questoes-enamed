@@ -109,7 +109,6 @@ JAZZMIN_SETTINGS = {
     "login_logo_max_size": "250px",
     "welcome_sign": "Bem-vindo ao Gerador de Provas do curso de Medicina",
     "copyright": "Desenvolvido por Prof. Rodrigo Niskier",
-    "custom_css": "admin_custom.css",
     "custom_links": {
         "questoes": [
             {
