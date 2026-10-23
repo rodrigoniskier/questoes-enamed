@@ -5,6 +5,12 @@ Exige usuário administrativo ativo e as permissões `questoes.importar_questoes
 `questoes.view_questao` e `questoes.add_questao`. O superusuário já as possui.
 Os recibos ficam disponíveis em **Registros de importação**, somente para leitura.
 
+A interface usa o tema Jazzmin do Admin: cabeçalho e breadcrumbs, cartões,
+campos e botões Bootstrap, tabela responsiva e avisos do próprio tema. Os ajustes
+locais de largura ficam no template, sem novo arquivo estático. A correção visual
+pode ser publicada com pull e Reload quando dependências, migração e estáticos da
+importação já estiverem instalados; não exige outro collectstatic.
+
 Escolha um semestre ativo e um componente doador canônico de período ativo.
 Carregue as questões, marque individualmente ou use **Selecionar todas do filtro**,
 escolha outro componente receptor e confirme. A seleção permanece entre páginas
