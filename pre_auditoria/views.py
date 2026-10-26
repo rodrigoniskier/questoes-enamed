@@ -74,6 +74,13 @@ def _prepare_question(question):
     else:
         question.alternativas_finais_preview = list(alternatives)
 
+    question.gabarito_preview = []
+    for index, alternative in enumerate(question.alternativas_finais_preview):
+        correct = alternative["eh_correta"] if isinstance(alternative, dict) else alternative.eh_correta
+        if correct:
+            text = alternative["texto"] if isinstance(alternative, dict) else alternative.texto
+            question.gabarito_preview.append({"letra": chr(ord("A") + index), "texto": text})
+
     question.preview_image_available = False
     question.preview_image_url = ""
     if question.imagem:

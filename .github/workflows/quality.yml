@@ -30,6 +30,6 @@ jobs:
           test -x "$import_browser_path"
           "$import_browser_path" --version
           printf 'BROWSER_EXECUTABLE=%s\n' "$import_browser_path" >> "$GITHUB_ENV"
-      - run: python manage.py test questoes.test_importacao_browser --settings=gerador_provas.test_settings
+      - run: python manage.py test questoes.test_importacao_browser pre_auditoria.test_browser --settings=gerador_provas.test_settings
         env:
           RUN_BROWSER_TESTS: '1'

@@ -11,6 +11,7 @@
     <div>
       {% include "pre_auditoria/partials/questao_previa.html" with questao=questao %}
       <button class="no-print" type="button" onclick="window.print()">IMPRIMIR PRÉ-VISUALIZAÇÃO</button>
+      {% include "pre_auditoria/partials/gabarito_justificativa.html" with questao=questao %}
     </div>
     <aside class="audit-review-sidebar">
       <section class="audit-section audit-status-panel">
@@ -39,16 +40,6 @@
           <ul class="audit-checklist">{% for item in questao.audit_checklist %}<li>— Não avaliado: {{ item.criterio }}</li>{% endfor %}</ul>
         {% endif %}
         <p class="audit-note">Apta para aprovação é o resultado estrutural. Aprovada é o status oficial após confirmação do gestor.</p>
-      </section>
-
-      <section class="audit-section">
-        <h2>Gabarito e justificativa · uso exclusivo do auditor</h2>
-        <ol>
-          {% for alternative in questao.alternativas.all %}
-            <li>{{ alternative.texto }}{% if alternative.eh_correta %} <strong>(gabarito cadastrado)</strong>{% endif %}</li>
-          {% endfor %}
-        </ol>
-        <p>{{ questao.justificativa|linebreaksbr }}</p>
       </section>
 
       {% if perms.pre_auditoria.review_parecerpreauditoria and questao.status == "PENDENTE" %}
