@@ -203,6 +203,118 @@ class PreAuditoriaTests(TestCase):
             self.assertContains(missing, "Imagem indisponível")
             self.assertFalse(missing.context["questao"].preview_image_available)
 
+    def test_dashboard_and_detail_show_answer_and_full_justification_without_writes(self):
+        self.question.alternativas.all().update(eh_correta=False)
+        answer = self.question.alternativas.order_by("pk")[2]
+        answer.eh_correta = True
+        answer.save()
+        self.question.justificativa = "C) CERTA. Justificativa completa.\nA, B e D) ERRADAS. Motivos."
+        self.question.save()
+        before = list(self.question.alternativas.values_list("pk", "texto", "eh_correta"))
+        self.client.force_login(self.reviewer)
+        for url in (
+            reverse("pre_auditoria:lista"),
+            reverse("pre_auditoria:detalhe", args=[self.question.pk]),
+        ):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(response, "Gabarito: C)")
+                self.assertContains(response, "Opção 3")
+                self.assertContains(
+                    response, "C) CERTA. Justificativa completa.<br>A, B e D) ERRADAS. Motivos."
+                )
+                self.assertContains(response, "RESULTADO DA PRÉ-AUDITORIA")
+                self.assertContains(response, 'class="audit-answer-review no-print"', count=1)
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, "PENDENTE")
+        self.assertEqual(before, list(self.question.alternativas.values_list("pk", "texto", "eh_correta")))
+        self.assertFalse(ParecerPreAuditoria.objects.exists())
+        self.assertFalse(DecisaoPreAuditoria.objects.exists())
+
+    def test_multiple_choice_answer_matches_generated_preview_on_dashboard_and_detail(self):
+        self.question.tipo_questao = "MULTIPLA_ESCOLHA"
+        self.question.save()
+        self.question.alternativas.all().delete()
+        for index in range(3):
+            Alternativa.objects.create(
+                questao=self.question, texto=f"Afirmação {index + 1}", eh_correta=index in (0, 2)
+            )
+        self.client.force_login(self.reviewer)
+        for url in (
+            reverse("pre_auditoria:lista"),
+            reverse("pre_auditoria:detalhe", args=[self.question.pk]),
+        ):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                question = response.context.get("questao") or response.context["questoes"][0]
+                index = next(
+                    i
+                    for i, alternative in enumerate(question.alternativas_finais_preview)
+                    if alternative["eh_correta"]
+                )
+                letter = "ABCD"[index]
+                self.assertContains(response, f"Gabarito: {letter})", count=1)
+                self.assertContains(response, "Apenas as afirmativas I e III estão corretas.")
+                self.assertNotContains(response, "Mais de uma alternativa marcada")
+
+    def test_assertion_reason_answer_uses_preview_letter_without_repeating_prefix(self):
+        self.question.tipo_questao = "ASSERCAO_RAZAO"
+        self.question.proposicao_dois = "Segunda proposição."
+        self.question.save()
+        self.question.alternativas.all().delete()
+        for letter, text in ASSERTION_ANSWERS.items():
+            Alternativa.objects.create(
+                questao=self.question, texto=f"{letter}) {text}", eh_correta=letter == "D"
+            )
+        self.client.force_login(self.reviewer)
+        for url in (
+            reverse("pre_auditoria:lista"),
+            reverse("pre_auditoria:detalhe", args=[self.question.pk]),
+        ):
+            response = self.client.get(url)
+            self.assertContains(
+                response, f"<strong>Gabarito: D)</strong> {ASSERTION_ANSWERS['D']}", html=True
+            )
+            self.assertNotContains(response, "Gabarito: D)</strong> D)")
+
+    def test_missing_or_ambiguous_answers_and_blank_justification_are_explicit(self):
+        self.client.force_login(self.reviewer)
+        self.question.justificativa = "   \n "
+        self.question.save()
+        self.question.alternativas.all().update(eh_correta=False)
+        for url in (
+            reverse("pre_auditoria:lista"),
+            reverse("pre_auditoria:detalhe", args=[self.question.pk]),
+        ):
+            response = self.client.get(url)
+            self.assertContains(response, "Gabarito não informado ou inválido.")
+            self.assertContains(response, "Justificativa não informada.")
+        self.question.alternativas.all().update(eh_correta=True)
+        response = self.client.get(reverse("pre_auditoria:lista"))
+        self.assertContains(response, "Mais de uma alternativa marcada como correta.")
+        self.assertContains(response, "Gabarito:", count=4)
+
+    def test_answer_review_escapes_content_and_requires_reviewer_access(self):
+        self.question.justificativa = '<script>alert("justificativa")</script>\nTexto preservado.'
+        self.question.save()
+        self.client.force_login(self.reviewer)
+        for url in (
+            reverse("pre_auditoria:lista"),
+            reverse("pre_auditoria:detalhe", args=[self.question.pk]),
+        ):
+            response = self.client.get(url)
+            self.assertContains(response, "&lt;script&gt;")
+            self.assertNotContains(response, '<script>alert("justificativa")</script>')
+        ordinary = get_user_model().objects.create_user("without-review-access")
+        self.client.force_login(ordinary)
+        for url in (
+            reverse("pre_auditoria:lista"),
+            reverse("pre_auditoria:detalhe", args=[self.question.pk]),
+        ):
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertNotContains(response, "Texto preservado.", status_code=403)
+
     def test_checklist_uses_audit_data_for_conforming_and_pending_criteria(self):
         self.client.force_login(self.reviewer)
         report = executar_pre_auditoria(self.question, revisor=self.reviewer)

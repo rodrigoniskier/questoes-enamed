@@ -1,0 +1,19 @@
+{% load questao_filters %}
+<section class="audit-answer-review no-print" aria-label="Gabarito e justificativas para conferência visual">
+  <h3>Gabarito e justificativas</h3>
+  <p class="audit-note">Uso exclusivo do auditor · letras correspondentes à pré-visualização acima.</p>
+  {% for alternativa in questao.gabarito_preview %}
+    <p class="audit-answer-key"><strong>Gabarito: {{ alternativa.letra }})</strong> {{ alternativa.texto|limpar_prefixo|linebreaksbr }}</p>
+  {% empty %}
+    <p class="audit-message" role="status">Gabarito não informado ou inválido. Confira o cadastro da questão.</p>
+  {% endfor %}
+  {% if questao.gabarito_preview|length > 1 %}
+    <p class="audit-message" role="status">Mais de uma alternativa marcada como correta. Confira o cadastro da questão.</p>
+  {% endif %}
+  <h4>Justificativa da resposta e dos distratores</h4>
+  {% if questao.justificativa.strip %}
+    <div class="audit-answer-explanation">{{ questao.justificativa|linebreaksbr }}</div>
+  {% else %}
+    <p class="audit-message" role="status">Justificativa não informada.</p>
+  {% endif %}
+</section>

@@ -60,7 +60,10 @@
           </div>
         </header>
         <div class="audit-review-grid">
-          <div>{% include "pre_auditoria/partials/questao_previa.html" with questao=question %}</div>
+          <div>
+            {% include "pre_auditoria/partials/questao_previa.html" with questao=question %}
+            {% include "pre_auditoria/partials/gabarito_justificativa.html" with questao=question %}
+          </div>
           <aside class="audit-review-sidebar">
             <section class="audit-status-panel">
               <h3>Status oficial da questão</h3>

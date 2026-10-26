@@ -4,6 +4,12 @@ Esta política usa exclusivamente as orientações visíveis nos formulários de
 
 A pré-auditoria é uma verificação formal. Ela não substitui a avaliação técnica, científica ou pedagógica, que é decisão do gestor responsável.
 
+## Conferência visual
+
+Cada cartão do painel e a tela de detalhes exibem o gabarito e a justificativa cadastrada, abaixo da questão e junto ao checklist estrutural. A letra do gabarito corresponde às alternativas da pré-visualização; em resposta múltipla, corresponde à combinação final gerada, e não à posição das afirmativas originais. A justificativa é apresentada integralmente, com suas quebras de linha.
+
+Conteúdo ausente ou mais de uma alternativa final marcada como correta recebe um aviso para conferência. A seção mantém as permissões do painel e fica oculta na impressão da prova. Consultar essas informações não executa auditoria, não altera o cadastro e não registra aprovação.
+
 ## Nível A: falhas estruturais obrigatórias
 
 Uma falha estrutural aparece como pendência objetiva, que normalmente deve ser corrigida antes da aprovação. O gestor pode, excepcionalmente, aprovar após inspeção visual e justificativa registrada; essa decisão não altera o resultado nem os achados do parecer.
