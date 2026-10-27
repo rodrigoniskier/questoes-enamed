@@ -34,6 +34,7 @@ class BrowserImportacaoTests(DadosImportacao, StaticLiveServerTestCase):
                 self.assertGreaterEqual(botao.bounding_box()["height"], 30)
             if os.environ.get("BROWSER_SCREENSHOT"):
                 captura = Path(os.environ["BROWSER_SCREENSHOT"])
+                captura.parent.mkdir(parents=True, exist_ok=True)
                 pagina.screenshot(
                     path=str(captura.with_name(f"{captura.stem}-{etapa}-{largura}.png")), full_page=True
                 )

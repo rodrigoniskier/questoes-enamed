@@ -6,6 +6,7 @@ import re
 
 from django.conf import settings
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
 
 from .ai_control import AIControlError, generate_text
 from .models import ComponenteCurricular
@@ -14,56 +15,34 @@ logger = logging.getLogger(__name__)
 
 
 # --- FUNÇÃO DE E-MAIL (MANTIDA) ---
-def enviar_email_status(questao):
-    """
-    Envia um e-mail para o professor informando a mudança de status da questão.
-    """
+def enviar_email_status(questao, *, status=None, parecer=None, correction_url=""):
+    status = status or questao.status
+    subjects = {
+        "APROVADA": f"Avaliação da questão {questao.pk} — Aprovada",
+        "APROVADA_SUGESTOES": f"Avaliação da questão {questao.pk} — Aprovada com sugestões",
+        "REPROVADA": f"Devolutiva pedagógica da questão {questao.pk} — Revisão necessária",
+    }
+    if status not in subjects:
+        return
     if not questao.professor_email:
-        print(
-            f"Aviso: Tentativa de notificar sobre a questão ID {questao.id}, mas não há e-mail de professor cadastrado."
-        )
-        return
-
-    if questao.status == "APROVADA":
-        assunto = "Sua questão foi Aprovada!"
-        mensagem = (
-            f"Olá, {questao.professor_nome},\n\n"
-            f"Temos uma ótima notícia! Sua questão sobre '{questao.componente.nome}' foi APROVADA.\n\n"
-            f'Enunciado: "{questao.enunciado[:80]}..."\n\n'
-            f"Agradecemos sua valiosa contribuição para o nosso banco de questões.\n\n"
-            f"Atenciosamente,\n"
-            f"NAPED - Medicina UNIPÊ"
-        )
-    elif questao.status == "REPROVADA":
-        assunto = "Feedback sobre sua questão submetida"
-        mensagem = (
-            f"Olá, {questao.professor_nome},\n\n"
-            f"Sua questão sobre '{questao.componente.nome}' foi avaliada e precisa de ajustes.\n\n"
-            f"Status: REPROVADA\n"
-            f'Enunciado: "{questao.enunciado[:80]}..."\n\n'
-            f"Relatório de Análise:\n"
-            f"--------------------------------\n"
-            f"{questao.comentario_validacao or 'Nenhum comentário adicional fornecido.'}\n"
-            f"--------------------------------\n\n"
-            f"Por favor, revise a questão com base no feedback e, se desejar, submeta uma nova versão.\n\n"
-            f"Atenciosamente,\n"
-            f"NAPED - Medicina UNIPÊ"
-        )
-    else:
-        return
-
-    try:
-        send_mail(
-            assunto,
-            mensagem,
-            settings.DEFAULT_FROM_EMAIL,
-            [questao.professor_email],
-            fail_silently=False,
-        )
-        logger.info("Status notification delivered for question %s", questao.id)
-    except Exception as e:
-        logger.exception("Status notification failed for question %s", questao.id)
-        raise e
+        raise ValueError("A questão não tem e-mail de professor cadastrado.")
+    context = {
+        "questao": questao,
+        "status": status,
+        "parecer": questao.comentario_validacao if parecer is None else parecer,
+        "correction_url": correction_url,
+    }
+    delivered = send_mail(
+        subjects[status],
+        render_to_string("questoes/emails/parecer.txt", context),
+        settings.DEFAULT_FROM_EMAIL,
+        [questao.professor_email],
+        fail_silently=False,
+        html_message=render_to_string("questoes/emails/parecer.html", context),
+    )
+    if delivered != 1:
+        raise RuntimeError("O serviço de e-mail não confirmou o envio da mensagem.")
+    logger.info("Status notification delivered for question %s", questao.pk)
 
 
 # --- FUNÇÃO DE AVALIAÇÃO COM IA (MANTIDA) ---

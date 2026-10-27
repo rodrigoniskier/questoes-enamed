@@ -15,6 +15,102 @@ from questoes.submission import ASSERTION_ANSWERS
 
 @skipUnless(os.environ.get("RUN_BROWSER_TESTS") == "1", "Habilite RUN_BROWSER_TESTS=1 para Chromium")
 class BrowserPreAuditoriaTests(StaticLiveServerTestCase):
+    def test_text_move_and_long_institutional_decision_on_real_forms(self):
+        from playwright.sync_api import sync_playwright
+
+        semester = Semestre.objects.create(nome="2026.2")
+        period = Periodo.objects.create(nome="2º Período", semestre=semester)
+        component = ComponenteCurricular.objects.create(nome="Componente de demonstração", periodo=period)
+        reviewer = get_user_model().objects.create_superuser(
+            "auditor-parecer", "auditor@example.com", "teste"
+        )
+        question = Questao.objects.create(
+            componente=component,
+            professor_nome="Docente fictício",
+            professor_email="docente@example.com",
+            texto_base="Contexto originalmente preenchido no texto-base.",
+            enunciado="Qual a conduta?",
+            justificativa="A alternativa A é correta; as demais são inadequadas.",
+        )
+        for index in range(4):
+            Alternativa.objects.create(questao=question, texto=f"Alternativa {index}", eh_correta=index == 0)
+        self.client.force_login(reviewer)
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                headless=True, executable_path=os.environ.get("BROWSER_EXECUTABLE") or None
+            )
+            page = browser.new_page(viewport={"width": 1440, "height": 1100})
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.context.add_cookies(
+                [
+                    {
+                        "name": "sessionid",
+                        "value": self.client.cookies["sessionid"].value,
+                        "url": self.live_server_url,
+                    }
+                ]
+            )
+            page.goto(self.live_server_url + reverse("pre_auditoria:editar", args=[question.pk]))
+            command = "Contexto originalmente preenchido no texto-base. Qual a conduta?"
+            page.locator('[name="texto_base"]').fill("")
+            page.locator('[name="enunciado"]').fill(command)
+            page.get_by_role("button", name="Salvar e reavaliar estrutura").click()
+            page.wait_for_url(self.live_server_url + reverse("pre_auditoria:detalhe", args=[question.pk]))
+            self.assertIn(command, page.locator(".question-print-preview").inner_text())
+            page.get_by_role("link", name="REGISTRAR PARECER", exact=True).click()
+            note = "Sugere-se tornar o comando mais claro.\n\n" + "Orientação pedagógica. " * 110
+            page.locator('[name="classificacao"]').select_option("APROVADA_SUGESTOES")
+            page.locator('[name="parecer"]').fill(note)
+            self.assertEqual(page.locator('[name="parecer"]').input_value(), note)
+            self.assertGreater(len(note), 2256)
+            self.assertIn("20.000", page.locator(".parecer-count").inner_text())
+            for width, height in ((1440, 1100), (390, 844)):
+                page.set_viewport_size({"width": width, "height": height})
+                self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                if os.environ.get("BROWSER_SCREENSHOT"):
+                    screenshot = Path(os.environ["BROWSER_SCREENSHOT"])
+                    screenshot.parent.mkdir(parents=True, exist_ok=True)
+                    page.screenshot(path=str(screenshot.with_name(f"parecer-{width}.png")), full_page=True)
+            page.locator('[name="confirmar"]').check()
+            page.get_by_role("button", name="REGISTRAR DECISÃO", exact=True).click()
+            page.wait_for_url(self.live_server_url + reverse("pre_auditoria:detalhe", args=[question.pk]))
+            self.assertIn("Aprovada com sugestões de ajustes", page.locator("main").inner_text())
+            page.goto(self.live_server_url + reverse("admin:questoes_questao_parecer", args=[question.pk]))
+            page.locator('[name="classificacao"]').select_option("REPROVADA")
+            page.locator('[name="parecer"]').fill(
+                "Revisar a consistência entre a alternativa e sua justificativa. " * 100
+            )
+            page.locator('[name="confirmar"]').check()
+            for width, height in ((1440, 1100), (390, 844)):
+                page.set_viewport_size({"width": width, "height": height})
+                page.wait_for_function("""() => {
+                    const sidebar = document.querySelector('.main-sidebar').getBoundingClientRect();
+                    const content = document.querySelector('.content-wrapper').getBoundingClientRect();
+                    return innerWidth < 768 ? sidebar.right <= 1 : content.left >= sidebar.right - 1;
+                }""")
+                self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                if os.environ.get("BROWSER_SCREENSHOT"):
+                    screenshot = Path(os.environ["BROWSER_SCREENSHOT"])
+                    page.screenshot(
+                        path=str(screenshot.with_name(f"admin-parecer-{width}.png")), full_page=True
+                    )
+            page.get_by_role("button", name="REGISTRAR DECISÃO", exact=True).click()
+            page.wait_for_url(
+                self.live_server_url + reverse("admin:questoes_questao_change", args=[question.pk])
+            )
+            self.assertEqual(errors, [])
+            browser.close()
+        question.refresh_from_db()
+        self.assertEqual(question.status, "REPROVADA")
+        self.assertEqual(question.texto_base, "")
+        self.assertEqual(question.enunciado, command)
+        self.assertEqual(question.alteracoes_pre_auditoria.count(), 1)
+        self.assertEqual(question.solicitacoes_correcao.count(), 1)
+        self.assertEqual(
+            question.decisoes_pre_auditoria.get(acao="APROVADA_SUGESTOES").justificativa, note.strip()
+        )
+
     def test_answers_visible_on_desktop_and_mobile_and_hidden_when_printing(self):
         from playwright.sync_api import sync_playwright
 
@@ -79,6 +175,7 @@ class BrowserPreAuditoriaTests(StaticLiveServerTestCase):
                     )
                     if os.environ.get("BROWSER_SCREENSHOT"):
                         screenshot = Path(os.environ["BROWSER_SCREENSHOT"])
+                        screenshot.parent.mkdir(parents=True, exist_ok=True)
                         name = "painel" if count == 3 else "detalhe"
                         page.screenshot(
                             path=str(screenshot.with_name(f"{screenshot.stem}-{name}-{width}.png")),

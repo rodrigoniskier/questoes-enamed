@@ -1,0 +1,13 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'questoes/pre_auditoria.css' %}">{% endblock %}
+{% block content %}
+<div class="audit-layout">
+  <h1>{{ title }}</h1>
+  <p><a href="{% url 'admin:questoes_questao_change' questao.pk %}">Voltar à edição da questão</a></p>
+  <p>{{ questao.componente.nome }} · {{ questao.professor_nome }} · {{ questao.get_status_display }}</p>
+  <form method="post">{% csrf_token %}<button name="verificar_estrutura" value="1" type="submit">Executar verificação estrutural</button></form>
+  {% include "pre_auditoria/partials/parecer_form.html" %}
+</div>
+<script src="{% static 'questoes/parecer.js' %}" defer></script>
+{% endblock %}

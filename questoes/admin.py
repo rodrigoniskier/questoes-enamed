@@ -1,21 +1,27 @@
 # questoes/admin.py
 
 import json
+import uuid
 
 from django import forms
 from django.contrib import admin, messages
-from django.db import models
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import DatabaseError, models
 from django.db.models import Count, Q
 from django.forms import Textarea
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpResponse
-from django.urls import path
+from django.shortcuts import get_object_or_404, redirect
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 from django.utils.html import format_html
+
+from .avaliacao import registrar_decisao
 
 # Modelos e utils
 from .importacao_admin import importar_view
 from .models import AIPrompt, Alternativa, ComponenteCurricular, ImportacaoQuestao, Periodo, Questao, Semestre
-from .utils import avaliar_questao_com_ia, enviar_email_status
+from .utils import avaliar_questao_com_ia
 
 
 # ==========================================
@@ -98,11 +104,14 @@ class QuestaoAdmin(admin.ModelAdmin):
         "uso_prova",
     )
     search_fields = ("enunciado", "texto_base", "professor_nome", "professor_email")
-    readonly_fields = ("professor_nome", "professor_email")
+    readonly_fields = ("professor_nome", "professor_email", "status", "registrar_parecer")
 
     fieldsets = (
         ("Identificação do Professor", {"fields": ("professor_nome", "professor_email")}),
-        ("Classificação", {"fields": ("componente", "tipo_questao", "uso_prova", "status")}),
+        (
+            "Classificação",
+            {"fields": ("componente", "tipo_questao", "uso_prova", "status", "registrar_parecer")},
+        ),
         ("Conteúdo da Questão", {"fields": ("texto_base", "imagem", "enunciado", "proposicao_dois")}),
         ("Gabarito e Feedback", {"fields": ("justificativa", "comentario_validacao")}),
     )
@@ -111,6 +120,7 @@ class QuestaoAdmin(admin.ModelAdmin):
         "exportar_backup_json",
         "avaliar_com_ia",
         "aprovar_e_notificar",
+        "aprovar_com_sugestoes",
         "reprovar_e_notificar",
         "marcar_como_pendente",
         "definir_uso_simulado",
@@ -168,44 +178,155 @@ class QuestaoAdmin(admin.ModelAdmin):
         if sucessos > 0:
             self.message_user(request, f"{sucessos} questão(ões) avaliada(s).", level=messages.SUCCESS)
 
-    def _set_status_and_notify(self, request, queryset, status):
-        delivered = failed = skipped = 0
-        for question in queryset:
-            if question.status != status:
-                question.status = status
-                question.save(update_fields=["status"])
-            if question.notified_status == status:
-                skipped += 1
-                continue
-            try:
-                enviar_email_status(question)
-                question.notified_status = status
-                question.save(update_fields=["notified_status"])
-                delivered += 1
-            except Exception:
-                failed += 1
-                self.message_user(
-                    request,
-                    f"Questão {question.pk}: status salvo, mas o e-mail falhou. Execute a ação novamente para tentar reenviar.",
-                    level=messages.WARNING,
-                )
-        self.message_user(
-            request,
-            f"{delivered} notificação(ões) enviada(s); {failed} falha(s); {skipped} já enviada(s). Os status foram salvos.",
+    def get_urls(self):
+        return [
+            path(
+                "<int:pk>/parecer/",
+                self.admin_site.admin_view(self.parecer_view),
+                name="questoes_questao_parecer",
+            )
+        ] + super().get_urls()
+
+    @admin.display(description="Parecer institucional")
+    def registrar_parecer(self, obj):
+        if not obj or not obj.pk:
+            return "Salve a questão para registrar um parecer."
+        return format_html(
+            '<a href="{}">Registrar ou reavaliar parecer</a>',
+            reverse("admin:questoes_questao_parecer", args=[obj.pk]),
         )
 
-    @admin.action(description="Aprovar selecionadas e notificar professor")
+    def parecer_view(self, request, pk):
+        from pre_auditoria.forms import ParecerInstitucionalForm
+        from pre_auditoria.services import (
+            POLICY_VERSION,
+            executar_pre_auditoria,
+            fingerprint_questao,
+            tem_pendencias_obrigatorias,
+        )
+
+        question = get_object_or_404(self.get_queryset(request), pk=pk)
+        if not self.has_change_permission(request, question):
+            raise PermissionDenied
+        report = question.pareceres_pre_auditoria.filter(arquivado_em__isnull=True).first()
+        question.approval_exception_needed = bool(
+            report
+            and report.fingerprint == fingerprint_questao(question)
+            and report.indicadores.get("politica") == POLICY_VERSION
+            and tem_pendencias_obrigatorias(report)
+        )
+        latest = question.decisoes_pre_auditoria.first()
+        if request.method == "POST" and request.POST.get("verificar_estrutura"):
+            executar_pre_auditoria(question, revisor=request.user, semantica=False)
+            self.message_user(
+                request, "Verificação estrutural atualizada. A decisão permanece sob sua responsabilidade."
+            )
+            return redirect("admin:questoes_questao_parecer", pk=question.pk)
+        form = ParecerInstitucionalForm(
+            request.POST if request.method == "POST" else None,
+            initial={
+                "fingerprint": fingerprint_questao(question),
+                "request_id": uuid.uuid4(),
+                "parecer": latest.justificativa if latest else "",
+            },
+        )
+        if request.method == "POST" and form.is_valid():
+            try:
+                registrar_decisao(
+                    question.pk,
+                    request.user,
+                    form.cleaned_data["classificacao"],
+                    form.cleaned_data["parecer"],
+                    fingerprint=form.cleaned_data["fingerprint"],
+                    request_id=form.cleaned_data["request_id"],
+                    base_url=request.build_absolute_uri("/"),
+                )
+            except ValidationError as error:
+                form.add_error(None, error)
+            except DatabaseError:
+                form.add_error(
+                    None, "Não foi possível registrar a decisão. Seu texto foi preservado; tente novamente."
+                )
+            else:
+                self.message_user(request, "Parecer institucional registrado.")
+                return redirect("admin:questoes_questao_change", question.pk)
+        return TemplateResponse(
+            request,
+            "admin/questoes/questao/parecer.html",
+            {
+                **self.admin_site.each_context(request),
+                "opts": self.model._meta,
+                "title": f"Parecer da questão {question.pk}",
+                "questao": question,
+                "form": form,
+            },
+            status=400 if form.is_bound else 200,
+        )
+
+    def save_model(self, request, obj, form, change):
+        from pre_auditoria.services import snapshot_questao
+
+        obj._antes_parecer = snapshot_questao(Questao.objects.get(pk=obj.pk)) if change else None
+        super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        from pre_auditoria.models import AlteracaoPreAuditoria
+        from pre_auditoria.services import executar_pre_auditoria, snapshot_questao
+
+        super().save_related(request, form, formsets, change)
+        question = form.instance
+        before = getattr(question, "_antes_parecer", None)
+        question.refresh_from_db()
+        after = snapshot_questao(question)
+        if before is not None and before != after:
+            AlteracaoPreAuditoria.objects.create(
+                questao=question,
+                revisor=request.user,
+                revisor_nome=request.user.get_username(),
+                antes=before,
+                depois=after,
+            )
+            executar_pre_auditoria(question, revisor=request.user, semantica=False)
+
+    def _set_status_and_notify(self, request, queryset, status):
+        count = 0
+        for question in queryset:
+            try:
+                registrar_decisao(
+                    question.pk,
+                    request.user,
+                    status,
+                    question.comentario_validacao or "",
+                    base_url=request.build_absolute_uri("/"),
+                )
+            except ValidationError as error:
+                self.message_user(
+                    request, f"Questão {question.pk}: " + "; ".join(error.messages), level=messages.ERROR
+                )
+            else:
+                count += 1
+        self.message_user(
+            request, f"{count} decisão(ões) registrada(s). Consulte o histórico para o resultado do envio."
+        )
+
+    @admin.action(description="Aprovar selecionadas e notificar professor", permissions=["change"])
     def aprovar_e_notificar(self, request, queryset):
         self._set_status_and_notify(request, queryset, "APROVADA")
 
-    @admin.action(description="Reprovar selecionadas e notificar professor")
+    @admin.action(description="Aprovar com sugestões (usar orientações registradas)", permissions=["change"])
+    def aprovar_com_sugestoes(self, request, queryset):
+        self._set_status_and_notify(request, queryset, "APROVADA_SUGESTOES")
+
+    @admin.action(
+        description="Reprovar com devolutiva pedagógica (usar orientações registradas)",
+        permissions=["change"],
+    )
     def reprovar_e_notificar(self, request, queryset):
         self._set_status_and_notify(request, queryset, "REPROVADA")
 
-    @admin.action(description="Marcar selecionadas como Pendente")
+    @admin.action(description="Devolver à situação Pendente de Validação", permissions=["change"])
     def marcar_como_pendente(self, request, queryset):
-        queryset.update(status="PENDENTE")
-        self.message_user(request, "Questões marcadas como PENDENTE.")
+        self._set_status_and_notify(request, queryset, "PENDENTE")
 
     # --- AÇÕES DE USO DE PROVA (Mantidas) ---
     @admin.action(description="Uso: SIMULADO")
@@ -243,7 +364,7 @@ class QuestaoAdmin(admin.ModelAdmin):
 
     @admin.display(description="Status")
     def status_colorido(self, obj):
-        cores = {"APROVADA": "green", "REPROVADA": "red", "PENDENTE": "orange"}
+        cores = {"APROVADA_SUGESTOES": "teal", "APROVADA": "green", "REPROVADA": "red", "PENDENTE": "orange"}
         cor = cores.get(obj.status, "black")
         return format_html(
             '<span style="color: {}; font-weight: bold;">{}</span>', cor, obj.get_status_display()
@@ -269,7 +390,7 @@ class SemestreAdmin(admin.ModelAdmin):
             _total=Count("periodos__componentes__questoes", distinct=True),
             _aprovadas=Count(
                 "periodos__componentes__questoes",
-                filter=Q(periodos__componentes__questoes__status="APROVADA"),
+                filter=Q(periodos__componentes__questoes__status__in=Questao.STATUS_APROVADOS),
                 distinct=True,
             ),
             _pendentes=Count(
@@ -313,7 +434,9 @@ class PeriodoAdmin(admin.ModelAdmin):
         return qs.annotate(
             _total=Count("componentes__questoes", distinct=True),
             _aprovadas=Count(
-                "componentes__questoes", filter=Q(componentes__questoes__status="APROVADA"), distinct=True
+                "componentes__questoes",
+                filter=Q(componentes__questoes__status__in=Questao.STATUS_APROVADOS),
+                distinct=True,
             ),
             _pendentes=Count(
                 "componentes__questoes", filter=Q(componentes__questoes__status="PENDENTE"), distinct=True
@@ -355,7 +478,9 @@ class ComponenteCurricularAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         return qs.annotate(
             _total=Count("questoes", distinct=True),
-            _aprovadas=Count("questoes", filter=Q(questoes__status="APROVADA"), distinct=True),
+            _aprovadas=Count(
+                "questoes", filter=Q(questoes__status__in=Questao.STATUS_APROVADOS), distinct=True
+            ),
             _pendentes=Count("questoes", filter=Q(questoes__status="PENDENTE"), distinct=True),
         )
 

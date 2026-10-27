@@ -58,18 +58,9 @@ class EvidenciaRevisorAdmin(ImmutableAuditAdminMixin, admin.ModelAdmin):
 
 @admin.register(DecisaoPreAuditoria)
 class DecisaoPreAuditoriaAdmin(ImmutableAuditAdminMixin, admin.ModelAdmin):
-    list_display = ("questao", "acao", "revisor", "criada_em")
+    list_display = ("questao", "acao", "revisor_nome", "criada_em", "notificacao_estado", "email_enviado_em")
     list_filter = ("acao", "criada_em")
-    readonly_fields = (
-        "questao",
-        "parecer",
-        "revisor",
-        "acao",
-        "fingerprint",
-        "justificativa",
-        "aprovacao_excepcional",
-        "criada_em",
-    )
+    readonly_fields = tuple(field.name for field in DecisaoPreAuditoria._meta.fields)
 
 
 @admin.register(SolicitacaoCorrecao)

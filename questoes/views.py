@@ -13,7 +13,6 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
 from django.db import DatabaseError
 from django.db.models import Q
 from django.forms import formset_factory
@@ -27,7 +26,7 @@ from django.views.decorators.http import require_GET
 
 from .ai_control import AIControlError, subject_key
 from .forms import AlternativaForm, QuestaoForm
-from .models import Alternativa, ComponenteCurricular, Periodo, Questao, Semestre
+from .models import ComponenteCurricular, Periodo, Questao, Semestre
 from .submission import (
     ASSERTION_ANSWERS,
     FORM_ROUTES,
@@ -550,9 +549,9 @@ def montador_manual_view(request):
             periodo_selecionado = Periodo.objects.get(id=periodo_id)
             context["periodo_selecionado"] = periodo_selecionado
 
-            questoes_do_periodo = Questao.objects.filter(componente__periodo=periodo_selecionado).order_by(
-                "componente__nome", "id"
-            )
+            questoes_do_periodo = Questao.objects.filter(
+                componente__periodo=periodo_selecionado, status__in=Questao.STATUS_APROVADOS
+            ).order_by("componente__nome", "id")
 
             questoes_processadas = []
             letra_map = {0: "A", 1: "B", 2: "C", 3: "D", 4: "E"}
@@ -635,7 +634,7 @@ def prova_gerada_view(request):
     questoes_selecionadas = []
 
     for componente in componentes_da_prova:
-        query_base = Q(componente=componente, status="APROVADA")
+        query_base = Q(componente=componente, status__in=Questao.STATUS_APROVADOS)
 
         if tipo_prova == "reposicao":
             query_tipo = Q(uso_prova="REPOSICAO") | Q(uso_prova="AMBAS")
@@ -771,7 +770,7 @@ def prova_gabarito_view(request):
 
     ids_list = [int(id) for id in ids_str.split(",")]
 
-    questoes = Questao.objects.filter(id__in=ids_list)
+    questoes = Questao.objects.filter(id__in=ids_list, status__in=Questao.STATUS_APROVADOS)
     questoes_mapeadas = {q.id: q for q in questoes}
     questoes_ordenadas = []
 
@@ -829,37 +828,10 @@ def relatorio_geral_view(request):
 # --- ADMIN ---
 @staff_member_required
 def admin_editar_questao(request, pk):
-    questao = get_object_or_404(Questao, pk=pk)
-    alternativas = Alternativa.objects.filter(questao=questao).order_by("id")
-    mensagem = ""
-
-    if request.method == "POST":
-        questao.texto_base = request.POST.get("texto_base", "")
-        questao.enunciado = request.POST.get("enunciado", "")
-        questao.justificativa = request.POST.get("justificativa", "")
-        questao.status = request.POST.get("status", "pendente")
-        questao.comentario_validacao = request.POST.get("comentario_avaliador", "")
-        if request.FILES.get("imagem"):
-            questao.imagem = request.FILES["imagem"]
-        questao.save()
-
-        for i, alternativa in enumerate(alternativas, 1):
-            novo_texto = request.POST.get(f"alternativa_{i}", "")
-            alternativa.texto = novo_texto
-            alternativa.save()
-
-        send_mail(
-            "Sua questão foi avaliada",
-            f"Status: {questao.status.upper()}\n\nParecer do avaliador: {questao.comentario_validacao}",
-            "no-reply@seuprojeto.com",
-            [questao.professor_email],
-            fail_silently=False,
-        )
-        mensagem = "Questão salva e e-mail enviado ao professor."
-
-    return render(
-        request, "admin/questoes/questao/edicao_unificada.html", {"questao": questao, "mensagem": mensagem}
-    )
+    if not request.user.has_perm("questoes.change_questao"):
+        return HttpResponseForbidden("Você não tem permissão para editar questões.")
+    get_object_or_404(Questao, pk=pk)
+    return redirect("admin:questoes_questao_change", pk)
 
 
 @require_GET

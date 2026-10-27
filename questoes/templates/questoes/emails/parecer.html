@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-br"><body>
+<p>Prezado(a) professor(a) {{ questao.professor_nome }},</p>
+<p>Agradecemos sua contribuição para a elaboração das avaliações do Curso de Medicina.</p>
+<p><strong>Questão {{ questao.pk }} — {{ questao.componente.nome }}</strong></p>
+{% if status == "APROVADA" %}
+<p>Informamos que a questão foi analisada e aprovada, atendendo aos critérios previstos para sua utilização.</p>
+{% elif status == "APROVADA_SUGESTOES" %}
+<p>A questão foi <strong>aprovada com sugestões de ajustes</strong>. Compartilhamos oportunidades de aprimoramento para sua apreciação.</p>
+<p>As recomendações têm caráter colaborativo e respeitam sua autonomia docente; a aprovação não depende de sua adoção.</p>
+{% elif status == "REPROVADA" %}
+<p>A análise técnica e pedagógica identificou aspectos que precisam ser revistos para que a questão atenda aos critérios previstos para sua utilização.</p>
+<p>Nesta etapa, a classificação foi <strong>Reprovada</strong>. A questão permanece disponível para reformulação ou substituição e posterior reavaliação.</p>
+<p>As observações a seguir buscam apoiar o aperfeiçoamento do item e fortalecer a qualidade e a segurança do processo avaliativo.</p>
+{% endif %}
+{% if parecer %}<h3>Orientações do avaliador</h3><div>{{ parecer|linebreaks }}</div>{% endif %}
+{% if status == "REPROVADA" %}
+<p>Convidamos o(a) professor(a) a considerar as orientações e encaminhar uma versão revisada ou uma nova questão. Nossa equipe está à disposição para esclarecer os pontos apresentados e colaborar.</p>
+{% if correction_url %}<p><a href="{{ correction_url }}">Revisar e reenviar a questão</a></p><p>O link expira em 7 dias e pode ser utilizado uma única vez. O reenvio retorna à situação Pendente de Validação para uma nova decisão humana.</p>
+{% else %}<p>Entre em contato com a equipe para encaminhar a revisão ou substituição da questão.</p>{% endif %}
+{% endif %}
+<p>Agradecemos sua parceria e o compromisso com a qualidade do processo avaliativo.</p>
+<p>Atenciosamente,<br>Equipe responsável pela avaliação de questões<br>Curso de Medicina | UNIPÊ</p>
+</body></html>

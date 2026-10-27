@@ -1,0 +1,33 @@
+{% autoescape off %}Prezado(a) professor(a) {{ questao.professor_nome }},
+
+Agradecemos sua contribuição para a elaboração das avaliações do Curso de Medicina.
+
+Questão {{ questao.pk }} — {{ questao.componente.nome }}
+
+{% if status == "APROVADA" %}Informamos que a questão foi analisada e aprovada, atendendo aos critérios previstos para sua utilização.
+{% elif status == "APROVADA_SUGESTOES" %}Após análise, a questão foi aprovada com sugestões de ajustes. Identificamos oportunidades de aprimoramento que poderão contribuir para sua clareza e qualidade pedagógica.
+
+Compartilhamos abaixo nossas sugestões para sua apreciação. As recomendações têm caráter colaborativo e respeitam sua autonomia docente; a aprovação não depende de sua adoção.
+{% elif status == "REPROVADA" %}Durante a análise técnica e pedagógica, identificamos aspectos que precisam ser revistos para que a questão atenda adequadamente aos critérios previstos para sua utilização.
+
+Nesta etapa, a questão foi classificada como Reprovada, permanecendo disponível para reformulação ou substituição e posterior reavaliação.
+
+Compartilhamos as observações que fundamentaram essa decisão, com o objetivo de apoiar o aperfeiçoamento do item e fortalecer a qualidade e a segurança do processo avaliativo.
+{% endif %}{% if parecer %}
+Orientações do avaliador:
+
+{{ parecer }}
+{% endif %}{% if status == "REPROVADA" %}
+Convidamos o(a) professor(a) a considerar as orientações e encaminhar uma versão revisada ou uma nova questão. Nossa equipe permanece à disposição para discutir os pontos apresentados e colaborar.
+{% if correction_url %}
+Acesse o link seguro para revisar e reenviar a questão: {{ correction_url }}
+O link expira em 7 dias e pode ser utilizado uma única vez. O reenvio retorna à situação Pendente de Validação para uma nova decisão humana.
+{% else %}
+Entre em contato com a equipe para encaminhar a revisão ou substituição da questão.
+{% endif %}{% endif %}
+Agradecemos sua parceria e o compromisso com a qualidade do processo avaliativo.
+
+Atenciosamente,
+Equipe responsável pela avaliação de questões
+Curso de Medicina | UNIPÊ
+{% endautoescape %}

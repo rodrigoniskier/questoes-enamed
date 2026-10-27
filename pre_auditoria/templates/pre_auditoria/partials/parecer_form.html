@@ -1,0 +1,23 @@
+<p>O parecer é uma decisão humana. A verificação estrutural auxilia a revisão.</p>
+<ul>
+  <li><strong>Aprovada:</strong> atende aos critérios científicos, pedagógicos e institucionais, sem alterações necessárias.</li>
+  <li><strong>Aprovada com sugestões de ajustes:</strong> pode ser utilizada; as sugestões de aprimoramento respeitam a autonomia docente.</li>
+  <li><strong>Reprovada:</strong> apresenta problemas que comprometem sua utilização. Explique os motivos e oriente a reformulação ou substituição.</li>
+</ul>
+<p>Pendente de Validação é uma etapa de tramitação, utilizada antes da decisão ou na devolução para nova análise.</p>
+{% if questao.approval_exception_needed %}
+<p class="audit-message">A verificação estrutural apresenta pendências. Ao aprovar, confirme que realizou a inspeção visual e justifique a decisão em pelo menos 20 caracteres. A aprovação será registrada como excepcional. Inconsistências impeditivas no gabarito continuam bloqueadas.</p>
+{% endif %}
+<form class="audit-form institutional-decision" method="post" data-exige-excecao="{% if questao.approval_exception_needed %}true{% else %}false{% endif %}">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {{ form.fingerprint }}{{ form.fingerprint.errors }}
+  {{ form.request_id }}{{ form.request_id.errors }}
+  <p>{{ form.classificacao.label_tag }} {{ form.classificacao }}{{ form.classificacao.errors }}</p>
+  <p>{{ form.parecer.label_tag }} {{ form.parecer }}{{ form.parecer.errors }}</p>
+  <p>{{ form.parecer.help_text }} <output class="parecer-count" aria-live="polite"></output></p>
+  <button type="button" class="parecer-topicos">Inserir tópicos de apoio</button>
+  <p>Use somente os aspectos pertinentes. O texto permanece livre; não é necessário preencher todos os tópicos.</p>
+  <p>{{ form.confirmar }} {{ form.confirmar.label_tag }}{{ form.confirmar.errors }}</p>
+  <button type="submit">REGISTRAR DECISÃO</button>
+</form>
