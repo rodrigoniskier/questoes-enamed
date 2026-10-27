@@ -130,8 +130,7 @@ JAZZMIN_UI_TWEAKS = {
 }
 # Em: gerador_provas/settings.py
 
-# Configuração de E-mail para Desenvolvimento
-# (Imprime os e-mails no console onde o 'runserver' está rodando)
+# Feedback automático por SMTP; credenciais privadas são carregadas do ambiente.
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587

@@ -109,7 +109,7 @@ class PareceresNapedTests(TestCase):
         self.assertEqual(self.question.decisoes_pre_auditoria.count(), 4)
         self.assertEqual(len(mail.outbox), 3)
         self.assertIn("Aprovada com sugestões", mail.outbox[1].subject)
-        self.assertIn("Revisão necessária", mail.outbox[2].subject)
+        self.assertIn("Precisa de Revisões", mail.outbox[2].subject)
 
     def test_long_reports_are_saved_and_emailed_in_full(self):
         for size in (2256, 6001, 20000):
@@ -119,7 +119,7 @@ class PareceresNapedTests(TestCase):
                 self.assertEqual(self.decide("REPROVADA", note).status_code, 302)
                 self.assertEqual(self.question.decisoes_pre_auditoria.first().justificativa, note)
                 self.assertIn(note, mail.outbox[-1].body)
-                self.assertIn("Reprovada", mail.outbox[-1].body)
+                self.assertIn("Precisa de Revisões", mail.outbox[-1].body)
                 self.assertIn(str(self.question.pk), mail.outbox[-1].subject)
                 self.assertIn(self.component.nome, mail.outbox[-1].body)
 
@@ -423,7 +423,7 @@ class PareceresNapedTests(TestCase):
         self.assertNotContains(manual, rejected.enunciado)
         dashboard = self.client.get(reverse("pre_auditoria:lista"), {"status": "APROVADA_SUGESTOES"})
         self.assertEqual(dashboard.context["aprovadas"], 1)
-        self.assertEqual(dashboard.context["reprovadas"], 1)
+        self.assertEqual(dashboard.context["precisam_revisoes"], 1)
         self.assertEqual(len(dashboard.context["questoes"]), 1)
         summary = self.client.get(reverse("admin:questoes_semestre_changelist"))
         self.assertEqual(summary.context["cl"].result_list[0]._aprovadas, 1)

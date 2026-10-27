@@ -9,6 +9,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 
 from .ai_control import AIControlError, generate_text
+from .feedback import texto_pedagogico
 from .models import ComponenteCurricular
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ def enviar_email_status(questao, *, status=None, parecer=None, correction_url=""
     subjects = {
         "APROVADA": f"Avaliação da questão {questao.pk} — Aprovada",
         "APROVADA_SUGESTOES": f"Avaliação da questão {questao.pk} — Aprovada com sugestões",
-        "REPROVADA": f"Devolutiva pedagógica da questão {questao.pk} — Revisão necessária",
+        "REPROVADA": f"Devolutiva pedagógica da questão {questao.pk} — Precisa de Revisões",
     }
     if status not in subjects:
         return
@@ -29,7 +30,7 @@ def enviar_email_status(questao, *, status=None, parecer=None, correction_url=""
     context = {
         "questao": questao,
         "status": status,
-        "parecer": questao.comentario_validacao if parecer is None else parecer,
+        "parecer": texto_pedagogico(questao.comentario_validacao if parecer is None else parecer),
         "correction_url": correction_url,
     }
     delivered = send_mail(

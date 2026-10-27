@@ -187,11 +187,11 @@
         <select name="status">
             <option value="pendente" {% if questao.status == "pendente" %}selected{% endif %}>🟡 Pendente</option>
             <option value="aprovada" {% if questao.status == "aprovada" %}selected{% endif %}>🟢 Aprovada</option>
-            <option value="reprovada" {% if questao.status == "reprovada" %}selected{% endif %}>🔴 Reprovada</option>
+            <option value="reprovada" {% if questao.status == "reprovada" %}selected{% endif %}>🔴 Precisa de Revisões</option>
         </select>
 
         <label for="id_comentario_avaliador">Feedback para o Professor</label>
-        <textarea name="comentario_avaliador" id="id_comentario_avaliador" rows="10" placeholder="Escreva aqui os motivos da aprovação ou reprovação...">{{ questao.comentario_avaliador }}</textarea>
+        <textarea name="comentario_avaliador" id="id_comentario_avaliador" rows="10" placeholder="Escreva aqui os motivos da aprovação ou necessidade de revisões...">{{ questao.comentario_avaliador }}</textarea>
 
         <button type="submit" class="btn-salvar">SALVAR E NOTIFICAR</button>
 

@@ -1,8 +1,9 @@
 {% extends "pre_auditoria/base.html" %}
+{% load questao_filters %}
 {% block content %}
 <main>
   <h1>Correção de questão submetida</h1>
-  <p>{{ mensagem }}</p>
+  <p>{{ mensagem|feedback_pedagogico|linebreaksbr }}</p>
   <p>O reenvio devolverá a questão para revisão. A aprovação definitiva é exclusiva do revisor.</p>
   <form class="audit-form" method="post" enctype="multipart/form-data">
     {% csrf_token %}{{ form.non_field_errors }}

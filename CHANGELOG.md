@@ -1,13 +1,21 @@
 # Alterações
 
+## 2026-10-27 — Precisa de Revisões e verificação SMTP
+
+- Nomenclatura padronizada no Admin, painel, filtros, históricos do professor e e-mails em texto/HTML.
+- Códigos internos e registros históricos preservados; descrição de status fornecida às interfaces.
+- Transporte SMTP testado com receptor local, confirmação após commit e recuperação explícita sem duplicação.
+- Comando `verificar_email_feedback --conectar` para conferir configuração/autenticação no servidor sem enviar mensagens.
+- Detalhes: [FEEDBACK_PRECISA_REVISOES.md](docs/FEEDBACK_PRECISA_REVISOES.md).
+
 ## 2026-10-27 — Pareceres institucionais do NAPED
 
 - Três decisões humanas padronizadas, pendência como tramitação e regras comuns ao Admin e à pré-auditoria.
-- Aprovação com sugestões disponível nos geradores, contadores e filtros; exclusão de reprovadas no montador manual e no gabarito por IDs.
+- Aprovação com sugestões disponível nos geradores, contadores e filtros; exclusão de questões que precisam de revisões no montador manual e no gabarito por IDs.
 - Pareceres de até 20.000 caracteres, validações específicas, preservação do texto e normalização das quebras de linha.
 - E-mails pedagógicos em texto e HTML, histórico preservado, recibos duráveis e recuperação explícita das notificações.
 - Correção do histórico e da reavaliação em edições apenas textuais, inclusive ao transferir texto-base para enunciado.
-- Reenvio de questão reprovada à pendência por link assinado e migrações testadas com dados históricos sintéticos.
+- Reenvio de questão que precisa de revisões à pendência por link assinado e migrações testadas com dados históricos sintéticos.
 - Relatório, testes e publicação manual: [PARECERES_NAPED_2026_2.md](docs/PARECERES_NAPED_2026_2.md).
 
 ## Pré-auditoria (em desenvolvimento)

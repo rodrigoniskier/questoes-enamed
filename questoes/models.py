@@ -80,7 +80,7 @@ class Questao(models.Model):
         ("PENDENTE", "Pendente de Validação"),
         ("APROVADA", "Aprovada"),
         ("APROVADA_SUGESTOES", "Aprovada com sugestões de ajustes"),
-        ("REPROVADA", "Reprovada"),
+        ("REPROVADA", "Precisa de Revisões"),
     ]
 
     TIPO_QUESTAO_CHOICES = [
@@ -118,10 +118,12 @@ class Questao(models.Model):
         max_length=20,
         choices=STATUS_CHOICES,
         default="PENDENTE",
-        help_text="Questões aprovadas serão usadas nas provas. Reprovadas geram notificações de status.",
+        help_text="Questões aprovadas serão usadas nas provas. A classificação Precisa de Revisões gera uma devolutiva ao professor.",
     )
     comentario_validacao = models.TextField(
-        blank=True, null=True, help_text="Comentário do administrador ao aprovar ou reprovar a questão."
+        blank=True,
+        null=True,
+        help_text="Orientações do avaliador ao aprovar ou solicitar revisões da questão.",
     )
     notified_status = models.CharField(max_length=20, blank=True, default="", editable=False)
 

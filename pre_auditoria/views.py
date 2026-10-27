@@ -18,6 +18,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
 
 from questoes.avaliacao import registrar_decisao
+from questoes.feedback import texto_pedagogico
 from questoes.models import ComponenteCurricular, Periodo, Questao, Semestre
 from questoes.views import gerar_alternativas_multipla_escolha
 
@@ -294,7 +295,7 @@ def lista(request):
             "total_submetidas": total_submitted,
             "pendentes": pending_count,
             "aprovadas": approved_count,
-            "reprovadas": rejected_count,
+            "precisam_revisoes": rejected_count,
             "status_selecionado": status_filter,
             "status_choices": Questao.STATUS_CHOICES,
             "return_to": request.get_full_path(),
@@ -715,7 +716,7 @@ def _parecer_response(request, question, data=None):
             "fingerprint": fingerprint_questao(question),
             "request_id": uuid.uuid4(),
             "classificacao": "",
-            "parecer": latest.justificativa if latest else "",
+            "parecer": texto_pedagogico(latest.justificativa) if latest else "",
         },
     )
     return form

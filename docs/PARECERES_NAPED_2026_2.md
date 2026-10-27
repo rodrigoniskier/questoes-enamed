@@ -36,7 +36,7 @@ produção foi acessado ou alterado.
 | --- | --- | --- | --- |
 | `APROVADA` | Aprovação sem sugestões obrigatórias | Disponível | E-mail de aprovação |
 | `APROVADA_SUGESTOES` | Aprovação com sugestões de ajustes | Disponível, independentemente da adoção das sugestões | E-mail colaborativo, com autonomia docente explícita |
-| `REPROVADA` | Problemas impeditivos e encaminhamento para revisão | Indisponível | Devolutiva pedagógica com justificativa completa |
+| Precisa de Revisões | Problemas impeditivos e encaminhamento para revisão | Indisponível | Devolutiva pedagógica com justificativa completa |
 | `PENDENTE` | Etapa de tramitação; sem decisão conclusiva | Indisponível | Sem notificação de parecer conclusivo |
 
 O campo de status existente foi preservado. Não houve reclassificação em massa.
@@ -49,14 +49,14 @@ Há filtros por situação e contadores que incluem aprovadas com sugestões. No
 Admin, o status oficial é somente leitura na edição de conteúdo; o link
 **Registrar ou reavaliar parecer** abre o mesmo formulário institucional.
 Também estão disponíveis ações de classificação em lote. Nelas, sugestões e
-reprovações usam as orientações já registradas em `comentario_validacao` e
+classificações como Precisa de Revisões usam as orientações já registradas em `comentario_validacao` e
 respeitam as mesmas validações do serviço.
 
 Os pareceres aceitam **20.000 caracteres**, com parágrafos, contador e tópicos
 opcionais de apoio derivados da organização do exemplo do NAPED. O limite contém
 o tamanho de cada submissão e mensagem, mantendo espaço para pareceres muito
 mais extensos que o relato original. O mínimo de 20 caracteres aplica-se a
-sugestões e reprovações. Aprovação simples e pendência permitem texto vazio.
+sugestões e classificações como Precisa de Revisões. Aprovação simples e pendência permitem texto vazio.
 Os erros específicos são exibidos e o formulário preserva o texto submetido.
 
 As aprovações exigem verificação estrutural atual. Foi mantida a regra existente
@@ -75,10 +75,10 @@ docente e componente, preservam o parecer completo e usam a configuração de
 remetente existente. O HTML escapa o conteúdo do avaliador. Nenhuma mensagem real
 é enviada pelos testes.
 
-Quando há verificação estrutural correspondente ao conteúdo reprovado, a
+Quando há verificação estrutural correspondente ao conteúdo que precisa de revisões, a
 devolutiva inclui um link assinado de revisão, com prazo de sete dias e uso
 único. Alterações posteriores ou uma nova decisão invalidam o acesso anterior.
-O reenvio do professor registra o conteúdo anterior e o novo, mantém a reprovação
+O reenvio do professor registra o conteúdo anterior e o novo, mantém a necessidade de revisões
 no histórico e devolve a questão à pendência para nova análise humana. Sem uma
 verificação estrutural correspondente, o e-mail orienta contato com a equipe;
 o Admin permite executá-la antes da emissão do parecer.
@@ -121,7 +121,7 @@ ou SARIF dessa integração.
 | `pre_auditoria/views.py` | Formulário institucional, edição corrigida, filtros e reenvio do professor |
 | `questoes/admin.py` | Decisões integradas ao Admin e histórico das edições |
 | `questoes/utils.py`, `questoes/templates/questoes/emails/` | Assuntos e devolutivas em texto e HTML |
-| `questoes/views.py` | Aprovação com sugestões nos geradores e exclusão de reprovadas do montador/gabarito |
+| `questoes/views.py` | Aprovação com sugestões nos geradores e exclusão de questões que precisam de revisões do montador/gabarito |
 | `questoes/static/questoes/parecer.js`, `pre_auditoria.css` | Contador, tópicos opcionais e formulário responsivo |
 | `pre_auditoria/test_pareceres.py`, `test_migrations_pareceres.py` | Regressão dos relatos, segurança e preservação histórica |
 | `pre_auditoria/test_browser.py` | Salvamento e emissão de pareceres nas duas interfaces em desktop e celular |
