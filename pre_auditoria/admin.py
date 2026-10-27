@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+from questoes.feedback import texto_pedagogico
+
 from .models import (
     AlteracaoPreAuditoria,
     DecisaoPreAuditoria,
@@ -12,6 +14,10 @@ from .models import (
 
 
 class ImmutableAuditAdminMixin:
+    @admin.display(description="Orientações")
+    def orientacoes(self, obj):
+        return texto_pedagogico(getattr(obj, "justificativa", getattr(obj, "mensagem", "")))
+
     def has_add_permission(self, request):
         return False
 
@@ -58,13 +64,17 @@ class EvidenciaRevisorAdmin(ImmutableAuditAdminMixin, admin.ModelAdmin):
 
 @admin.register(DecisaoPreAuditoria)
 class DecisaoPreAuditoriaAdmin(ImmutableAuditAdminMixin, admin.ModelAdmin):
+    exclude = ("justificativa",)
     list_display = ("questao", "acao", "revisor_nome", "criada_em", "notificacao_estado", "email_enviado_em")
     list_filter = ("acao", "criada_em")
-    readonly_fields = tuple(field.name for field in DecisaoPreAuditoria._meta.fields)
+    readonly_fields = tuple(
+        field.name for field in DecisaoPreAuditoria._meta.fields if field.name != "justificativa"
+    ) + ("orientacoes",)
 
 
 @admin.register(SolicitacaoCorrecao)
 class SolicitacaoCorrecaoAdmin(ImmutableAuditAdminMixin, admin.ModelAdmin):
+    exclude = ("mensagem",)
     list_display = ("questao", "revisor", "criada_em", "expira_em", "utilizada_em", "email_enviado_em")
     list_filter = ("criada_em", "expira_em", "utilizada_em")
     readonly_fields = (
@@ -72,7 +82,7 @@ class SolicitacaoCorrecaoAdmin(ImmutableAuditAdminMixin, admin.ModelAdmin):
         "parecer",
         "revisor",
         "nonce",
-        "mensagem",
+        "orientacoes",
         "criada_em",
         "expira_em",
         "utilizada_em",

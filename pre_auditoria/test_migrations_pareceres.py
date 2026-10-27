@@ -54,6 +54,8 @@ class PreservacaoHistoricaTests(TransactionTestCase):
             for pk, status in questions:
                 question = Questao.objects.get(pk=pk)
                 self.assertEqual(question.status, status)
+                if status == "REPROVADA":
+                    self.assertEqual(question.get_status_display(), "Precisa de Revisões")
                 self.assertEqual(question.notified_status, status)
                 self.assertEqual(question.comentario_validacao, "Parecer legado integral.")
             preserved = DecisaoPreAuditoria.objects.get(pk=decision.pk)

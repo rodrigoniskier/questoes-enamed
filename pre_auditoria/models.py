@@ -108,7 +108,7 @@ class DecisaoPreAuditoria(models.Model):
     class Acao(models.TextChoices):
         APROVADA = "APROVADA", "Aprovação confirmada"
         APROVADA_SUGESTOES = "APROVADA_SUGESTOES", "Aprovada com sugestões de ajustes"
-        REPROVADA = "REPROVADA", "Reprovada — revisão necessária"
+        REPROVADA = "REPROVADA", "Precisa de Revisões"
         PENDENTE = "PENDENTE", "Pendente de validação (tramitação)"
         CORRECAO = "CORRECAO", "Correção solicitada"
 

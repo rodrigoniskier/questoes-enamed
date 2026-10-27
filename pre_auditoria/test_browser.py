@@ -99,6 +99,10 @@ class BrowserPreAuditoriaTests(StaticLiveServerTestCase):
             page.wait_for_url(
                 self.live_server_url + reverse("admin:questoes_questao_change", args=[question.pk])
             )
+            page.get_by_text("Classificação", exact=True).click()
+            page.get_by_text("Precisa de Revisões", exact=True).wait_for()
+            self.assertIn("Precisa de Revisões", page.locator("body").inner_text())
+            self.assertNotIn("reprovada", page.locator("body").inner_text().lower())
             self.assertEqual(errors, [])
             browser.close()
         question.refresh_from_db()

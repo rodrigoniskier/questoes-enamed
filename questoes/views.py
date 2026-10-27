@@ -377,7 +377,15 @@ def get_historico_questoes(request):
         total_necessario = componente.numero_questoes_prova
         total_enviado = questoes.count()
         restantes = total_necessario - total_enviado
-        dados_questoes = list(questoes.values("id", "enunciado", "status"))
+        dados_questoes = [
+            {
+                "id": q.pk,
+                "enunciado": q.enunciado,
+                "status": q.status,
+                "status_descricao": q.get_status_display(),
+            }
+            for q in questoes
+        ]
         resposta = {
             "questoes": dados_questoes,
             "contagem": {

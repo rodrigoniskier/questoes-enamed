@@ -414,7 +414,7 @@
                             text.textContent = question.enunciado;
                             const badge = document.createElement('span');
                             badge.className = 'status-badge';
-                            badge.textContent = {APROVADA: 'Aprovada', REPROVADA: 'Reprovada'}[question.status] || 'Pendente';
+                            badge.textContent = question.status_descricao || 'Pendente de Validação';
                             card.append(text, badge);
                             historicoContainer.append(card);
                         });

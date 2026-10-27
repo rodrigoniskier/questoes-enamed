@@ -10,7 +10,7 @@ Questão {{ questao.pk }} — {{ questao.componente.nome }}
 Compartilhamos abaixo nossas sugestões para sua apreciação. As recomendações têm caráter colaborativo e respeitam sua autonomia docente; a aprovação não depende de sua adoção.
 {% elif status == "REPROVADA" %}Durante a análise técnica e pedagógica, identificamos aspectos que precisam ser revistos para que a questão atenda adequadamente aos critérios previstos para sua utilização.
 
-Nesta etapa, a questão foi classificada como Reprovada, permanecendo disponível para reformulação ou substituição e posterior reavaliação.
+Nesta etapa, a questão foi classificada como Precisa de Revisões, permanecendo disponível para reformulação ou substituição e posterior reavaliação.
 
 Compartilhamos as observações que fundamentaram essa decisão, com o objetivo de apoiar o aperfeiçoamento do item e fortalecer a qualidade e a segurança do processo avaliativo.
 {% endif %}{% if parecer %}

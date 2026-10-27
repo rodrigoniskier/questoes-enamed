@@ -121,7 +121,7 @@ class ParecerInstitucionalForm(forms.Form):
         max_length=MAX_PARECER,
         required=False,
         widget=forms.Textarea(attrs={"rows": 12, "data-parecer": "true"}),
-        help_text="Até 20.000 caracteres. Sugestões e reprovações exigem pelo menos 20 caracteres.",
+        help_text="Até 20.000 caracteres. Sugestões e classificações como Precisa de Revisões exigem pelo menos 20 caracteres.",
     )
     confirmar = forms.BooleanField(label="Confirmo que realizei a análise e assumo esta decisão.")
     fingerprint = forms.CharField(widget=forms.HiddenInput)

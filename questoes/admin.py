@@ -17,6 +17,7 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 
 from .avaliacao import registrar_decisao
+from .feedback import texto_pedagogico
 
 # Modelos e utils
 from .importacao_admin import importar_view
@@ -63,6 +64,10 @@ class AlternativaInline(admin.TabularInline):
 
 
 class QuestaoAdminForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.initial["comentario_validacao"] = texto_pedagogico(self.initial.get("comentario_validacao"))
+
     class Meta:
         model = Questao
         fields = "__all__"
@@ -121,7 +126,7 @@ class QuestaoAdmin(admin.ModelAdmin):
         "avaliar_com_ia",
         "aprovar_e_notificar",
         "aprovar_com_sugestoes",
-        "reprovar_e_notificar",
+        "precisa_de_revisoes_e_notificar",
         "marcar_como_pendente",
         "definir_uso_simulado",
         "definir_uso_residencia",
@@ -143,6 +148,7 @@ class QuestaoAdmin(admin.ModelAdmin):
                 "tipo_questao": q.tipo_questao,
                 "uso_prova": q.uso_prova,
                 "status": q.status,
+                "status_descricao": q.get_status_display(),
                 "professor": q.professor_nome,
                 "email": q.professor_email,
                 "texto_base": q.texto_base,
@@ -227,7 +233,7 @@ class QuestaoAdmin(admin.ModelAdmin):
             initial={
                 "fingerprint": fingerprint_questao(question),
                 "request_id": uuid.uuid4(),
-                "parecer": latest.justificativa if latest else "",
+                "parecer": texto_pedagogico(latest.justificativa) if latest else "",
             },
         )
         if request.method == "POST" and form.is_valid():
@@ -318,10 +324,10 @@ class QuestaoAdmin(admin.ModelAdmin):
         self._set_status_and_notify(request, queryset, "APROVADA_SUGESTOES")
 
     @admin.action(
-        description="Reprovar com devolutiva pedagógica (usar orientações registradas)",
+        description="Marcar como Precisa de Revisões e notificar (usar orientações registradas)",
         permissions=["change"],
     )
-    def reprovar_e_notificar(self, request, queryset):
+    def precisa_de_revisoes_e_notificar(self, request, queryset):
         self._set_status_and_notify(request, queryset, "REPROVADA")
 
     @admin.action(description="Devolver à situação Pendente de Validação", permissions=["change"])

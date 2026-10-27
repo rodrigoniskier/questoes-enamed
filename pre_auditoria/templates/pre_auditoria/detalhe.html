@@ -1,4 +1,5 @@
 {% extends "pre_auditoria/base.html" %}
+{% load questao_filters %}
 {% block content %}
 <main class="audit-detail-page">
   <p class="no-print"><a href="{% url 'pre_auditoria:lista' %}">Voltar ao painel</a></p>
@@ -111,7 +112,7 @@
         <p>{{ decision.get_acao_display }} por {{ decision.revisor_nome|default:decision.revisor|default:"Usuário não identificado" }} em {{ decision.criada_em }}</p>
         {% if decision.aprovacao_excepcional %}<p><strong>Aprovação excepcional com pendências de pré-auditoria.</strong></p>{% endif %}
         <p>Notificação: {{ decision.get_notificacao_estado_display }}{% if decision.email_enviado_em %} · {{ decision.email_enviado_em }}{% endif %}</p>
-        <p>{{ decision.justificativa|default:"Sem justificativa adicional."|linebreaksbr }}</p>
+        <p>{{ decision.justificativa|feedback_pedagogico|default:"Sem justificativa adicional."|linebreaksbr }}</p>
       </article>
     {% empty %}<p>Nenhuma decisão registrada.</p>{% endfor %}
   </section>

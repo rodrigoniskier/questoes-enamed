@@ -4,7 +4,10 @@ import re  # Vamos usar Expressões Regulares (RegEx)
 
 from django import template
 
+from questoes.feedback import texto_pedagogico
+
 register = template.Library()
+register.filter("feedback_pedagogico", texto_pedagogico)
 
 # 1. Definimos o padrão de RegEx que queremos "limpar".
 # Este padrão procura por:
