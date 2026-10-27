@@ -75,9 +75,11 @@ class ComponenteCurricular(models.Model):
 
 
 class Questao(models.Model):
+    STATUS_APROVADOS = ("APROVADA", "APROVADA_SUGESTOES")
     STATUS_CHOICES = [
         ("PENDENTE", "Pendente de Validação"),
         ("APROVADA", "Aprovada"),
+        ("APROVADA_SUGESTOES", "Aprovada com sugestões de ajustes"),
         ("REPROVADA", "Reprovada"),
     ]
 

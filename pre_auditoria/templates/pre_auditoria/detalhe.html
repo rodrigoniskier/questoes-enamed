@@ -42,39 +42,17 @@
         <p class="audit-note">Apta para aprovação é o resultado estrutural. Aprovada é o status oficial após confirmação do gestor.</p>
       </section>
 
-      {% if perms.pre_auditoria.review_parecerpreauditoria and questao.status == "PENDENTE" %}
+      {% if perms.pre_auditoria.review_parecerpreauditoria %}
         <nav class="audit-actions no-print" aria-label="Ações da questão">
-          <a href="{% url 'pre_auditoria:editar' questao.pk %}">EDITAR</a>
-          {% if parecer_atual %}
-            <form method="post" action="{% url 'pre_auditoria:aprovar' questao.pk %}">
-              {% csrf_token %}
-              {% if questao.approval_exception_needed %}
-                <h3>APROVAÇÃO COM PENDÊNCIAS</h3>
-                <p>Esta questão apresenta pendências identificadas pela Pré-Auditoria. Você confirma que realizou a inspeção visual e assume a decisão de aprová-la mesmo assim?</p>
-                {% for finding in questao.audit_findings %}{% if finding.gravidade == "obrigatoria" or finding.gravidade == "mandatory" %}<p><strong>{{ finding.criterio }}:</strong> {{ finding.evidencia }}</p>{% endif %}{% endfor %}
-                <label>Justificativa breve e objetiva
-                  <textarea name="justificativa" minlength="20" maxlength="2000" rows="4" required></textarea>
-                </label>
-              {% endif %}
-              <label><input type="checkbox" name="confirmar_aprovacao" required> Confirmo a aprovação desta questão.</label>
-              <button class="audit-action-button" type="submit">APROVAR QUESTÃO</button>
-            </form>
-          {% else %}
+          <a href="{% url 'pre_auditoria:decidir' questao.pk %}">REGISTRAR PARECER</a>
+          {% if questao.status == "PENDENTE" %}
+            <a href="{% url 'pre_auditoria:editar' questao.pk %}">EDITAR</a>
             <form method="post" action="{% url 'pre_auditoria:iniciar' questao.pk %}">
-              {% csrf_token %}
-              <label><input type="checkbox" name="analise_textual"> Solicitar recomendações opcionais da IA</label>
-              <button class="audit-action-button" type="submit">{% if questao.latest_audit %}REAVALIAR{% else %}INICIAR AUDITORIA{% endif %}</button>
+              {% csrf_token %}<label><input type="checkbox" name="analise_textual"> Solicitar recomendações opcionais da IA</label>
+              <button type="submit">{% if questao.latest_audit %}REAVALIAR{% else %}INICIAR AUDITORIA{% endif %}</button>
             </form>
           {% endif %}
         </nav>
-        <section class="audit-section no-print">
-          <h2>Solicitar correção ao professor</h2>
-          <form class="audit-inline-form" method="post" action="{% url 'pre_auditoria:solicitar_correcao' questao.pk %}">
-            {% csrf_token %}
-            <label>Orientações <textarea name="mensagem" minlength="20" required rows="4"></textarea></label>
-            <button class="audit-action-button" type="submit">SOLICITAR CORREÇÃO</button>
-          </form>
-        </section>
       {% endif %}
     </aside>
   </div>
@@ -124,14 +102,15 @@
   </section>
 
   <section class="audit-section no-print"><h2>Histórico de edições</h2>
-    {% for change in alteracoes %}<details><summary>{{ change.criada_em }} · {{ change.revisor|default:"revisor removido" }}</summary><h3>Antes</h3><pre>{{ change.antes }}</pre><h3>Depois</h3><pre>{{ change.depois }}</pre></details>
+    {% for change in alteracoes %}<details><summary>{{ change.criada_em }} · {{ change.get_origem_display }} · {{ change.revisor_nome|default:change.revisor|default:"Usuário não identificado" }}</summary><h3>Antes</h3><pre>{{ change.antes }}</pre><h3>Depois</h3><pre>{{ change.depois }}</pre></details>
     {% empty %}<p>Nenhuma edição registrada.</p>{% endfor %}
   </section>
   <section class="audit-section no-print"><h2>Histórico de decisões</h2>
     {% for decision in decisoes %}
       <article class="audit-history-entry">
-        <p>{{ decision.get_acao_display }} por {{ decision.revisor|default:"revisor removido" }} em {{ decision.criada_em }}</p>
+        <p>{{ decision.get_acao_display }} por {{ decision.revisor_nome|default:decision.revisor|default:"Usuário não identificado" }} em {{ decision.criada_em }}</p>
         {% if decision.aprovacao_excepcional %}<p><strong>Aprovação excepcional com pendências de pré-auditoria.</strong></p>{% endif %}
+        <p>Notificação: {{ decision.get_notificacao_estado_display }}{% if decision.email_enviado_em %} · {{ decision.email_enviado_em }}{% endif %}</p>
         <p>{{ decision.justificativa|default:"Sem justificativa adicional."|linebreaksbr }}</p>
       </article>
     {% empty %}<p>Nenhuma decisão registrada.</p>{% endfor %}

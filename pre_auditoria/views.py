@@ -2,12 +2,10 @@ import logging
 import uuid
 from datetime import timedelta
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core import signing
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import DatabaseError, transaction
 from django.db.models import Count, OuterRef, Subquery
@@ -19,8 +17,8 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
 
+from questoes.avaliacao import registrar_decisao
 from questoes.models import ComponenteCurricular, Periodo, Questao, Semestre
-from questoes.utils import enviar_email_status
 from questoes.views import gerar_alternativas_multipla_escolha
 
 from .forms import (
@@ -28,7 +26,7 @@ from .forms import (
     CorrecaoProfessorForm,
     DecisaoForm,
     EvidenciaRevisorForm,
-    PedidoCorrecaoForm,
+    ParecerInstitucionalForm,
     QuestaoRevisaoForm,
 )
 from .models import (
@@ -47,7 +45,6 @@ from .services import (
     fingerprint_questao,
     snapshot_questao,
     tem_pendencias_obrigatorias,
-    validar_aprovacao,
 )
 
 logger = logging.getLogger(__name__)
@@ -259,7 +256,11 @@ def lista(request):
     )
     total_submitted = questions.count()
     pending_count = questions.filter(status="PENDENTE").count()
-    approved_count = questions.filter(status="APROVADA").count()
+    approved_count = questions.filter(status__in=Questao.STATUS_APROVADOS).count()
+    rejected_count = questions.filter(status="REPROVADA").count()
+    status_filter = request.GET.get("status", "PENDENTE")
+    if status_filter not in dict(Questao.STATUS_CHOICES) and status_filter != "TODAS":
+        status_filter = "PENDENTE"
 
     latest_audit = ParecerPreAuditoria.objects.filter(
         questao_id=OuterRef("pk"), arquivado_em__isnull=True
@@ -268,7 +269,9 @@ def lista(request):
         latest_audit_id=Subquery(latest_audit.values("pk")[:1]),
         audit_count=Count("pareceres_pre_auditoria"),
     ).order_by("-pk")
-    page = Paginator(questions.filter(status="PENDENTE"), 25).get_page(request.GET.get("page"))
+    page = Paginator(
+        questions if status_filter == "TODAS" else questions.filter(status=status_filter), 25
+    ).get_page(request.GET.get("page"))
     audits = ParecerPreAuditoria.objects.filter(
         pk__in=[q.latest_audit_id for q in page.object_list if q.latest_audit_id]
     )
@@ -291,6 +294,9 @@ def lista(request):
             "total_submetidas": total_submitted,
             "pendentes": pending_count,
             "aprovadas": approved_count,
+            "reprovadas": rejected_count,
+            "status_selecionado": status_filter,
+            "status_choices": Questao.STATUS_CHOICES,
             "return_to": request.get_full_path(),
         },
     )
@@ -441,6 +447,7 @@ def editar(request, questao_id):
             pk=questao_id,
             status="PENDENTE",
         )
+        before = snapshot_questao(question)
         current_fingerprint = fingerprint_questao(question)
         if request.method == "POST" and request.POST.get("fingerprint") != current_fingerprint:
             question_form = QuestaoRevisaoForm(request.POST, request.FILES, instance=question)
@@ -470,7 +477,6 @@ def editar(request, questao_id):
                 request.POST, request.FILES, instance=question, prefix="alternativas"
             )
             if question_form.is_valid() and alternative_formset.is_valid():
-                before = snapshot_questao(question)
                 question_form.save()
                 alternative_formset.save()
                 question.refresh_from_db()
@@ -484,6 +490,9 @@ def editar(request, questao_id):
                         depois=after,
                     )
                     executar_pre_auditoria(question, revisor=request.user, semantica=False)
+                messages.success(
+                    request, "Alterações salvas. A estrutura foi reavaliada com o conteúdo atualizado."
+                )
                 return redirect("pre_auditoria:detalhe", questao_id=question.pk)
         else:
             question_form = QuestaoRevisaoForm(instance=question)
@@ -694,50 +703,56 @@ def registrar_evidencia(request, parecer_id):
 
 
 def _aprovar_questao(questao_id, revisor, justificativa=""):
-    with transaction.atomic():
-        question = (
-            Questao.objects.select_for_update()
-            .select_related("componente__periodo__semestre")
-            .filter(
-                pk=questao_id,
-                status="PENDENTE",
-                componente__periodo__ativo=True,
-                componente__periodo__semestre__ativo=True,
+    return registrar_decisao(questao_id, revisor, "APROVADA", justificativa)
+
+
+def _parecer_response(request, question, data=None):
+    _mark_audit_state(question, question.pareceres_pre_auditoria.filter(arquivado_em__isnull=True).first())
+    latest = question.decisoes_pre_auditoria.first()
+    form = ParecerInstitucionalForm(
+        data=data,
+        initial={
+            "fingerprint": fingerprint_questao(question),
+            "request_id": uuid.uuid4(),
+            "classificacao": "",
+            "parecer": latest.justificativa if latest else "",
+        },
+    )
+    return form
+
+
+@reviewer_write_required
+@require_http_methods(["GET", "POST"])
+def decidir(request, questao_id):
+    question = get_object_or_404(Questao, pk=questao_id)
+    form = _parecer_response(request, question, request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            decision = registrar_decisao(
+                question.pk,
+                request.user,
+                form.cleaned_data["classificacao"],
+                form.cleaned_data["parecer"],
+                fingerprint=form.cleaned_data["fingerprint"],
+                request_id=form.cleaned_data["request_id"],
+                base_url=request.build_absolute_uri("/"),
             )
-            .first()
-        )
-        if question is None:
-            raise ValidationError("Questão inexistente, arquivada ou já decidida.")
-        report = question.pareceres_pre_auditoria.select_for_update().order_by("-criado_em", "-pk").first()
-        if report is None:
-            raise ValidationError("A questão ainda não tem parecer de pré-auditoria.")
-        fingerprint = validar_aprovacao(question, report, justificativa)
-        question.status = "APROVADA"
-        question.save(update_fields=["status"])
-        decision = DecisaoPreAuditoria.objects.create(
-            questao=question,
-            parecer=report,
-            revisor=revisor,
-            revisor_nome=revisor.get_username(),
-            acao=DecisaoPreAuditoria.Acao.APROVADA,
-            fingerprint=fingerprint,
-            justificativa=justificativa,
-            aprovacao_excepcional=tem_pendencias_obrigatorias(report),
-        )
-        transaction.on_commit(lambda: _notificar_aprovacao(question.pk))
-        return decision
-
-
-def _notificar_aprovacao(question_id):
-    question = Questao.objects.filter(pk=question_id, status="APROVADA").first()
-    if not question or question.notified_status == "APROVADA":
-        return
-    try:
-        enviar_email_status(question)
-        question.notified_status = "APROVADA"
-        question.save(update_fields=["notified_status"])
-    except Exception as error:
-        logger.error("Approval notification failed for question %s: %s", question_id, type(error).__name__)
+        except ValidationError as error:
+            form.add_error(None, error)
+        except DatabaseError as error:
+            logger.error("Decision persistence failed: %s", type(error).__name__)
+            form.add_error(
+                None, "Não foi possível registrar a decisão. Seu texto foi preservado; tente novamente."
+            )
+        else:
+            messages.success(request, f"Decisão registrada: {decision.get_acao_display()}.")
+            return redirect("pre_auditoria:detalhe", questao_id=question.pk)
+    return render(
+        request,
+        "pre_auditoria/parecer.html",
+        {"questao": question, "form": form},
+        status=400 if form.is_bound else 200,
+    )
 
 
 @reviewer_write_required
@@ -745,32 +760,25 @@ def _notificar_aprovacao(question_id):
 def aprovar(request, questao_id):
     form = DecisaoForm(request.POST)
     if not form.is_valid():
-        errors = "; ".join(str(error) for values in form.errors.values() for error in values)
-        messages.error(request, errors or "Confirme a aprovação.")
-        return redirect(
-            _safe_next(
-                request,
-                request.POST.get("next", ""),
-                reverse("pre_auditoria:detalhe", args=[questao_id]),
-            )
-        )
-    try:
-        _aprovar_questao(questao_id, request.user, form.cleaned_data["justificativa"])
-    except (ValidationError, Questao.DoesNotExist) as error:
-        messages.error(
-            request,
-            "; ".join(error.messages)
-            if isinstance(error, ValidationError)
-            else "Questão indisponível para aprovação.",
-        )
+        messages.error(request, "; ".join(str(error) for values in form.errors.values() for error in values))
     else:
-        messages.success(request, "Aprovação confirmada; o status oficial da questão foi atualizado.")
+        try:
+            registrar_decisao(
+                questao_id,
+                request.user,
+                "APROVADA",
+                form.cleaned_data["justificativa"],
+                base_url=request.build_absolute_uri("/"),
+            )
+        except (ValidationError, Questao.DoesNotExist) as error:
+            messages.error(
+                request,
+                "; ".join(error.messages) if isinstance(error, ValidationError) else "Questão indisponível.",
+            )
+        else:
+            messages.success(request, "Aprovação confirmada; o status oficial da questão foi atualizado.")
     return redirect(
-        _safe_next(
-            request,
-            request.POST.get("next", ""),
-            reverse("pre_auditoria:detalhe", args=[questao_id]),
-        )
+        _safe_next(request, request.POST.get("next", ""), reverse("pre_auditoria:detalhe", args=[questao_id]))
     )
 
 
@@ -781,103 +789,72 @@ def aprovar_lote(request):
     if not raw_ids or len(raw_ids) > MAX_APPROVAL_BATCH or any(not value.isdigit() for value in raw_ids):
         messages.error(request, f"Selecione entre 1 e {MAX_APPROVAL_BATCH} questões válidas.")
         return redirect("pre_auditoria:lista")
-    question_ids = list(dict.fromkeys(int(value) for value in raw_ids))
-    if len(question_ids) > MAX_APPROVAL_BATCH:
-        messages.error(request, f"O lote está limitado a {MAX_APPROVAL_BATCH} questões.")
-        return redirect("pre_auditoria:lista")
-
     approved = 0
-    failures = []
-    for question_id in question_ids:
+    for question_id in dict.fromkeys(map(int, raw_ids)):
         try:
-            _aprovar_questao(question_id, request.user, request.POST.get("justificativa", ""))
-            approved += 1
-        except (ValidationError, Questao.DoesNotExist) as error:
-            failures.append(
-                f"{question_id}: {('; '.join(error.messages)) if isinstance(error, ValidationError) else 'indisponível'}"
+            registrar_decisao(
+                question_id,
+                request.user,
+                "APROVADA",
+                request.POST.get("justificativa", ""),
+                base_url=request.build_absolute_uri("/"),
             )
+        except (ValidationError, Questao.DoesNotExist) as error:
+            messages.warning(
+                request,
+                f"{question_id}: "
+                + (
+                    "; ".join(error.messages)
+                    if isinstance(error, ValidationError)
+                    else "Questão indisponível."
+                ),
+            )
+        else:
+            approved += 1
     messages.success(request, f"{approved} aprovação(ões) confirmada(s).")
-    for failure in failures:
-        messages.warning(request, failure)
     return redirect("pre_auditoria:lista")
 
 
 @reviewer_write_required
 @require_POST
 def solicitar_correcao(request, questao_id):
-    question = get_object_or_404(Questao, pk=questao_id, status="PENDENTE")
-    report = question.pareceres_pre_auditoria.order_by("-criado_em", "-pk").first()
-    if report is None or report.fingerprint != fingerprint_questao(question):
-        messages.error(request, "Execute uma pré-auditoria atual antes de solicitar correção.")
-        return redirect("pre_auditoria:detalhe", questao_id=question.pk)
-    form = PedidoCorrecaoForm(request.POST)
-    if not form.is_valid():
-        messages.error(request, "Descreva as correções necessárias com pelo menos 20 caracteres.")
-        return redirect("pre_auditoria:detalhe", questao_id=question.pk)
-
-    now = timezone.now()
-    with transaction.atomic():
-        question = get_object_or_404(Questao.objects.select_for_update(), pk=questao_id, status="PENDENTE")
-        report = question.pareceres_pre_auditoria.select_for_update().order_by("-criado_em", "-pk").first()
-        if report is None or report.fingerprint != fingerprint_questao(question):
-            messages.error(
-                request, "A questão mudou. Execute nova pré-auditoria antes do pedido de correção."
+    # Compatibilidade com páginas antigas abertas antes desta atualização.
+    data = request.POST.copy()
+    data.update(
+        {
+            "classificacao": "REPROVADA",
+            "parecer": request.POST.get("mensagem", ""),
+            "confirmar": "on",
+            "request_id": request.POST.get("request_id") or str(uuid.uuid4()),
+        }
+    )
+    question = get_object_or_404(Questao, pk=questao_id)
+    data["fingerprint"] = request.POST.get("fingerprint") or fingerprint_questao(question)
+    form = ParecerInstitucionalForm(data)
+    if form.is_valid():
+        try:
+            registrar_decisao(
+                question.pk,
+                request.user,
+                "REPROVADA",
+                form.cleaned_data["parecer"],
+                fingerprint=form.cleaned_data["fingerprint"],
+                request_id=form.cleaned_data["request_id"],
+                base_url=request.build_absolute_uri("/"),
             )
-            return redirect("pre_auditoria:detalhe", questao_id=question.pk)
-        outstanding = (
-            SolicitacaoCorrecao.objects.select_for_update()
-            .filter(questao=question, utilizada_em__isnull=True, expira_em__gt=now)
-            .first()
-        )
-        if outstanding and outstanding.email_enviado_em:
-            messages.warning(request, "Já existe um link válido enviado para esta questão.")
-            return redirect("pre_auditoria:detalhe", questao_id=question.pk)
-        if outstanding:
-            correction = outstanding
+        except ValidationError as error:
+            form.add_error(None, error)
+        except DatabaseError as error:
+            logger.error("Decision persistence failed: %s", type(error).__name__)
+            form.add_error(
+                None, "Não foi possível registrar a decisão. Seu texto foi preservado; tente novamente."
+            )
         else:
-            correction = SolicitacaoCorrecao.objects.create(
-                questao=question,
-                parecer=report,
-                revisor=request.user,
-                revisor_nome=request.user.get_username(),
-                mensagem=form.cleaned_data["mensagem"],
-                expira_em=now + timedelta(days=7),
+            messages.success(
+                request, "Revisão necessária registrada; a devolutiva foi preparada para o professor."
             )
-            DecisaoPreAuditoria.objects.create(
-                questao=question,
-                parecer=report,
-                revisor=request.user,
-                revisor_nome=request.user.get_username(),
-                acao=DecisaoPreAuditoria.Acao.CORRECAO,
-                fingerprint=report.fingerprint,
-                justificativa=form.cleaned_data["mensagem"],
-            )
-    signed_token = signing.dumps(
-        {"nonce": str(correction.nonce), "fingerprint": report.fingerprint},
-        salt=CORRECTION_SIGNING_SALT,
-    )
-    correction_url = request.build_absolute_uri(
-        reverse("pre_auditoria:correcao_professor", args=[signed_token])
-    )
-    try:
-        send_mail(
-            "Correções solicitadas para sua questão",
-            f"Olá, {question.professor_nome}.\n\n{correction.mensagem}\n\nAcesse o link seguro para corrigir a questão: {correction_url}\n\nO link expira em 7 dias e só pode ser usado uma vez.",
-            settings.DEFAULT_FROM_EMAIL,
-            [question.professor_email],
-            fail_silently=False,
-        )
-    except Exception as error:
-        logger.error("Correction request email failed for question %s: %s", question.pk, type(error).__name__)
-        messages.error(
-            request,
-            "O pedido foi registrado, mas o e-mail falhou. Não reenvie automaticamente; confira o SMTP.",
-        )
-    else:
-        correction.email_enviado_em = timezone.now()
-        correction.save(update_fields=["email_enviado_em"])
-        messages.success(request, "Pedido de correção enviado ao professor responsável.")
-    return redirect("pre_auditoria:detalhe", questao_id=question.pk)
+            return redirect("pre_auditoria:detalhe", questao_id=question.pk)
+    return render(request, "pre_auditoria/parecer.html", {"questao": question, "form": form}, status=400)
 
 
 @require_http_methods(["GET", "POST"])
@@ -900,9 +877,10 @@ def correcao_professor(request, token):
         )
         if correction is None or correction.utilizada_em is not None or correction.expira_em <= now:
             return HttpResponseGone("Este link já foi utilizado ou expirou.")
-        question = correction.questao
+        question = Questao.objects.select_for_update().get(pk=correction.questao_id)
+        before = snapshot_questao(question)
         if (
-            question.status != "PENDENTE"
+            question.status not in {"PENDENTE", "REPROVADA"}
             or correction.parecer.fingerprint != payload["fingerprint"]
             or fingerprint_questao(question) != payload["fingerprint"]
         ):
@@ -921,7 +899,6 @@ def correcao_professor(request, token):
         )
         if request.method == "POST":
             if form.is_valid() and alternative_formset.is_valid():
-                before = snapshot_questao(question)
                 form.save()
                 alternative_formset.save()
                 question.refresh_from_db()
@@ -929,13 +906,26 @@ def correcao_professor(request, token):
                 if before != after:
                     AlteracaoPreAuditoria.objects.create(
                         questao=question,
-                        revisor=correction.revisor,
-                        revisor_nome=correction.revisor_nome,
+                        revisor=None,
+                        revisor_nome=question.professor_nome,
                         antes=before,
                         depois=after,
                         origem=AlteracaoPreAuditoria.Origem.PROFESSOR,
                         solicitacao_correcao=correction,
                     )
+                question.status = "PENDENTE"
+                question.notified_status = ""
+                question.save(update_fields=["status", "notified_status"])
+                DecisaoPreAuditoria.objects.create(
+                    questao=question,
+                    parecer=correction.parecer,
+                    revisor=None,
+                    revisor_nome=question.professor_nome,
+                    acao="PENDENTE",
+                    fingerprint=fingerprint_questao(question),
+                    justificativa="Reenvio do professor para nova avaliação após reformulação.",
+                    notificacao_estado="SEM_ENVIO",
+                )
                 correction.utilizada_em = timezone.now()
                 correction.save(update_fields=["utilizada_em"])
                 executar_pre_auditoria(question, revisor=correction.revisor, semantica=False)

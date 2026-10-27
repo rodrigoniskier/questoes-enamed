@@ -783,10 +783,11 @@ class PreAuditoriaTests(TestCase):
     def test_signed_correction_link_is_single_use_and_cannot_approve(self):
         report = executar_pre_auditoria(self.question, revisor=self.reviewer, semantica=False)
         self.client.force_login(self.reviewer)
-        response = self.client.post(
-            reverse("pre_auditoria:solicitar_correcao", args=[self.question.pk]),
-            {"mensagem": "Esclareça a justificativa e revise a alternativa C."},
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("pre_auditoria:solicitar_correcao", args=[self.question.pk]),
+                {"mensagem": "Esclareça a justificativa e revise a alternativa C."},
+            )
         self.assertRedirects(response, reverse("pre_auditoria:detalhe", args=[self.question.pk]))
         correction = SolicitacaoCorrecao.objects.get(questao=self.question)
         self.assertEqual(correction.parecer_id, report.pk)
@@ -824,7 +825,9 @@ class PreAuditoriaTests(TestCase):
             self.question.alteracoes_pre_auditoria.get().origem, AlteracaoPreAuditoria.Origem.PROFESSOR
         )
         self.assertEqual(self.client.get(correction_url).status_code, 410)
-        self.assertEqual(DecisaoPreAuditoria.objects.get().acao, DecisaoPreAuditoria.Acao.CORRECAO)
+        self.assertEqual(
+            list(DecisaoPreAuditoria.objects.values_list("acao", flat=True)), ["PENDENTE", "REPROVADA"]
+        )
 
     def test_semester_2026_2_single_answer_uses_four_options(self):
         report = executar_pre_auditoria(self.question, revisor=self.reviewer)

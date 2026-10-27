@@ -33,3 +33,10 @@ jobs:
       - run: python manage.py test questoes.test_importacao_browser pre_auditoria.test_browser --settings=gerador_provas.test_settings
         env:
           RUN_BROWSER_TESTS: '1'
+          BROWSER_SCREENSHOT: '${{ runner.temp }}/enamed-qa/tela.png'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: telas-regressao
+          path: '${{ runner.temp }}/enamed-qa/*.png'
+          if-no-files-found: ignore

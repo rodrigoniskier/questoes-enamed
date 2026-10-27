@@ -30,6 +30,8 @@ Testes usam banco em memória, e-mail simulado e IA simulada. Nenhuma geração 
 
 ## Implantação no PythonAnywhere
 
+Para a atualização de pareceres de 27/10/2026, siga [o relatório e o procedimento manual de publicação](docs/PARECERES_NAPED_2026_2.md). Ele inclui as novas migrações, backup anterior ao pull, conferência dos registros e Reload manual.
+
 Na primeira atualização que remove o SQLite do Git, siga obrigatoriamente [o procedimento que preserva o banco no disco](docs/OPERATIONS_2026_2.md). Nas atualizações posteriores, após o pull, use o script que exige `main` igual a `origin/main`, faz backup consistente do banco e das mídias e compara registros existentes. O banco existente não é restaurado pelo Git. Preserve `.env`, mídias e configuração WSGI.
 
 ```sh

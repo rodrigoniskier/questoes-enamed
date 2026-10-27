@@ -1,5 +1,15 @@
 # Alterações
 
+## 2026-10-27 — Pareceres institucionais do NAPED
+
+- Três decisões humanas padronizadas, pendência como tramitação e regras comuns ao Admin e à pré-auditoria.
+- Aprovação com sugestões disponível nos geradores, contadores e filtros; exclusão de reprovadas no montador manual e no gabarito por IDs.
+- Pareceres de até 20.000 caracteres, validações específicas, preservação do texto e normalização das quebras de linha.
+- E-mails pedagógicos em texto e HTML, histórico preservado, recibos duráveis e recuperação explícita das notificações.
+- Correção do histórico e da reavaliação em edições apenas textuais, inclusive ao transferir texto-base para enunciado.
+- Reenvio de questão reprovada à pendência por link assinado e migrações testadas com dados históricos sintéticos.
+- Relatório, testes e publicação manual: [PARECERES_NAPED_2026_2.md](docs/PARECERES_NAPED_2026_2.md).
+
 ## Pré-auditoria (em desenvolvimento)
 
 - Criado app Django com fila autenticada por permissão, filtros hierárquicos dos cadastros ativos, indicadores e histórico versionado de pareceres.

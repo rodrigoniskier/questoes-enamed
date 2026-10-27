@@ -1,0 +1,11 @@
+{% extends "pre_auditoria/base.html" %}
+{% load static %}
+{% block content %}
+<main>
+  <p><a href="{% url 'pre_auditoria:detalhe' questao.pk %}">Voltar à questão</a></p>
+  <header class="audit-heading"><h1>Parecer da questão {{ questao.pk }}</h1></header>
+  <p>{{ questao.componente.nome }} · {{ questao.professor_nome }} · {{ questao.get_status_display }}</p>
+  {% include "pre_auditoria/partials/parecer_form.html" %}
+</main>
+<script src="{% static 'questoes/parecer.js' %}" defer></script>
+{% endblock %}

@@ -9,7 +9,8 @@
   <section aria-label="Indicadores" class="audit-metrics">
     <div class="audit-metric"><span>Submetidas</span><strong>{{ total_submetidas }}</strong></div>
     <div class="audit-metric"><span>Pendentes</span><strong>{{ pendentes }}</strong></div>
-    <div class="audit-metric"><span>Aprovadas</span><strong>{{ aprovadas }}</strong></div>
+    <div class="audit-metric"><span>Aprovadas (inclui sugestões)</span><strong>{{ aprovadas }}</strong></div>
+    <div class="audit-metric"><span>Reprovadas</span><strong>{{ reprovadas }}</strong></div>
   </section>
   <form method="get" class="audit-section audit-filters">
     <label>Semestre ativo
@@ -30,6 +31,12 @@
         {% for component in componentes %}<option value="{{ component.pk }}" {% if componente_selecionado == component.pk|stringformat:'s' %}selected{% endif %}>{{ component.nome }}</option>{% endfor %}
       </select>
     </label>
+    <label>Situação
+      <select name="status" onchange="this.form.submit()">
+        <option value="TODAS" {% if status_selecionado == "TODAS" %}selected{% endif %}>Todas</option>
+        {% for value, label in status_choices %}<option value="{{ value }}" {% if status_selecionado == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
   </form>
 
   {% if perms.pre_auditoria.review_parecerpreauditoria %}
@@ -43,7 +50,7 @@
     </section>
   {% endif %}
 
-  <section class="audit-cards" aria-label="Questões pendentes">
+  <section class="audit-cards" aria-label="Questões para revisão">
     {% for question in questoes %}
       <article class="audit-review-card">
         <header class="audit-card-heading">
@@ -97,47 +104,24 @@
             {% if perms.pre_auditoria.review_parecerpreauditoria %}
               <nav class="audit-actions" aria-label="Ações da questão">
                 <a href="{% url 'pre_auditoria:detalhe' question.pk %}">HISTÓRICO E DETALHES</a>
+                <a href="{% url 'pre_auditoria:decidir' question.pk %}">REGISTRAR PARECER</a>
                 {% if question.status == "PENDENTE" %}
                   <a href="{% url 'pre_auditoria:editar' question.pk %}">EDITAR</a>
-                  {% if question.audit_is_current %}
-                    <form method="post" action="{% url 'pre_auditoria:aprovar' question.pk %}">
-                      {% csrf_token %}<input type="hidden" name="next" value="{{ return_to }}">
-                      {% if question.approval_exception_needed %}
-                        <h3>APROVAÇÃO COM PENDÊNCIAS</h3>
-                        <p>Esta questão apresenta pendências identificadas pela Pré-Auditoria. Você confirma que realizou a inspeção visual e assume a decisão de aprová-la mesmo assim?</p>
-                        <label>Justificativa breve e objetiva
-                          <textarea name="justificativa" minlength="20" maxlength="2000" rows="3" required></textarea>
-                        </label>
-                      {% endif %}
-                      <label><input type="checkbox" name="confirmar_aprovacao" required> Confirmo a aprovação desta questão.</label>
-                      <button class="audit-action-button" type="submit">APROVAR QUESTÃO</button>
-                    </form>
-                  {% else %}
-                    <form method="post" action="{% url 'pre_auditoria:iniciar' question.pk %}">{% csrf_token %}<button type="submit">{% if question.latest_audit %}REAVALIAR{% else %}INICIAR AUDITORIA{% endif %}</button></form>
-                  {% endif %}
+                  <form method="post" action="{% url 'pre_auditoria:iniciar' question.pk %}">{% csrf_token %}<button type="submit">{% if question.latest_audit %}REAVALIAR{% else %}INICIAR AUDITORIA{% endif %}</button></form>
                 {% endif %}
               </nav>
-              {% if question.audit_is_current and question.status == "PENDENTE" %}
-                <details class="audit-correction-control">
-                  <summary>SOLICITAR CORREÇÃO</summary>
-                  <form class="audit-inline-form" method="post" action="{% url 'pre_auditoria:solicitar_correcao' question.pk %}">
-                    {% csrf_token %}
-                    <label>Orientações ao professor <textarea name="mensagem" minlength="20" maxlength="2000" required rows="3"></textarea></label>
-                    <button type="submit">SOLICITAR CORREÇÃO</button>
-                  </form>
-                </details>
-              {% endif %}
+
             {% endif %}
           </aside>
         </div>
       </article>
-    {% empty %}<p>Nenhuma questão pendente neste filtro.</p>{% endfor %}
+    {% empty %}<p>Nenhuma questão neste filtro.</p>{% endfor %}
   </section>
 
   <nav class="audit-pagination" aria-label="Paginação">
-    {% if questoes.has_previous %}<a href="?page={{ questoes.previous_page_number }}&semestre={{ semestre_selecionado }}&periodo={{ periodo_selecionado }}&componente={{ componente_selecionado }}">Anterior</a>{% endif %}
+    {% if questoes.has_previous %}<a href="?page={{ questoes.previous_page_number }}&semestre={{ semestre_selecionado }}&periodo={{ periodo_selecionado }}&componente={{ componente_selecionado }}&status={{ status_selecionado }}">Anterior</a>{% endif %}
     <span>Página {{ questoes.number }} de {{ questoes.paginator.num_pages }}</span>
-    {% if questoes.has_next %}<a href="?page={{ questoes.next_page_number }}&semestre={{ semestre_selecionado }}&periodo={{ periodo_selecionado }}&componente={{ componente_selecionado }}">Próxima</a>{% endif %}
+    {% if questoes.has_next %}<a href="?page={{ questoes.next_page_number }}&semestre={{ semestre_selecionado }}&periodo={{ periodo_selecionado }}&componente={{ componente_selecionado }}&status={{ status_selecionado }}">Próxima</a>{% endif %}
   </nav>
 </main>
 {% endblock %}

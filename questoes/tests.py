@@ -255,6 +255,7 @@ class SubmissionTests(TestCase):
             professor_email="professor@example.com",
             enunciado="Comando sintético",
             justificativa="Justificativa sintética",
+            status="APROVADA",
         )
         Alternativa.objects.create(questao=question, texto="Resposta sintética", eh_correta=True)
         response = self.client.get(url, {"periodo_id": self.component.periodo_id})
@@ -275,7 +276,8 @@ class NotificationTests(TestCase):
 
         from .admin import QuestaoAdmin
 
-        period = Periodo.objects.create(nome="1º Período")
+        semester = Semestre.objects.create(nome="2026.2")
+        period = Periodo.objects.create(nome="1º Período", semestre=semester)
         component = ComponenteCurricular.objects.create(nome="Anatomia", periodo=period)
         self.questions = [
             Questao.objects.create(
@@ -287,13 +289,35 @@ class NotificationTests(TestCase):
             )
             for index in range(2)
         ]
+        from django.contrib.auth import get_user_model
+        from django.test import RequestFactory
+
+        from pre_auditoria.services import executar_pre_auditoria
+
+        self.request = RequestFactory().get("/admin/")
+        self.request.user = get_user_model().objects.create_superuser(
+            "admin-notify", "admin@example.com", "test"
+        )
+        for question in self.questions:
+            question.texto_base = "Contexto sintético."
+            question.comentario_validacao = (
+                "Revise a fundamentação das alternativas e a contextualização clínica."
+            )
+            question.save()
+            for index in range(4):
+                Alternativa.objects.create(questao=question, texto=f"Opção {index}", eh_correta=index == 0)
+            executar_pre_auditoria(question, revisor=self.request.user, semantica=False)
         self.admin = QuestaoAdmin(Questao, AdminSite())
 
+    def set_status(self, status):
+        with self.captureOnCommitCallbacks(execute=True):
+            self.admin._set_status_and_notify(self.request, Questao.objects.order_by("pk"), status)
+
     @patch("questoes.admin.QuestaoAdmin.message_user")
-    @patch("questoes.admin.enviar_email_status")
+    @patch("questoes.avaliacao.enviar_email_status")
     def test_retry_sends_only_failed_notifications(self, notify, message):
         notify.side_effect = [None, RuntimeError("SMTP failure")]
-        self.admin._set_status_and_notify(None, Questao.objects.order_by("pk"), "APROVADA")
+        self.set_status("APROVADA")
         self.assertEqual(notify.call_count, 2)
         self.questions[0].refresh_from_db()
         self.questions[1].refresh_from_db()
@@ -301,18 +325,18 @@ class NotificationTests(TestCase):
         self.assertEqual(self.questions[1].notified_status, "")
         notify.reset_mock()
         notify.side_effect = None
-        self.admin._set_status_and_notify(None, Questao.objects.order_by("pk"), "APROVADA")
+        self.set_status("APROVADA")
         self.assertEqual(notify.call_count, 1)
         self.assertEqual(notify.call_args.args[0].pk, self.questions[1].pk)
         notify.reset_mock()
-        self.admin._set_status_and_notify(None, Questao.objects.order_by("pk"), "APROVADA")
+        self.set_status("APROVADA")
         notify.assert_not_called()
 
     @patch("questoes.admin.QuestaoAdmin.message_user")
-    @patch("questoes.admin.enviar_email_status")
+    @patch("questoes.avaliacao.enviar_email_status")
     def test_new_status_notifies_again_after_success(self, notify, message):
-        self.admin._set_status_and_notify(None, Questao.objects.order_by("pk"), "APROVADA")
-        self.admin._set_status_and_notify(None, Questao.objects.order_by("pk"), "REPROVADA")
+        self.set_status("APROVADA")
+        self.set_status("REPROVADA")
         self.assertEqual(notify.call_count, 4)
         self.assertEqual(Questao.objects.filter(notified_status="REPROVADA").count(), 2)
 

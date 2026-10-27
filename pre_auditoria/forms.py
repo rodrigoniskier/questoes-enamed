@@ -2,6 +2,7 @@ from django import forms
 from django.forms import inlineformset_factory
 from django.forms.models import BaseInlineFormSet
 
+from questoes.avaliacao import MAX_PARECER
 from questoes.models import Alternativa, Questao
 from questoes.submission import alternative_count, validate_alternatives
 
@@ -9,7 +10,10 @@ from questoes.submission import alternative_count, validate_alternatives
 class QuestaoRevisaoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["texto_base"].required = True
+        self.fields["texto_base"].required = False
+        self.fields[
+            "texto_base"
+        ].help_text = "Pode ficar vazio ao reorganizar o conteúdo. A estrutura será reavaliada após salvar."
 
     def clean(self):
         cleaned = super().clean()
@@ -87,16 +91,52 @@ class EvidenciaRevisorForm(forms.Form):
     referencia = forms.CharField(max_length=1000, required=False, widget=forms.TextInput())
 
 
+class ParecerField(forms.CharField):
+    def to_python(self, value):
+        # Textareas são submetidas com CRLF pelo navegador. Conte cada quebra
+        # uma única vez, antes de aplicar os validadores de comprimento.
+        return super().to_python(value).replace("\r\n", "\n").replace("\r", "\n")
+
+
 class DecisaoForm(forms.Form):
     confirmar_aprovacao = forms.BooleanField(
         required=True,
         error_messages={"required": "Confirme explicitamente a aprovação da questão."},
     )
-    justificativa = forms.CharField(max_length=2000, required=False, widget=forms.Textarea(attrs={"rows": 4}))
+    justificativa = ParecerField(
+        max_length=MAX_PARECER, required=False, widget=forms.Textarea(attrs={"rows": 8})
+    )
 
 
 class PedidoCorrecaoForm(forms.Form):
-    mensagem = forms.CharField(max_length=2000, min_length=20, widget=forms.Textarea(attrs={"rows": 5}))
+    mensagem = ParecerField(max_length=MAX_PARECER, min_length=20, widget=forms.Textarea(attrs={"rows": 10}))
+
+
+class ParecerInstitucionalForm(forms.Form):
+    classificacao = forms.ChoiceField(
+        label="Decisão do avaliador", choices=[("", "Selecione a decisão")] + Questao.STATUS_CHOICES
+    )
+    parecer = ParecerField(
+        label="Orientações ao professor",
+        max_length=MAX_PARECER,
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 12, "data-parecer": "true"}),
+        help_text="Até 20.000 caracteres. Sugestões e reprovações exigem pelo menos 20 caracteres.",
+    )
+    confirmar = forms.BooleanField(label="Confirmo que realizei a análise e assumo esta decisão.")
+    fingerprint = forms.CharField(widget=forms.HiddenInput)
+    request_id = forms.UUIDField(widget=forms.HiddenInput)
+
+    def clean(self):
+        cleaned = super().clean()
+        status = cleaned.get("classificacao")
+        if (
+            "parecer" not in self.errors
+            and status in {"APROVADA_SUGESTOES", "REPROVADA"}
+            and len(cleaned.get("parecer", "")) < 20
+        ):
+            self.add_error("parecer", "Apresente orientações fundamentadas com pelo menos 20 caracteres.")
+        return cleaned
 
 
 AlternativasRevisaoFormSet = inlineformset_factory(

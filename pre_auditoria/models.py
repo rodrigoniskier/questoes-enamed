@@ -96,12 +96,26 @@ class EvidenciaRevisor(models.Model):
 
 
 class DecisaoPreAuditoria(models.Model):
+    class Notificacao(models.TextChoices):
+        LEGADO = "LEGADO", "Registro anterior, sem novo envio"
+        SEM_ENVIO = "SEM_ENVIO", "Sem notificação para esta tramitação"
+        PENDENTE = "PENDENTE", "Aguardando envio"
+        ENVIANDO = "ENVIANDO", "Envio iniciado; confirmação pendente"
+        ENVIADO = "ENVIADO", "E-mail enviado"
+        FALHOU = "FALHOU", "Falha no envio; ação manual necessária"
+        SUPERADO = "SUPERADO", "Decisão superada; envio cancelado"
+
     class Acao(models.TextChoices):
         APROVADA = "APROVADA", "Aprovação confirmada"
+        APROVADA_SUGESTOES = "APROVADA_SUGESTOES", "Aprovada com sugestões de ajustes"
+        REPROVADA = "REPROVADA", "Reprovada — revisão necessária"
+        PENDENTE = "PENDENTE", "Pendente de validação (tramitação)"
         CORRECAO = "CORRECAO", "Correção solicitada"
 
     questao = models.ForeignKey(Questao, on_delete=models.PROTECT, related_name="decisoes_pre_auditoria")
-    parecer = models.ForeignKey(ParecerPreAuditoria, on_delete=models.PROTECT, related_name="decisoes")
+    parecer = models.ForeignKey(
+        ParecerPreAuditoria, on_delete=models.PROTECT, related_name="decisoes", null=True, blank=True
+    )
     revisor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -109,7 +123,11 @@ class DecisaoPreAuditoria(models.Model):
         related_name="decisoes_pre_auditoria",
     )
     revisor_nome = models.CharField(max_length=150, blank=True, default="")
-    acao = models.CharField(max_length=12, choices=Acao.choices)
+    acao = models.CharField(max_length=20, choices=Acao.choices)
+    notificacao_estado = models.CharField(
+        max_length=12, choices=Notificacao.choices, default="LEGADO", editable=False
+    )
+    email_enviado_em = models.DateTimeField(null=True, blank=True, editable=False)
     fingerprint = models.CharField(max_length=64)
     justificativa = models.TextField(blank=True)
     aprovacao_excepcional = models.BooleanField(default=False)
@@ -117,6 +135,14 @@ class DecisaoPreAuditoria(models.Model):
 
     class Meta:
         ordering = ["-criada_em", "-pk"]
+
+
+class ReciboDecisao(models.Model):
+    """Todos os tokens recebidos, inclusive repetições equivalentes de um parecer."""
+
+    id = models.UUIDField(primary_key=True, editable=False)
+    decisao = models.ForeignKey(DecisaoPreAuditoria, on_delete=models.PROTECT, related_name="recibos")
+    criado_em = models.DateTimeField(auto_now_add=True)
 
 
 class SolicitacaoCorrecao(models.Model):
