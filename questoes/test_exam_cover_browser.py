@@ -63,9 +63,7 @@ class CapaProvaBrowserTests(StaticLiveServerTestCase):
 
             for total in (1, 12, 24):
                 params = [("componentes", str(c.pk)) for c in self.componentes[:total]]
-                params.extend(
-                    (f"quantidade_{c.pk}", "1") for c in self.componentes[:total]
-                )
+                params.extend((f"quantidade_{c.pk}", "1") for c in self.componentes[:total])
                 url = f"{self.live_server_url}{reverse('prova_gerada')}?{urlencode(params)}"
                 page.goto(url)
                 page.locator(".capa-logo-oficial").wait_for()
@@ -74,7 +72,7 @@ class CapaProvaBrowserTests(StaticLiveServerTestCase):
                     "return img.complete && img.naturalWidth > 0; }"
                 )
                 self.assertEqual(page.locator(".capa-componente").count(), total)
-                self.assertIn("4º Período", page.locator(".capa-periodo-valor").inner_text())
+                self.assertIn("4º PERÍODO", page.locator(".capa-periodo-valor").inner_text())
                 self.assertIn("PROVA INTEGRADA", page.locator(".capa-titulo-bloco").inner_text())
                 if total > 20:
                     self.assertIn("capa-muito-densa", page.locator(".capa-container").get_attribute("class"))
@@ -101,9 +99,7 @@ class CapaProvaBrowserTests(StaticLiveServerTestCase):
                 self.assertGreater(geometria["altura"], 1100)
                 self.assertTrue(geometria["interno"], f"A capa excedeu a página: {geometria}")
                 self.assertEqual(
-                    page.locator(".capa-identificacao h3").evaluate(
-                        "el => getComputedStyle(el).color"
-                    ),
+                    page.locator(".capa-identificacao h3").evaluate("el => getComputedStyle(el).color"),
                     "rgb(17, 17, 17)",
                 )
 
