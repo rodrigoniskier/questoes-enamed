@@ -75,9 +75,13 @@ class CapaProvaBrowserTests(StaticLiveServerTestCase):
                 )
                 self.assertTrue(
                     page.evaluate(
-                        """() => performance.getEntriesByType('resource').some(
-                            r => r.name.endsWith('/images/capa_background.jpg') && r.decodedBodySize > 0)
-                        """
+                        """async () => {
+                            const imagem = new Image();
+                            imagem.src = new URL('capa_background.jpg',
+                                document.querySelector('.capa-footer img').src).href;
+                            await imagem.decode();
+                            return imagem.naturalWidth > 0;
+                        }"""
                     )
                 )
                 self.assertIn("4º PERÍODO", capa.locator(".capa-periodo").inner_text())
