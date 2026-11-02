@@ -1,5 +1,6 @@
 # questoes/views.py
 
+import csv
 import json
 import logging
 import math
@@ -26,6 +27,7 @@ from django.views.decorators.http import require_GET
 
 from .ai_control import AIControlError, subject_key
 from .answer_layout import LayoutBalanceError, montar_layout_balanceado
+from .answer_sheet import codigo_prova, linhas_do_gabarito, paginas_do_cartao
 from .forms import AlternativaForm, QuestaoForm
 from .models import ComponenteCurricular, Periodo, Questao, Semestre
 from .submission import (
@@ -764,8 +766,20 @@ def prova_gerada_view(request):
     questao_ids = [q.id for q in questoes_selecionadas]
     total_questoes = len(questoes_selecionadas)
     meio = math.ceil(total_questoes / 2)
+    if not total_questoes:
+        messages.error(request, "Não há questões aprovadas para compor esta prova.")
+        return redirect("pagina_gerar_prova")
+
+    try:
+        codigo_cartao = codigo_prova(questoes_selecionadas, alternativas_por_questao)
+        folhas_cartao = paginas_do_cartao(questoes_selecionadas, alternativas_por_questao)
+    except ValueError as erro:
+        messages.error(request, str(erro))
+        return redirect("pagina_gerar_prova")
 
     context = {
+        "codigo_prova": codigo_cartao,
+        "paginas_cartao": folhas_cartao,
         "componentes": componentes_da_prova,
         "questoes_selecionadas": questoes_selecionadas,
         "questao_ids": questao_ids,
@@ -813,11 +827,76 @@ def prova_gabarito_view(request):
     componentes_ids = {q.componente.id for q in questoes_ordenadas}
     componentes = ComponenteCurricular.objects.filter(id__in=componentes_ids)
 
+    try:
+        codigo_cartao = codigo_prova(questoes_ordenadas, alternativas_por_questao)
+    except ValueError as erro:
+        messages.error(request, str(erro))
+        return redirect("pagina_gerar_prova")
+
     context = {
         "componentes": componentes,
         "questoes_ordenadas": questoes_ordenadas,
+        "codigo_prova": codigo_cartao,
     }
     return render(request, "questoes/prova_gabarito.html", context)
+
+
+@staff_member_required
+@never_cache
+def prova_gabarito_csv_view(request):
+    """Exporta gabarito autoritativo para conferência externa das folhas."""
+    ids_str = request.GET.get("ids", "")
+    if not ids_str or len(ids_str) > 4000:
+        return HttpResponse("Informe os IDs da prova.", status=400)
+
+    partes = ids_str.split(",")
+    if (
+        len(partes) > 300
+        or not all(parte.isdecimal() and 0 < int(parte) for parte in partes)
+        or len(set(partes)) != len(partes)
+    ):
+        return HttpResponse("Lista de questões inválida.", status=400)
+
+    ids = [int(parte) for parte in partes]
+    questoes = Questao.objects.filter(pk__in=ids, status__in=Questao.STATUS_APROVADOS)
+    mapa = {questao.pk: questao for questao in questoes}
+    if len(mapa) != len(ids):
+        return HttpResponse("Questões não encontradas ou não aprovadas.", status=400)
+
+    ordenadas = [mapa[pk] for pk in ids]
+    try:
+        alternativas = montar_layout_balanceado(ordenadas, gerar_alternativas_multipla_escolha)
+        codigo = codigo_prova(ordenadas, alternativas)
+        linhas = linhas_do_gabarito(ordenadas, alternativas)
+    except (LayoutBalanceError, ValueError) as erro:
+        return HttpResponse(str(erro), status=422)
+
+    resposta = HttpResponse(content_type="text/csv; charset=utf-8")
+    resposta["Content-Disposition"] = f'attachment; filename="gabarito_{codigo}.csv"'
+    resposta.write("\ufeff")
+    escritor = csv.writer(resposta)
+    escritor.writerow(
+        [
+            "codigo_prova",
+            "numero_questao",
+            "questao_id",
+            "alternativas_validas",
+            "resposta_correta",
+            "total_questoes",
+        ]
+    )
+    for linha in linhas:
+        escritor.writerow(
+            [
+                codigo,
+                linha["questao"],
+                linha["questao_id"],
+                "ABCDE"[: linha["quantidade_alternativas"]],
+                linha["correta"],
+                len(linhas),
+            ]
+        )
+    return resposta
 
 
 # --- RELATÓRIOS ---

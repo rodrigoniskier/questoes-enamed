@@ -35,6 +35,7 @@ urlpatterns = [
     path("gerar-prova/", views.pagina_gerar_prova, name="pagina_gerar_prova"),
     path("prova-gerada/", views.prova_gerada_view, name="prova_gerada"),
     path("prova-gabarito/", views.prova_gabarito_view, name="prova_gabarito"),
+    path("prova-gabarito-csv/", views.prova_gabarito_csv_view, name="prova_gabarito_csv"),
     # --- ALTERAÇÃO AQUI: NOVA URL DO MONTADOR MANUAL ---
     path("montador-manual/", views.montador_manual_view, name="montador_manual"),
     # --- FIM DA ALTERAÇÃO ---
