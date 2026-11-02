@@ -107,15 +107,11 @@ class CapaProvaBrowserTests(StaticLiveServerTestCase):
                 if total == 1:
                     # Regressão da falha real: salvar PDF sem imprimir fundos
                     # deve incluir os vetores decorativos da capa.
-                    com_arte = page.pdf(
-                        print_background=False, prefer_css_page_size=True, page_ranges="1"
-                    )
+                    com_arte = page.pdf(print_background=False, prefer_css_page_size=True, page_ranges="1")
                     page.locator("svg.capa-arte-vetorial").evaluate(
                         "elemento => elemento.style.visibility = 'hidden'"
                     )
-                    sem_arte = page.pdf(
-                        print_background=False, prefer_css_page_size=True, page_ranges="1"
-                    )
+                    sem_arte = page.pdf(print_background=False, prefer_css_page_size=True, page_ranges="1")
                     self.assertGreater(
                         len(com_arte) - len(sem_arte),
                         120,
