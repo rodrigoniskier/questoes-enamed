@@ -12,6 +12,31 @@
         .glass-effect { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.9); }
         .dark .glass-effect { background: rgba(31, 41, 55, 0.9); }
         select[multiple] { height: 200px; }
+        #modal-gabarito {
+            width: min(92vw, 560px); max-height: 85vh; overflow-y: auto;
+            border: 0; border-radius: 16px; background: #fff; color: #111827;
+            padding: 24px; box-shadow: 0 18px 80px rgba(0,0,0,.28);
+        }
+        #modal-gabarito::backdrop { background: rgba(10, 20, 40, .72); }
+        #modal-gabarito h2 { font-size: 1.35rem; font-weight: 800; margin: 0 0 12px; }
+        #modal-gabarito-status { font-weight: 650; margin: 8px 0; }
+        #modal-gabarito-codigo { font-size: .95rem; margin: 8px 0 16px; }
+        #modal-gabarito-letras { display: grid; gap: 9px; }
+        .modal-letra-linha { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center; }
+        .modal-letra-barra { width: 100%; height: 12px; border-radius: 10px; background: #e5e7eb; overflow: hidden; }
+        .modal-letra-preenchimento { height: 100%; background: #334a78; }
+        .modal-observacao { margin: 14px 0; font-size: .91rem; line-height: 1.5; }
+        .modal-acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+        .modal-acoes button, .modal-acoes a {
+            border-radius: 8px; padding: 10px 14px; font-weight: 700;
+            cursor: pointer; text-decoration: none; text-align: center;
+        }
+        .modal-acoes button { border: 1px solid #9ca3af; background: white; }
+        .modal-acoes a { background: #1f467f; color: white; }
+        .modal-acoes button:focus-visible, .modal-acoes a:focus-visible { outline: 3px solid #1f467f; }
+        @media (max-width: 520px) {
+            .modal-acoes { flex-direction: column; }
+        }
     </style>
     <link rel="stylesheet" href="{% static 'questoes/tailwind.css' %}">
     <link rel="stylesheet" href="{% static 'questoes/app.css' %}?v=medicina-2026-2-20261007">
@@ -28,11 +53,11 @@
                     {% endfor %}
                 {% endif %}
                 <p class="bg-white rounded-lg p-4 mb-4 text-sm">
-                    Gabarito A–D balanceado no conjunto da prova (diferença máxima de uma questão);
-                    respostas únicas em ordem crescente ou decrescente de extensão.
-                    Se as duas regras forem incompatíveis, a geração será interrompida
-                    com aviso para revisar a seleção.
+                    As alternativas de Resposta Única ficam sempre em ordem crescente ou decrescente
+                    de extensão. O sistema busca equilibrar A–D; se não for possível,
+                    mantém a ordenação e apresenta a distribuição efetiva antes de abrir a prova.
                 </p>
+                <p id="erro-preflight" role="alert" class="hidden bg-white border border-red-600 rounded-lg p-4 mb-4 text-red-900"></p>
                 <form action="{% url 'prova_gerada' %}" method="GET" target="_blank" class="space-y-8">
 
                     <div class="glass-effect rounded-2xl p-8 shadow-xl border border-white/20">
@@ -113,6 +138,19 @@
         </div>
     </div>
 
+    <dialog id="modal-gabarito" aria-labelledby="modal-gabarito-titulo">
+        <h2 id="modal-gabarito-titulo">Distribuição do gabarito</h2>
+        <p id="modal-gabarito-status" role="status"></p>
+        <p id="modal-gabarito-codigo"></p>
+        <div id="modal-gabarito-letras" aria-label="Frequências das letras corretas"></div>
+        <p id="modal-gabarito-observacao" class="modal-observacao"></p>
+        <div class="modal-acoes">
+            <button type="button" id="modal-gabarito-cancelar">Voltar e ajustar</button>
+            <a id="modal-gabarito-abrir" href="#" target="_blank" rel="noopener noreferrer">
+                Confirmar e abrir prova
+            </a>
+        </div>
+    </dialog>
     <script>
         const periods = document.getElementById('periodos');
         const components = document.getElementById('componentes');
@@ -183,6 +221,86 @@
             }
         });
         renderCounts();
+
+        const geradorForm = document.querySelector('form[action="{% url 'prova_gerada' %}"]');
+        const modalGabarito = document.getElementById('modal-gabarito');
+        const modalAbrir = document.getElementById('modal-gabarito-abrir');
+        const modalCancelar = document.getElementById('modal-gabarito-cancelar');
+        const erroPreflight = document.getElementById('erro-preflight');
+        let preparandoProva = false;
+
+        geradorForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            if (preparandoProva) return;
+            preparandoProva = true;
+            erroPreflight.classList.add('hidden');
+            submitButtons.forEach(button => button.disabled = true);
+
+            const parametros = new URLSearchParams(new FormData(geradorForm));
+            if (event.submitter && event.submitter.name) {
+                parametros.set(event.submitter.name, event.submitter.value);
+            }
+            parametros.set('preflight', '1');
+            try {
+                const url = new URL(geradorForm.action, window.location.href);
+                url.search = parametros.toString();
+                const response = await fetch(url, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store'
+                });
+                const dados = await response.json();
+                if (!response.ok) throw new Error(dados.erro || 'Não foi possível preparar a prova.');
+                const situacao = document.getElementById('modal-gabarito-status');
+                situacao.textContent = dados.equilibrado
+                    ? 'Gabarito A–D equilibrado nas questões de quatro alternativas.'
+                    : 'Atenção: o gabarito está desequilibrado. A ordenação por extensão foi preservada.';
+                const codigo = document.getElementById('modal-gabarito-codigo');
+                codigo.textContent = 'Prova: ' + dados.codigo_prova + ' · ' + dados.total + ' questões';
+                const lista = document.getElementById('modal-gabarito-letras');
+                lista.replaceChildren();
+                dados.distribuicao.forEach(item => {
+                    const linha = document.createElement('div');
+                    linha.className = 'modal-letra-linha';
+                    const letra = document.createElement('strong');
+                    letra.textContent = item.letra;
+                    const barra = document.createElement('div');
+                    barra.className = 'modal-letra-barra';
+                    const preenchimento = document.createElement('div');
+                    preenchimento.className = 'modal-letra-preenchimento';
+                    preenchimento.style.width = item.percentual + '%';
+                    barra.append(preenchimento);
+                    const medida = document.createElement('span');
+                    medida.textContent = item.quantidade + ' (' + item.percentual.toLocaleString('pt-BR', {
+                        maximumFractionDigits: 1
+                    }) + '%)';
+                    linha.append(letra, barra, medida);
+                    lista.append(linha);
+                });
+                const observacao = document.getElementById('modal-gabarito-observacao');
+                observacao.textContent = dados.cinco_alternativas
+                    ? 'A distribuição acima considera todas as questões. ' +
+                      dados.cinco_alternativas + ' questão(ões) com cinco opções não ' +
+                      'participam da meta de equilíbrio A–D; a letra E aparece quando utilizada.'
+                    : 'Percentuais calculados sobre o total de questões. ' +
+                      'A diferença máxima de uma resposta por letra caracteriza o equilíbrio exato.';
+                modalAbrir.textContent = dados.exportar_txt
+                    ? 'Confirmar e baixar TXT'
+                    : 'Confirmar e abrir prova';
+                modalAbrir.href = dados.url_abertura;
+                modalGabarito.showModal();
+            } catch (error) {
+                erroPreflight.textContent = error.message || 'Falha ao verificar a prova.';
+                erroPreflight.classList.remove('hidden');
+                erroPreflight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } finally {
+                preparandoProva = false;
+                renderCounts();
+            }
+        });
+        modalCancelar.addEventListener('click', () => modalGabarito.close());
+        modalAbrir.addEventListener('click', () => modalGabarito.close());
     </script>
 {% include "questoes/partials/footer.html" %}
 </body>
