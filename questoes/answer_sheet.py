@@ -24,6 +24,11 @@ def codigo_prova(questoes, alternativas_por_questao):
         if len(corretas) != 1 or not 1 <= len(alternativas) <= len(LETRAS):
             raise ValueError(f"Questão {questao.pk}: alternativas ou gabarito inválidos.")
         partes.append(f"{numero}:{questao.pk}:{len(alternativas)}:{LETRAS[corretas[0]]}")
+        for atributo in ("texto_base", "enunciado", "proposicao_dois"):
+            partes.append(str(getattr(questao, atributo, "") or ""))
+        for alternativa in alternativas:
+            texto = alternativa["texto"] if isinstance(alternativa, dict) else alternativa.texto
+            partes.append(str(texto))
     assinatura = hashlib.sha256("|".join(partes).encode("utf-8")).hexdigest().upper()[:12]
     return f"{assinatura[:6]}-{assinatura[6:]}"
 
