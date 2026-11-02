@@ -630,9 +630,7 @@ def prova_gerada_view(request):
         if modo_preflight or len(token_prova) > 12000:
             return falha("Solicitação de prova inválida.")
         try:
-            dados = signing.loads(
-                token_prova, salt="questoes.prova.preflight.v1", max_age=3600
-            )
+            dados = signing.loads(token_prova, salt="questoes.prova.preflight.v1", max_age=3600)
         except signing.BadSignature:
             return falha("A confirmação da prova expirou ou foi alterada. Gere uma nova prova.")
         ids = dados.get("ids")
@@ -642,9 +640,8 @@ def prova_gerada_view(request):
             or not 1 <= len(ids) <= 300
             or any(type(pk) is not int or pk <= 0 for pk in ids)
             or len(set(ids)) != len(ids)
-            or dados.get("tipo_prova") not in (
-                "integrada", "internato", "reposicao", "residencia", "simulado"
-            )
+            or dados.get("tipo_prova")
+            not in ("integrada", "internato", "reposicao", "residencia", "simulado")
             or not isinstance(dados.get("codigo"), str)
             or type(dados.get("exportar_txt")) is not bool
         ):
@@ -656,9 +653,7 @@ def prova_gerada_view(request):
             return falha("A seleção da prova foi modificada. Gere uma nova prova.")
         questoes_selecionadas = [mapa[pk] for pk in ids]
         componentes_ids = {questao.componente_id for questao in questoes_selecionadas}
-        componentes_da_prova = ComponenteCurricular.objects.filter(
-            pk__in=componentes_ids
-        ).order_by("nome")
+        componentes_da_prova = ComponenteCurricular.objects.filter(pk__in=componentes_ids).order_by("nome")
         tipo_prova = dados["tipo_prova"]
         exportar_txt = dados["exportar_txt"]
         try:
@@ -681,22 +676,17 @@ def prova_gerada_view(request):
         canonicos = {c.consolidado_em_id or c.pk for c in selecionados}
         if not canonicos:
             return falha("Selecione pelo menos um componente válido para a prova.")
-        componentes_da_prova = ComponenteCurricular.objects.filter(
-            pk__in=canonicos
-        ).order_by("nome")
+        componentes_da_prova = ComponenteCurricular.objects.filter(pk__in=canonicos).order_by("nome")
         quantidades = {}
         for componente in componentes_da_prova:
-            valor = request.GET.get(
-                f"quantidade_{componente.pk}", str(componente.numero_questoes_prova)
-            )
+            valor = request.GET.get(f"quantidade_{componente.pk}", str(componente.numero_questoes_prova))
             if (
                 len(valor) > 10
                 or not valor.isdigit()
                 or not 1 <= int(valor) <= componente.numero_questoes_prova
             ):
                 return falha(
-                    f"Informe de 1 a {componente.numero_questoes_prova} questões "
-                    f"para {componente.nome}."
+                    f"Informe de 1 a {componente.numero_questoes_prova} questões para {componente.nome}."
                 )
             quantidades[componente.pk] = int(valor)
 
@@ -722,17 +712,13 @@ def prova_gerada_view(request):
             sorteadas_total = []
             for aprovadas, quantidade in bancos:
                 sorteadas = (
-                    random.sample(aprovadas, quantidade)
-                    if len(aprovadas) >= quantidade
-                    else aprovadas
+                    random.sample(aprovadas, quantidade) if len(aprovadas) >= quantidade else aprovadas
                 )
                 sorteadas_total.extend(sorteadas)
             if not sorteadas_total:
                 return falha("Não há questões aprovadas para compor esta prova.")
             try:
-                layout = montar_layout_balanceado(
-                    sorteadas_total, gerar_alternativas_multipla_escolha
-                )
+                layout = montar_layout_balanceado(sorteadas_total, gerar_alternativas_multipla_escolha)
                 resumo = resumo_gabarito(sorteadas_total, layout)
             except LayoutBalanceError as erro:
                 ultimo_erro = erro
@@ -746,9 +732,7 @@ def prova_gerada_view(request):
             )
             if melhor is None or score < melhor[0]:
                 melhor = (score, sorteadas_total, layout)
-            if resumo["equilibrado"] or all(
-                len(aprovadas) <= quantidade for aprovadas, quantidade in bancos
-            ):
+            if resumo["equilibrado"] or all(len(aprovadas) <= quantidade for aprovadas, quantidade in bancos):
                 break
 
         if melhor is None:
