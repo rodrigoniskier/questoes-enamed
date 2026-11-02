@@ -22,6 +22,17 @@
         <div class="container mx-auto px-4 py-8">
             <header class="page-heading"><p class="eyebrow">MEDICINA · NAPED / UNIPÊ</p><h1>Gerador de Provas</h1><p>Elabore, revise e organize questões com clareza.</p></header>
 <div class="max-w-4xl mx-auto">
+                {% if messages %}
+                    {% for message in messages %}
+                        <p role="alert" class="bg-white border border-red-600 rounded-lg p-4 mb-4 text-red-900">{{ message }}</p>
+                    {% endfor %}
+                {% endif %}
+                <p class="bg-white rounded-lg p-4 mb-4 text-sm">
+                    Gabarito A–D balanceado no conjunto da prova (diferença máxima de uma questão);
+                    respostas únicas em ordem crescente ou decrescente de extensão.
+                    Se as duas regras forem incompatíveis, a geração será interrompida
+                    com aviso para revisar a seleção.
+                </p>
                 <form action="{% url 'prova_gerada' %}" method="GET" target="_blank" class="space-y-8">
 
                     <div class="glass-effect rounded-2xl p-8 shadow-xl border border-white/20">
