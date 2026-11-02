@@ -179,7 +179,7 @@ class AnswerLayoutTests(TestCase):
             reverse("prova_gerada"), {**parametros, "formato_txt": "1"}
         )
         self.assertEqual(texto.status_code, 200)
-        linhas = [l for l in texto.content.decode().splitlines() if l]
+        linhas = [linha for linha in texto.content.decode().splitlines() if linha]
         self.assertEqual(len(linhas), 4)
         contagens = [0, 0, 0, 0]
         for linha in linhas:
