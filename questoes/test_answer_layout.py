@@ -185,7 +185,7 @@ class AnswerLayoutTests(TestCase):
         for linha in linhas:
             partes = linha.split("\t")
             self.assertEqual(partes[0], "MC")
-            marcadores = partes[2::2]
+            marcadores = partes[3::2]
             self.assertEqual(len(marcadores), 4)
             self.assertEqual(marcadores.count("correct"), 1)
             contagens[marcadores.index("correct")] += 1
