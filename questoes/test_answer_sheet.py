@@ -37,7 +37,9 @@ class PaginasCartaoTests(SimpleTestCase):
                     [item["numero"] for coluna in paginas[0]["colunas"] for item in coluna],
                     list(range(1, quantidade + 1)),
                 )
-                self.assertTrue(all(item["letras"] == "ABCD" for coluna in paginas[0]["colunas"] for item in coluna))
+                self.assertTrue(
+                    all(item["letras"] == "ABCD" for coluna in paginas[0]["colunas"] for item in coluna)
+                )
 
     def test_121_itens_geram_duas_folhas_com_numeracao_sem_lacunas(self):
         questoes, opcoes = self.gerar(121)
@@ -160,10 +162,6 @@ class GeradorCartaoTests(TestCase):
 
     def test_helper_registra_numeracao_sem_alterar_gabarito(self):
         questoes = self.questoes
-        alternativas = {
-            q.pk: list(q.alternativas.order_by("pk")) for q in questoes
-        }
+        alternativas = {q.pk: list(q.alternativas.order_by("pk")) for q in questoes}
         linhas = linhas_do_gabarito(questoes, alternativas)
-        self.assertEqual(
-            [linha["correta"] for linha in linhas], list("ABCD")
-        )
+        self.assertEqual([linha["correta"] for linha in linhas], list("ABCD"))
