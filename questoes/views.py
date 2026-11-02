@@ -12,6 +12,7 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import messages
+from django.core import signing
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError
@@ -26,7 +27,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET
 
 from .ai_control import AIControlError, subject_key
-from .answer_layout import LayoutBalanceError, montar_layout_balanceado
+from .answer_layout import LayoutBalanceError, montar_layout_balanceado, resumo_gabarito
 from .answer_sheet import codigo_prova, linhas_do_gabarito, paginas_do_cartao
 from .forms import AlternativaForm, QuestaoForm
 from .models import ComponenteCurricular, Periodo, Questao, Semestre
@@ -614,70 +615,172 @@ def pagina_gerar_prova(request):
 
 @staff_member_required
 def prova_gerada_view(request):
-    componentes_ids = request.GET.getlist("componentes")
+    modo_preflight = request.GET.get("preflight") == "1"
+    token_prova = request.GET.get("prova_token", "")
     tipo_prova = request.GET.get("tipo_prova", "integrada")
-
-    # Verifica se o utilizador pediu para exportar em TXT
     exportar_txt = request.GET.get("formato_txt") == "1"
 
-    if not componentes_ids:
+    def falha(mensagem, status=400):
+        if modo_preflight:
+            return JsonResponse({"erro": mensagem}, status=status)
+        messages.error(request, mensagem)
         return redirect("pagina_gerar_prova")
 
-    if len(componentes_ids) > 100 or not all(pk.isdigit() for pk in componentes_ids):
-        messages.error(request, "Selecione componentes válidos para a prova.")
-        return redirect("pagina_gerar_prova")
-    # Previous links may include more than one alias of the same shared bank.
-    selecionados = ComponenteCurricular.objects.filter(pk__in=componentes_ids)
-    canonicos = {c.consolidado_em_id or c.pk for c in selecionados}
-    if not canonicos:
-        messages.error(request, "Selecione pelo menos um componente válido para a prova.")
-        return redirect("pagina_gerar_prova")
-    componentes_da_prova = ComponenteCurricular.objects.filter(pk__in=canonicos).order_by("nome")
-    quantidades = {}
-    for componente in componentes_da_prova:
-        valor = request.GET.get(f"quantidade_{componente.pk}", str(componente.numero_questoes_prova))
-        if len(valor) > 10 or not valor.isdigit() or not 1 <= int(valor) <= componente.numero_questoes_prova:
-            messages.error(
-                request, f"Informe de 1 a {componente.numero_questoes_prova} questões para {componente.nome}."
+    if token_prova:
+        if modo_preflight or len(token_prova) > 12000:
+            return falha("Solicitação de prova inválida.")
+        try:
+            dados = signing.loads(
+                token_prova, salt="questoes.prova.preflight.v1", max_age=3600
             )
-            return redirect("pagina_gerar_prova")
-        quantidades[componente.pk] = int(valor)
-    # A prova é balanceada como um conjunto: os itens sorteados podem mudar
-    # entre tentativas, mas a disposição final é sempre reprodutível por IDs.
-    bancos = []
-    for componente in componentes_da_prova:
-        query_base = Q(componente=componente, status__in=Questao.STATUS_APROVADOS)
+        except signing.BadSignature:
+            return falha("A confirmação da prova expirou ou foi alterada. Gere uma nova prova.")
+        ids = dados.get("ids")
+        if (
+            dados.get("usuario") != request.user.pk
+            or not isinstance(ids, list)
+            or not 1 <= len(ids) <= 300
+            or any(type(pk) is not int or pk <= 0 for pk in ids)
+            or len(set(ids)) != len(ids)
+            or dados.get("tipo_prova") not in (
+                "integrada", "internato", "reposicao", "residencia", "simulado"
+            )
+            or not isinstance(dados.get("codigo"), str)
+            or type(dados.get("exportar_txt")) is not bool
+        ):
+            return falha("Confirmação inválida. Gere uma nova prova.")
 
-        if tipo_prova == "reposicao":
-            query_tipo = Q(uso_prova="REPOSICAO") | Q(uso_prova="AMBAS")
-        elif tipo_prova == "residencia":
-            query_tipo = Q(uso_prova="RESIDENCIA")
-        elif tipo_prova == "simulado":
-            query_tipo = Q(uso_prova="SIMULADO")
-        else:
-            query_tipo = Q(uso_prova="INTEGRADA") | Q(uso_prova="AMBAS")
-
-        aprovadas = list(Questao.objects.filter(query_base & query_tipo))
-        bancos.append((aprovadas, quantidades[componente.pk]))
-
-    erro_layout = None
-    for _ in range(20):
-        questoes_selecionadas = []
-        for aprovadas, quantidade in bancos:
-            sorteadas = random.sample(aprovadas, quantidade) if len(aprovadas) >= quantidade else aprovadas
-            questoes_selecionadas.extend(sorteadas)
-
+        questoes_db = Questao.objects.filter(pk__in=ids, status__in=Questao.STATUS_APROVADOS)
+        mapa = {questao.pk: questao for questao in questoes_db}
+        if len(mapa) != len(ids):
+            return falha("A seleção da prova foi modificada. Gere uma nova prova.")
+        questoes_selecionadas = [mapa[pk] for pk in ids]
+        componentes_ids = {questao.componente_id for questao in questoes_selecionadas}
+        componentes_da_prova = ComponenteCurricular.objects.filter(
+            pk__in=componentes_ids
+        ).order_by("nome")
+        tipo_prova = dados["tipo_prova"]
+        exportar_txt = dados["exportar_txt"]
         try:
             alternativas_por_questao = montar_layout_balanceado(
                 questoes_selecionadas, gerar_alternativas_multipla_escolha
             )
-        except LayoutBalanceError as erro:
-            erro_layout = erro
-        else:
-            break
+            codigo_atual = codigo_prova(questoes_selecionadas, alternativas_por_questao)
+        except (LayoutBalanceError, ValueError) as erro:
+            return falha(str(erro))
+        if codigo_atual != dados["codigo"]:
+            return falha("O conteúdo ou a disposição da prova mudou. Gere uma nova versão.")
     else:
-        messages.error(request, str(erro_layout))
-        return redirect("pagina_gerar_prova")
+        componentes_ids = request.GET.getlist("componentes")
+        if not componentes_ids:
+            return falha("Selecione pelo menos um componente.")
+        if len(componentes_ids) > 100 or not all(pk.isdigit() for pk in componentes_ids):
+            return falha("Selecione componentes válidos para a prova.")
+
+        selecionados = ComponenteCurricular.objects.filter(pk__in=componentes_ids)
+        canonicos = {c.consolidado_em_id or c.pk for c in selecionados}
+        if not canonicos:
+            return falha("Selecione pelo menos um componente válido para a prova.")
+        componentes_da_prova = ComponenteCurricular.objects.filter(
+            pk__in=canonicos
+        ).order_by("nome")
+        quantidades = {}
+        for componente in componentes_da_prova:
+            valor = request.GET.get(
+                f"quantidade_{componente.pk}", str(componente.numero_questoes_prova)
+            )
+            if (
+                len(valor) > 10
+                or not valor.isdigit()
+                or not 1 <= int(valor) <= componente.numero_questoes_prova
+            ):
+                return falha(
+                    f"Informe de 1 a {componente.numero_questoes_prova} questões "
+                    f"para {componente.nome}."
+                )
+            quantidades[componente.pk] = int(valor)
+
+        bancos = []
+        for componente in componentes_da_prova:
+            query_base = Q(componente=componente, status__in=Questao.STATUS_APROVADOS)
+            if tipo_prova == "reposicao":
+                query_tipo = Q(uso_prova="REPOSICAO") | Q(uso_prova="AMBAS")
+            elif tipo_prova == "residencia":
+                query_tipo = Q(uso_prova="RESIDENCIA")
+            elif tipo_prova == "simulado":
+                query_tipo = Q(uso_prova="SIMULADO")
+            else:
+                query_tipo = Q(uso_prova="INTEGRADA") | Q(uso_prova="AMBAS")
+            aprovadas = list(Questao.objects.filter(query_base & query_tipo))
+            bancos.append((aprovadas, quantidades[componente.pk]))
+
+        # Procura uma seleção balanceada. Se nenhuma das tentativas atingir a
+        # meta, escolhe a melhor encontrada, sem jamais romper a ordem textual.
+        melhor = None
+        ultimo_erro = None
+        for _ in range(20):
+            sorteadas_total = []
+            for aprovadas, quantidade in bancos:
+                sorteadas = (
+                    random.sample(aprovadas, quantidade)
+                    if len(aprovadas) >= quantidade
+                    else aprovadas
+                )
+                sorteadas_total.extend(sorteadas)
+            if not sorteadas_total:
+                return falha("Não há questões aprovadas para compor esta prova.")
+            try:
+                layout = montar_layout_balanceado(
+                    sorteadas_total, gerar_alternativas_multipla_escolha
+                )
+                resumo = resumo_gabarito(sorteadas_total, layout)
+            except LayoutBalanceError as erro:
+                ultimo_erro = erro
+                continue
+
+            contagens = list(resumo["contagens_quatro"].values())
+            total_quatro = resumo["quatro_alternativas"]
+            score = (
+                max(contagens) - min(contagens),
+                sum((4 * quantidade - total_quatro) ** 2 for quantidade in contagens),
+            )
+            if melhor is None or score < melhor[0]:
+                melhor = (score, sorteadas_total, layout)
+            if resumo["equilibrado"] or all(
+                len(aprovadas) <= quantidade for aprovadas, quantidade in bancos
+            ):
+                break
+
+        if melhor is None:
+            return falha(str(ultimo_erro or "Não foi possível montar uma prova válida."))
+        _, questoes_selecionadas, alternativas_por_questao = melhor
+
+    # Prévia da própria prova, com seleção e ordenação imutáveis no link
+    # assinado. A abertura da nova aba acontece SOMENTE após confirmação.
+    if modo_preflight:
+        resumo = resumo_gabarito(questoes_selecionadas, alternativas_por_questao)
+        codigo = codigo_prova(questoes_selecionadas, alternativas_por_questao)
+        token = signing.dumps(
+            {
+                "usuario": request.user.pk,
+                "ids": [questao.pk for questao in questoes_selecionadas],
+                "tipo_prova": tipo_prova,
+                "exportar_txt": exportar_txt,
+                "codigo": codigo,
+            },
+            salt="questoes.prova.preflight.v1",
+        )
+        url = reverse("prova_gerada") + "?" + urlencode({"prova_token": token})
+        resposta = JsonResponse(
+            {
+                **resumo,
+                "codigo_prova": codigo,
+                "url_abertura": url,
+                "exportar_txt": exportar_txt,
+            }
+        )
+        resposta["Cache-Control"] = "no-store"
+        return resposta
 
     # ==========================================
     # LÓGICA DE EXPORTAÇÃO PARA .TXT (CORRIGIDA)
