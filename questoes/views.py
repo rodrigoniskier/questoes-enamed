@@ -770,9 +770,16 @@ def prova_gerada_view(request):
         messages.error(request, "Não há questões aprovadas para compor esta prova.")
         return redirect("pagina_gerar_prova")
 
+    try:
+        codigo_cartao = codigo_prova(questoes_selecionadas, alternativas_por_questao)
+        folhas_cartao = paginas_do_cartao(questoes_selecionadas, alternativas_por_questao)
+    except ValueError as erro:
+        messages.error(request, str(erro))
+        return redirect("pagina_gerar_prova")
+
     context = {
-        "codigo_prova": codigo_prova(questoes_selecionadas, alternativas_por_questao),
-        "paginas_cartao": paginas_do_cartao(questoes_selecionadas, alternativas_por_questao),
+        "codigo_prova": codigo_cartao,
+        "paginas_cartao": folhas_cartao,
         "componentes": componentes_da_prova,
         "questoes_selecionadas": questoes_selecionadas,
         "questao_ids": questao_ids,
@@ -820,10 +827,16 @@ def prova_gabarito_view(request):
     componentes_ids = {q.componente.id for q in questoes_ordenadas}
     componentes = ComponenteCurricular.objects.filter(id__in=componentes_ids)
 
+    try:
+        codigo_cartao = codigo_prova(questoes_ordenadas, alternativas_por_questao)
+    except ValueError as erro:
+        messages.error(request, str(erro))
+        return redirect("pagina_gerar_prova")
+
     context = {
         "componentes": componentes,
         "questoes_ordenadas": questoes_ordenadas,
-        "codigo_prova": codigo_prova(questoes_ordenadas, alternativas_por_questao),
+        "codigo_prova": codigo_cartao,
     }
     return render(request, "questoes/prova_gabarito.html", context)
 
