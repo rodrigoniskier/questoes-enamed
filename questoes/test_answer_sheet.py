@@ -160,6 +160,8 @@ class GeradorCartaoTests(TestCase):
         self.assertContains(resposta, resposta.context["codigo_prova"])
         self.assertContains(resposta, "images/logo.jpg")
         self.assertContains(resposta, "capa-logo-oficial")
+        self.assertContains(resposta, "images/capa-aprovada-vetor.svg")
+        self.assertContains(resposta, "capa-disciplinas")
         self.assertNotContains(resposta, "images/capa_background.jpg")
 
     def test_csv_tem_codigo_igual_ao_gabarito_impresso(self):
