@@ -17,9 +17,7 @@ class AnswerLayoutTests(TestCase):
         cls.componente = ComponenteCurricular.objects.create(
             nome="Clínica Médica", periodo=periodo, numero_questoes_prova=8
         )
-        cls.gestor = get_user_model().objects.create_user(
-            "gestor-layout", is_staff=True
-        )
+        cls.gestor = get_user_model().objects.create_user("gestor-layout", is_staff=True)
 
     def criar_unica(self, indice_correto, comprimentos=(4, 8, 12, 16)):
         questao = Questao.objects.create(
@@ -58,21 +56,16 @@ class AnswerLayoutTests(TestCase):
         return questao
 
     def layout(self, questoes):
-        return montar_layout_balanceado(
-            questoes, gerar_alternativas_multipla_escolha
-        )
+        return montar_layout_balanceado(questoes, gerar_alternativas_multipla_escolha)
 
     def testar_balanceamento(self, questoes, layout):
         contagens = [0, 0, 0, 0]
         for questao in questoes:
             alternativas = layout[questao.pk]
             correta = [
-                indice for indice, alternativa in enumerate(alternativas)
-                if (
-                    alternativa["eh_correta"]
-                    if isinstance(alternativa, dict)
-                    else alternativa.eh_correta
-                )
+                indice
+                for indice, alternativa in enumerate(alternativas)
+                if (alternativa["eh_correta"] if isinstance(alternativa, dict) else alternativa.eh_correta)
             ]
             self.assertEqual(len(correta), 1)
             contagens[correta[0]] += 1
@@ -88,17 +81,10 @@ class AnswerLayoutTests(TestCase):
                 extensoes,
                 [sorted(extensoes), sorted(extensoes, reverse=True)],
             )
+        repetido = self.layout(questoes)
         self.assertEqual(
-            {
-                q.pk: [a.pk for a in alternativas]
-                for q, alternativas in ((q, layout[q.pk]) for q in questoes)
-            },
-            {
-                q.pk: [a.pk for a in alternativas]
-                for q, alternativas in (
-                    (q, self.layout(questoes)[q.pk]) for q in questoes
-                )
-            },
+            [[a.pk for a in layout[q.pk]] for q in questoes],
+            [[a.pk for a in repetido[q.pk]] for q in questoes],
         )
 
     def test_multiplas_preenchem_letras_ausentes(self):
@@ -108,15 +94,10 @@ class AnswerLayoutTests(TestCase):
         self.testar_balanceamento(questoes, layout)
         for questao in questoes[-2:]:
             self.assertEqual(len(layout[questao.pk]), 4)
-            self.assertEqual(
-                len({a["texto"] for a in layout[questao.pk]}), 4
-            )
+            self.assertEqual(len({a["texto"] for a in layout[questao.pk]}), 4)
 
     def test_empates_de_extensao_permitidos(self):
-        questoes = [
-            self.criar_unica(0, comprimentos=(6, 6, 6, 6))
-            for _ in range(4)
-        ]
+        questoes = [self.criar_unica(0, comprimentos=(6, 6, 6, 6)) for _ in range(4)]
         self.testar_balanceamento(questoes, self.layout(questoes))
 
     def test_distribuicao_exata_impossivel_bloqueia_geracao(self):
@@ -161,23 +142,15 @@ class AnswerLayoutTests(TestCase):
             {"ids": ",".join(str(q.pk) for q in selecionadas)},
         )
         self.assertEqual(gabarito.status_code, 200)
-        for original, gabaritada in zip(
-            selecionadas, gabarito.context["questoes_ordenadas"]
-        ):
+        for original, gabaritada in zip(selecionadas, gabarito.context["questoes_ordenadas"]):
             self.assertEqual(
                 [a.pk for a in original.alternativas_finais],
                 [a.pk for a in gabaritada.alternativas_finais_exibicao],
             )
-            letra = next(
-                "ABCD"[i]
-                for i, a in enumerate(original.alternativas_finais)
-                if a.eh_correta
-            )
+            letra = next("ABCD"[i] for i, a in enumerate(original.alternativas_finais) if a.eh_correta)
             self.assertEqual(gabaritada.letra_gabarito, letra)
 
-        texto = self.client.get(
-            reverse("prova_gerada"), {**parametros, "formato_txt": "1"}
-        )
+        texto = self.client.get(reverse("prova_gerada"), {**parametros, "formato_txt": "1"})
         self.assertEqual(texto.status_code, 200)
         linhas = [linha for linha in texto.content.decode().splitlines() if linha]
         self.assertEqual(len(linhas), 4)
