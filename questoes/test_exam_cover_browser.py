@@ -67,6 +67,8 @@ class CapaProvaBrowserTests(StaticLiveServerTestCase):
                 url = f"{self.live_server_url}{reverse('prova_gerada')}?{urlencode(params)}"
                 page.goto(url)
                 page.locator(".capa-logo-oficial").wait_for()
+                self.assertEqual(page.locator("svg.capa-arte-vetorial").count(), 1)
+                self.assertTrue(page.locator("svg.capa-arte-vetorial").is_visible())
                 page.wait_for_function(
                     "() => { const img = document.querySelector('.capa-logo-oficial'); "
                     "return img.complete && img.naturalWidth > 0; }"
@@ -102,6 +104,22 @@ class CapaProvaBrowserTests(StaticLiveServerTestCase):
                     page.locator(".capa-identificacao h3").evaluate("el => getComputedStyle(el).color"),
                     "rgb(17, 17, 17)",
                 )
+                if total == 1:
+                    # Regressão da falha real: salvar PDF sem imprimir fundos
+                    # deve incluir os vetores decorativos da capa.
+                    com_arte = page.pdf(print_background=False, prefer_css_page_size=True, page_ranges="1")
+                    page.locator("svg.capa-arte-vetorial").evaluate(
+                        "elemento => elemento.style.visibility = 'hidden'"
+                    )
+                    sem_arte = page.pdf(print_background=False, prefer_css_page_size=True, page_ranges="1")
+                    self.assertGreater(
+                        len(com_arte) - len(sem_arte),
+                        120,
+                        "Arte vetorial ausente do PDF quando fundos não são impressos.",
+                    )
+                    page.locator("svg.capa-arte-vetorial").evaluate(
+                        "elemento => elemento.style.removeProperty('visibility')"
+                    )
 
                 if os.environ.get("BROWSER_SCREENSHOT"):
                     captura = Path(os.environ["BROWSER_SCREENSHOT"])

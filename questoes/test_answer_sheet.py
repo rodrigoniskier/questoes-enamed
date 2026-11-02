@@ -160,7 +160,7 @@ class GeradorCartaoTests(TestCase):
         self.assertContains(resposta, resposta.context["codigo_prova"])
         self.assertContains(resposta, "images/logo.jpg")
         self.assertContains(resposta, "capa-logo-oficial")
-        self.assertContains(resposta, "images/capa-aprovada-vetor.svg")
+        self.assertContains(resposta, 'class="capa-arte-vetorial"')
         self.assertContains(resposta, "capa-disciplinas")
         self.assertNotContains(resposta, "images/capa_background.jpg")
 
