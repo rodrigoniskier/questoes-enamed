@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1055" height="1491" viewBox="0 0 1055 1491">
+  <title>Arte gráfica aprovada para a capa da Prova Integrada de Medicina UNIPÊ</title>
+  <rect width="1055" height="1491" fill="#ffffff"/>
+  <path d="M0 0H325C250 36 176 88 112 143C63 184 26 224 0 262Z" fill="#082f60"/>
+  <path d="M0 0H375C255 35 149 103 47 201L0 247Z" fill="#073e75" opacity=".83"/>
+  <path d="M0 0H438C311 43 174 102 37 239L0 270Z" fill="#d8dce6" opacity=".78"/>
+  <path d="M0 0H360C255 36 114 101 0 201" fill="none" stroke="#f9c317" stroke-width="9"/>
+  <path d="M425 1491C588 1423 774 1377 1055 1331V1491Z" fill="#082d5a"/>
+  <path d="M474 1491C660 1421 838 1376 1055 1350" fill="none" stroke="#f9c317" stroke-width="15"/>
+  <path d="M390 1491C575 1420 758 1385 1055 1344" fill="none" stroke="#dce0e9" stroke-width="22"/>
+  <path d="M477 1491C674 1419 841 1377 1055 1358" fill="none" stroke="#ffffff" stroke-width="8"/>
+  <path d="M90 385H453M603 385H963" stroke="#f5c01c" stroke-width="7" stroke-linecap="round"/>
+  <rect x="53" y="413" width="949" height="147" rx="52" fill="none" stroke="#072c59" stroke-width="5"/>
+  <path d="M77 486H153L167 476L186 500L206 445L223 527L242 472L255 491H314" fill="none" stroke="#07325f" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M765 494H781L790 477L799 511L808 487L815 493H833" fill="none" stroke="#07325f" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M841 414L794 559" stroke="#072c59" stroke-width="5"/>
+  <g transform="translate(914 480)" stroke="#062d58" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0-45V66"/>
+    <path d="M19-20C-5-39-23-15-11-4C-5 0 11 1 13 9C13 24-18 20-19 34C-18 46 13 39 13 51C13 60-10 56-11 66"/>
+    <circle cx="0" cy="-55" r="6" fill="#062d58" stroke="none"/>
+    <path d="M19-20C27-23 33-18 39-18" stroke-width="3"/>
+  </g>
+</svg>
