@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from .answer_layout import LayoutBalanceError, montar_layout_balanceado
+from .answer_layout import montar_layout_balanceado
 from .models import Alternativa, ComponenteCurricular, Periodo, Questao, Semestre
 from .views import gerar_alternativas_multipla_escolha
 
@@ -100,26 +100,33 @@ class AnswerLayoutTests(TestCase):
         questoes = [self.criar_unica(0, comprimentos=(6, 6, 6, 6)) for _ in range(4)]
         self._verificar_balanceamento(questoes, self.layout(questoes))
 
-    def test_distribuicao_exata_impossivel_bloqueia_geracao(self):
+    def test_distribuicao_impossivel_prioriza_ordem_de_extensao(self):
+        from .answer_layout import resumo_gabarito
+
         questoes = [self.criar_unica(0) for _ in range(4)]
-        with self.assertRaises(LayoutBalanceError):
-            self.layout(questoes)
+        layout = self.layout(questoes)
+        resumo = resumo_gabarito(questoes, layout)
+        self.assertFalse(resumo["equilibrado"])
+        self.assertEqual(resumo["contagens_quatro"], {"A": 2, "B": 0, "C": 0, "D": 2})
+        for questao in questoes:
+            tamanhos = [len(a.texto) for a in layout[questao.pk]]
+            self.assertIn(tamanhos, [sorted(tamanhos), sorted(tamanhos, reverse=True)])
 
         self.client.force_login(self.gestor)
-        url = reverse("prova_gerada")
-        resposta = self.client.get(
-            url,
-            {
-                "componentes": [self.componente.pk],
-                f"quantidade_{self.componente.pk}": 4,
-            },
-            follow=True,
+        parametros = {
+            "componentes": [self.componente.pk],
+            f"quantidade_{self.componente.pk}": 4,
+        }
+        previa = self.client.get(reverse("prova_gerada"), {**parametros, "preflight": "1"})
+        self.assertEqual(previa.status_code, 200)
+        self.assertFalse(previa.json()["equilibrado"])
+        self.assertEqual(previa.json()["codigo_prova"], self.client.get(
+            previa.json()["url_abertura"]
+        ).context["codigo_prova"])
+        self.assertEqual(
+            {item["letra"]: item["quantidade"] for item in previa.json()["distribuicao"]},
+            resumo["contagens_quatro"],
         )
-        self.assertContains(
-            resposta,
-            "Não é possível equilibrar A, B, C e D",
-        )
-        self.assertTemplateUsed(resposta, "questoes/gerar_prova.html")
 
     def test_prova_gabarito_e_txt_usam_mesma_regra(self):
         questoes = [self.criar_unica(indice) for indice in range(4)]
