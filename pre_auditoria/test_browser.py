@@ -16,7 +16,7 @@ from questoes.submission import ASSERTION_ANSWERS
 @skipUnless(os.environ.get("RUN_BROWSER_TESTS") == "1", "Habilite RUN_BROWSER_TESTS=1 para Chromium")
 class BrowserPreAuditoriaTests(StaticLiveServerTestCase):
     def test_text_move_and_long_institutional_decision_on_real_forms(self):
-        from playwright.sync_api import sync_playwright
+        from playwright.sync_api import expect, sync_playwright
 
         semester = Semestre.objects.create(nome="2026.2")
         period = Periodo.objects.create(nome="2º Período", semestre=semester)
@@ -64,7 +64,7 @@ class BrowserPreAuditoriaTests(StaticLiveServerTestCase):
             page.locator('[name="parecer"]').fill(note)
             self.assertEqual(page.locator('[name="parecer"]').input_value(), note)
             self.assertGreater(len(note), 2256)
-            self.assertIn("20.000", page.locator(".parecer-count").inner_text())
+            expect(page.locator(".parecer-count")).to_contain_text("20.000")
             for width, height in ((1440, 1100), (390, 844)):
                 page.set_viewport_size({"width": width, "height": height})
                 self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)

@@ -30,6 +30,8 @@ Testes usam banco em memória, e-mail simulado e IA simulada. Nenhuma geração 
 
 ## Implantação no PythonAnywhere
 
+Atualização de 02/11/2026: [seleção, exportação em PDF e aprovação em lote](docs/PRE_AUDITORIA_PDF_LOTE.md). Esta mudança não adiciona migrações/dependências/estáticos; sobre a versão anterior já instalada, requer pull e Reload.
+
 Atualização de nomenclatura e verificação do envio automático: [Precisa de Revisões e feedback SMTP](docs/FEEDBACK_PRECISA_REVISOES.md).
 
 Para a atualização de pareceres de 27/10/2026, siga [o relatório e o procedimento manual de publicação](docs/PARECERES_NAPED_2026_2.md). Ele inclui as novas migrações, backup anterior ao pull, conferência dos registros e Reload manual.

@@ -14,7 +14,9 @@ from django.http import HttpResponseGone, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
 
 from questoes.avaliacao import registrar_decisao
@@ -46,6 +48,7 @@ from .services import (
     fingerprint_questao,
     snapshot_questao,
     tem_pendencias_obrigatorias,
+    validar_aprovacao,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,6 +58,9 @@ MAX_CLEANUP_QUESTIONS = 25
 MAX_CLEANUP_REPORTS = 500
 AUDIT_CLAIM_TIMEOUT = timedelta(minutes=2)
 CLEANUP_CONFIRMATION_SALT = "pre_auditoria.limpeza.v1"
+SELECTION_SALT = "pre_auditoria.selecao.v1"
+APPROVAL_CONFIRMATION_SALT = "pre_auditoria.aprovacao_lote.v1"
+SELECTION_MAX_AGE = 30 * 60
 
 
 def _safe_next(request, candidate, fallback):
@@ -63,6 +69,72 @@ def _safe_next(request, candidate, fallback):
     ):
         return candidate
     return fallback
+
+
+def _selection_owner(request):
+    return {
+        "user": request.user.pk,
+        "session": salted_hmac(SELECTION_SALT, request.session.session_key or "").hexdigest(),
+    }
+
+
+def _question_selection_state(question):
+    return {
+        "id": question.pk,
+        "fingerprint": fingerprint_questao(question),
+        "status": question.status,
+        "componente": question.componente_id,
+        "decisao": question.decisoes_pre_auditoria.values_list("pk", flat=True).first(),
+    }
+
+
+def _read_selection(request, token, salt):
+    try:
+        selection = signing.loads(token, salt=salt, max_age=SELECTION_MAX_AGE)
+    except signing.BadSignature as error:
+        raise ValidationError(
+            "A seleção expirou ou é inválida. Volte ao painel e selecione novamente."
+        ) from error
+    if selection.get("owner") != _selection_owner(request):
+        raise ValidationError("A seleção pertence a outra sessão. Volte ao painel e selecione novamente.")
+    return selection
+
+
+def _selected_states(request):
+    raw_ids = request.POST.getlist("questoes")
+    if (
+        not raw_ids
+        or len(raw_ids) > MAX_APPROVAL_BATCH
+        or any(not value.isascii() or not value.isdigit() or len(value) > 18 for value in raw_ids)
+    ):
+        raise ValidationError(f"Selecione entre 1 e {MAX_APPROVAL_BATCH} questões válidas.")
+    selected_ids = set(map(int, raw_ids))
+    selection = _read_selection(request, request.POST.get("selecao", ""), SELECTION_SALT)
+    states = [item for item in selection["questions"] if item["id"] in selected_ids]
+    if {item["id"] for item in states} != selected_ids:
+        raise ValidationError("Selecione somente questões exibidas nesta página do painel.")
+    return states
+
+
+def _load_selected_questions(states, lock=False, check_state=True):
+    questions = Questao.objects.filter(
+        pk__in=[item["id"] for item in states],
+        componente__periodo__ativo=True,
+        componente__periodo__semestre__ativo=True,
+        componente__consolidado_em__isnull=True,
+    ).select_related("componente__periodo__semestre")
+    if lock:
+        questions = questions.select_for_update()
+    question_map = {question.pk: question for question in questions.order_by("pk")}
+    if len(question_map) != len(states):
+        raise ValidationError("Uma questão não está mais disponível. Atualize a seleção no painel.")
+    result = []
+    for state in states:
+        question = question_map[state["id"]]
+        if check_state and _question_selection_state(question) != state:
+            raise ValidationError(f"A questão {question.pk} mudou. Atualize a seleção no painel.")
+        result.append(question)
+    return result
 
 
 def _prepare_question(question):
@@ -226,6 +298,7 @@ def reviewer_write_required(view):
 
 
 @reviewer_required
+@never_cache
 def lista(request):
     semestres = Semestre.objects.filter(ativo=True).order_by("-nome")
     periods = Periodo.objects.filter(ativo=True, semestre__ativo=True)
@@ -299,7 +372,34 @@ def lista(request):
             "status_selecionado": status_filter,
             "status_choices": Questao.STATUS_CHOICES,
             "return_to": request.get_full_path(),
+            "selecao": signing.dumps(
+                {
+                    "owner": _selection_owner(request),
+                    "questions": [_question_selection_state(question) for question in page.object_list],
+                },
+                salt=SELECTION_SALT,
+                compress=True,
+            ),
         },
+    )
+
+
+@reviewer_required
+@require_POST
+@never_cache
+def exportar_pdf(request):
+    return_to = _safe_next(request, request.POST.get("next", ""), reverse("pre_auditoria:lista"))
+    try:
+        questions = _load_selected_questions(_selected_states(request))
+    except ValidationError as error:
+        messages.error(request, "; ".join(error.messages))
+        return redirect(return_to)
+    for question in questions:
+        _prepare_question(question)
+    return render(
+        request,
+        "pre_auditoria/exportar_pdf.html",
+        {"questoes": questions, "return_to": return_to},
     )
 
 
@@ -783,37 +883,139 @@ def aprovar(request, questao_id):
     )
 
 
+def _batch_approval_reports(questions):
+    impediments = []
+    for question in questions:
+        report = question.pareceres_pre_auditoria.filter(arquivado_em__isnull=True).first()
+        _mark_audit_state(question, report)
+        try:
+            if question.status != "PENDENTE":
+                raise ValidationError("Somente questões pendentes podem ser aprovadas em lote.")
+            if report is None:
+                raise ValidationError("Execute uma pré-auditoria atual antes de aprovar.")
+            # A justificativa real será exigida e validada na confirmação.
+            validar_aprovacao(question, report, "Inspeção a confirmar pelo gestor.")
+        except ValidationError as error:
+            impediments.append(f"Questão {question.pk}: {'; '.join(error.messages)}")
+    return impediments
+
+
+def _render_batch_approval(
+    request, questions, token, return_to, form, impediments, status=200, selection_invalid=False
+):
+    requires_reason = any(question.approval_exception_needed for question in questions)
+    if requires_reason:
+        form.fields["justificativa"].required = True
+        form.fields["justificativa"].widget.attrs["minlength"] = 20
+    return render(
+        request,
+        "pre_auditoria/confirmar_aprovacao_lote.html",
+        {
+            "questoes": questions,
+            "confirmacao": token,
+            "return_to": return_to,
+            "form": form,
+            "impedimentos": impediments,
+            "exige_justificativa": requires_reason,
+            "confirmacao_invalida": selection_invalid,
+        },
+        status=status,
+    )
+
+
+def _invalid_batch_confirmation(request, token, return_to, error):
+    # O token expirado só pode recuperar o contexto para leitura. Não renovamos
+    # sua validade e nunca usamos este caminho para autorizar gravações.
+    questions = []
+    try:
+        selection = signing.loads(token, salt=APPROVAL_CONFIRMATION_SALT)
+    except signing.BadSignature:
+        selection = None
+    if selection and selection.get("owner") == _selection_owner(request):
+        question_map = {
+            question.pk: question
+            for question in Questao.objects.filter(
+                pk__in=[item["id"] for item in selection["questions"]]
+            ).select_related("componente__periodo__semestre")
+        }
+        questions = [
+            question_map[item["id"]] for item in selection["questions"] if item["id"] in question_map
+        ]
+        _batch_approval_reports(questions)
+    form = DecisaoForm(request.POST)
+    form.is_valid()
+    form.add_error(None, error)
+    return _render_batch_approval(
+        request, questions, token, return_to, form, error.messages, status=409, selection_invalid=True
+    )
+
+
 @reviewer_write_required
 @require_POST
+@never_cache
 def aprovar_lote(request):
-    raw_ids = request.POST.getlist("questoes")
-    if not raw_ids or len(raw_ids) > MAX_APPROVAL_BATCH or any(not value.isdigit() for value in raw_ids):
-        messages.error(request, f"Selecione entre 1 e {MAX_APPROVAL_BATCH} questões válidas.")
-        return redirect("pre_auditoria:lista")
-    approved = 0
-    for question_id in dict.fromkeys(map(int, raw_ids)):
-        try:
-            registrar_decisao(
-                question_id,
-                request.user,
-                "APROVADA",
-                request.POST.get("justificativa", ""),
-                base_url=request.build_absolute_uri("/"),
-            )
-        except (ValidationError, Questao.DoesNotExist) as error:
-            messages.warning(
-                request,
-                f"{question_id}: "
-                + (
-                    "; ".join(error.messages)
-                    if isinstance(error, ValidationError)
-                    else "Questão indisponível."
-                ),
-            )
-        else:
-            approved += 1
-    messages.success(request, f"{approved} aprovação(ões) confirmada(s).")
-    return redirect("pre_auditoria:lista")
+    return_to = _safe_next(request, request.POST.get("next", ""), reverse("pre_auditoria:lista"))
+    token = request.POST.get("confirmacao", "")
+    try:
+        selection = _read_selection(request, token, APPROVAL_CONFIRMATION_SALT) if token else None
+        states = selection["questions"] if selection else _selected_states(request)
+        questions = _load_selected_questions(states, check_state=selection is None)
+    except ValidationError as error:
+        if token:
+            return _invalid_batch_confirmation(request, token, return_to, error)
+        messages.error(request, "; ".join(error.messages))
+        return redirect(return_to)
+
+    impediments = _batch_approval_reports(questions)
+    if selection is None:
+        token = signing.dumps(
+            {
+                "owner": _selection_owner(request),
+                "questions": states,
+                "reports": [
+                    question.latest_audit.pk if question.latest_audit else None for question in questions
+                ],
+                "batch": str(uuid.uuid4()),
+            },
+            salt=APPROVAL_CONFIRMATION_SALT,
+            compress=True,
+        )
+        return _render_batch_approval(request, questions, token, return_to, DecisaoForm(), impediments)
+
+    form = DecisaoForm(request.POST)
+    if impediments or not form.is_valid():
+        return _render_batch_approval(request, questions, token, return_to, form, impediments, status=400)
+    try:
+        with transaction.atomic():
+            # Ordem estável de aquisição dos locks e nova leitura no momento da gravação.
+            locked_questions = _load_selected_questions(states, lock=True)
+            for question, report_id in zip(locked_questions, selection["reports"], strict=True):
+                report = question.pareceres_pre_auditoria.filter(arquivado_em__isnull=True).first()
+                if report is None or report.pk != report_id:
+                    raise ValidationError(
+                        f"O parecer da questão {question.pk} mudou. Refaça a seleção no painel."
+                    )
+                registrar_decisao(
+                    question.pk,
+                    request.user,
+                    "APROVADA",
+                    form.cleaned_data["justificativa"],
+                    fingerprint=fingerprint_questao(question),
+                    request_id=uuid.uuid5(uuid.UUID(selection["batch"]), str(question.pk)),
+                    base_url=request.build_absolute_uri("/"),
+                )
+    except ValidationError as error:
+        form.add_error(None, error)
+        return _render_batch_approval(request, questions, token, return_to, form, [], status=409)
+    except DatabaseError as error:
+        logger.error("Batch approval persistence failed: %s", type(error).__name__)
+        form.add_error(
+            None,
+            "Não foi possível registrar o lote. Nenhuma aprovação foi gravada; sua justificativa foi preservada.",
+        )
+        return _render_batch_approval(request, questions, token, return_to, form, [], status=503)
+    messages.success(request, f"{len(questions)} aprovação(ões) confirmada(s).")
+    return redirect(return_to)
 
 
 @reviewer_write_required

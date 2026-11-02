@@ -1,0 +1,102 @@
+{
+  "plugin_version": "0.1.0",
+  "fluxo": "desenvolver",
+  "escopo": "Auditoria independente somente leitura do diff Django de PDF/seleção/aprovação em lote, inspeção de templates/workflow e testes sintéticos dirigidos. Nenhum arquivo da aplicação editado pelo auditor.",
+  "criterios": [
+    "Autenticação/permissões, assinatura/owner/sessão/expiração, IDs selecionados restritos à página atual",
+    "Confirmação humana explícita, parecer atual e fingerprint, invalidação de estados antigos e recibos sem duplicação",
+    "Lote atômico sem efeitos de email em rollback; preservação da justificativa em falhas",
+    "Escape de conteúdo e coerência do PDF com as parciais de prova; revisão de controles de seleção"
+  ],
+  "baseline": {
+    "versao": "e2a00ba8d3d678e971e28fd6187443ae4039d77f; feat/pre-auditoria-pdf-lote; final source bundle SHA256 08bd15082958691ef37f8fc9f5b4dd0e719814183cd3dfb85574cb079f6ac615",
+    "ambiente": "Venv /tmp/questoes-enamed-venv; gerador_provas.test_settings; SQLite exclusivo /tmp/audit-batch-probe-independent.sqlite3; SMTP locmem; IA desabilitada",
+    "estado": "Diff local não commitado; arquivos finais de implementação congelados pelo coordenador; documentos de relatório ainda podem mudar"
+  },
+  "execucoes": [
+    {
+      "comando": "/tmp/questoes-enamed-venv/bin/python /tmp/audit_batch_probe.py (antes da correção ACH-001; 2 probes)",
+      "resultado": "passou",
+      "codigo_saida": 0,
+      "nivel": "N2",
+      "evidencia": "Reproduziu falha: archive e expiry retornaram302, reason_present=False, nenhuma decisão/status/email gravado."
+    },
+    {
+      "comando": "/tmp/questoes-enamed-venv/bin/python /tmp/audit_batch_probe.py (após correção; 3 probes independentes +21 testes pre_auditoria.test_batch)",
+      "resultado": "passou",
+      "codigo_saida": 0,
+      "nivel": "N3",
+      "evidencia": "24 testes passaram em1.608s. archive e expiry retornaram409, reason_present=True, seleção2 itens, token original não renovado, botão ausente e nenhuma gravação; token adulterado/outra sessão sem revelar questões."
+    },
+    {
+      "comando": "git diff --check",
+      "resultado": "passou",
+      "codigo_saida": 0,
+      "nivel": "N2",
+      "evidencia": "Sem saída ou erros ao verificar o diff atual."
+    }
+  ],
+  "achados": [
+    {
+      "id": "ACH-001",
+      "titulo": "Falhas precoces de confirmação descartavam a justificativa e a seleção",
+      "arquivo": "pre_auditoria/views.py",
+      "linha": 926,
+      "mecanismo": "O handler ValidationError de aprovar_lote redirecionava antes de construir DecisaoForm bound quando token expirava ou período era arquivado entre preview e confirmação. Agora usa _invalid_batch_confirmation para erro somente leitura, preservando entrada sem renovar o token.",
+      "impacto": "Perda do texto fundamentado pelo gestor e da seleção durante falha recuperável de confirmação; nenhuma aprovação indevida foi reproduzida.",
+      "reproducao": [
+        "Criar duas questões sintéticas e pré-auditorias; abrir preview assinado",
+        "Arquivar Periodo.ativo=False OU avançar relógio do signing1801s",
+        "POST confirmação com justificativa longa; antes302 sem texto, após409 com texto e seleção, sem botão/gravação"
+      ],
+      "gravidade": "medio",
+      "confianca": "alta",
+      "status": "corrigido_validado",
+      "nivel": "N3",
+      "evidencias": [
+        "/tmp/audit_batch_probe.py; logs observados antes/após correção",
+        "24 testes finais passaram em DB exclusivo"
+      ],
+      "autor_correcao": "/root",
+      "validador": "/root/auditor",
+      "versao": "Aplicação idêntica à execução independente; final source bundle SHA256 08bd15082958691ef37f8fc9f5b4dd0e719814183cd3dfb85574cb079f6ac615",
+      "justificativa": "Teste independente executado pelo auditor sem editar aplicação confirmou preservação e procurou bypass com token adulterado e de sessão estrangeira."
+    }
+  ],
+  "nao_verificado": [
+    "Execução visual e de PDF em navegador não foi repetida pelo auditor; o coordenador dispõe de execução do autor UI e inspeção visual própria.",
+    "Concorrência real entre múltiplos workers não foi executada; análise dos locks e testes sequenciais de atomicidade/idempotência com SQLite sintético.",
+    "Produção/PythonAnywhere, rede, SMTP real e IA real não operados; fora do escopo autorizado desta auditoria."
+  ],
+  "riscos": [],
+  "parecer": "evidencias_insuficientes",
+  "nivel": "N3",
+  "fundamento": "Nenhum achado acionável permanece aberto na inspeção e nos testes independentes executados. ACH-001 corrigido e revalidado. Parecer formal mantém evidências insuficientes para aprovação do conjunto visual/deploy porque esses eixos não foram executados por este auditor; o coordenador deve integrar as evidências adicionais sem atribuir a este auditor essa execução.",
+  "independencia": {
+    "realizada": true,
+    "autor": "/root + corretor UI",
+    "validador": "/root/auditor",
+    "evidencia": "Contexto inicial com critérios/diff/escopo, sem justificativa do corretor. Auditor não editou aplicação, criou apenas probes/relatório em /tmp e executou DB sintético próprio."
+  },
+  "decisao_humana": {
+    "status": "pendente",
+    "referencia": ""
+  },
+  "source_sha256": {
+    ".github/workflows/quality.yml": "580546e63ce055f71122b156229d4ba85ec57097be86413c0c1063be581f4186",
+    "pre_auditoria/views.py": "b7b48c0f1d2207e88d9f1d549a3c8bcbb699e5a5ba030222b5c041bbf0d45c6f",
+    "pre_auditoria/urls.py": "9304319e50254cef5382200dc120f45619e9a4c4a4c02901adc7c94a1297c7c7",
+    "pre_auditoria/tests.py": "de1e678722b3930de8229f0c4ecfbe7caf35c88e98922602447a1a860243d8dc",
+    "pre_auditoria/test_batch.py": "44ddb128f250216d2b8d08929f52408b6d747da96aec512f5ccd86c28b9e40a5",
+    "pre_auditoria/test_batch_browser.py": "955d8d4be54ea76c3acd65406747ec78cee825a0fa65ee8ca9f5ac51dbba452e",
+    "pre_auditoria/templates/pre_auditoria/lista.html": "b318c15bca74d078eca7585b86c8683736483153881e047776dfc4b6ac48af8a",
+    "pre_auditoria/templates/pre_auditoria/confirmar_aprovacao_lote.html": "1a300be892f2f1d8daad5e467c17ddd83fc19de75476574810ffd8dc01a57999",
+    "pre_auditoria/templates/pre_auditoria/exportar_pdf.html": "ec09f7006ccf12490b3b64feeb8c8f4c51005a796945127935d9a67c8e8d1805",
+    "pre_auditoria/test_browser.py": "9b6ff35442644e299caeae84d6679d41940e5265d447e6a80445c81f05d73560"
+  },
+  "executed_source_bundle_sha256": "034031b1ce18ac991297a590f9a80123a171ace21a0e2653624e6708049c9ba4",
+  "final_test_only_review": {
+    "nivel": "N1",
+    "resultado": "Duas sincronizações de teste revisadas: espera da navegação status=TODAS antes da asserção de reinício e expect(...).to_contain_text(20.000) com espera Playwright. Mantêm o mesmo resultado esperado e evitam leitura antecipada; não removem verificações. Apenas test_batch_browser.py mudou entre os nove arquivos previamente assinados; test_browser.py agora incluído no conjunto. Aplicação/URLs/templates mantiveram os hashes. Nenhuma nova execução foi atribuída a estes testes de navegador."
+  }
+}
