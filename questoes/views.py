@@ -662,11 +662,7 @@ def prova_gerada_view(request):
     for _ in range(20):
         questoes_selecionadas = []
         for aprovadas, quantidade in bancos:
-            sorteadas = (
-                random.sample(aprovadas, quantidade)
-                if len(aprovadas) >= quantidade
-                else aprovadas
-            )
+            sorteadas = random.sample(aprovadas, quantidade) if len(aprovadas) >= quantidade else aprovadas
             questoes_selecionadas.extend(sorteadas)
 
         try:
@@ -792,9 +788,7 @@ def prova_gabarito_view(request):
 
     questoes = Questao.objects.filter(id__in=ids_list, status__in=Questao.STATUS_APROVADOS)
     questoes_mapeadas = {q.id: q for q in questoes}
-    questoes_ordenadas = [
-        questoes_mapeadas[pk] for pk in ids_list if pk in questoes_mapeadas
-    ]
+    questoes_ordenadas = [questoes_mapeadas[pk] for pk in ids_list if pk in questoes_mapeadas]
     try:
         alternativas_por_questao = montar_layout_balanceado(
             questoes_ordenadas, gerar_alternativas_multipla_escolha
