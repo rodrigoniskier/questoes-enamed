@@ -1,0 +1,72 @@
+{% extends "pre_auditoria/base.html" %}
+{% block content %}
+<style>
+  .audit-approval-list { display: grid; gap: 12px; list-style: none; padding: 0; }
+  .audit-approval-list li { padding: 16px; border: 1px solid var(--line); background: var(--surface); overflow-wrap: anywhere; }
+  .audit-approval-list h2 { margin: 0 0 6px; font-size: 17px; }
+  .audit-approval-list p { margin: 6px 0; }
+  .audit-approval-confirmation .audit-inline-form { max-width: 860px; }
+  .audit-approval-confirmation textarea { display: block; box-sizing: border-box; width: 100%; max-width: 100%; padding: 10px; font: inherit; }
+  .audit-approval-confirmation .errorlist { color: #a33127; }
+  .audit-approval-confirmation .audit-action-button { justify-self: start; max-width: 100%; white-space: normal; }
+</style>
+<main class="audit-approval-confirmation">
+  <header class="audit-heading">
+    <p class="eyebrow">CONFIRMAÇÃO DO GESTOR</p>
+    <h1>Aprovar questões em lote</h1>
+    {% if confirmacao_invalida %}
+      <p>Esta confirmação não está mais disponível. Sua justificativa foi preservada abaixo; volte ao painel para refazer a seleção.</p>
+    {% else %}
+      <p>Confira as {{ questoes|length }} questões selecionadas antes de confirmar a alteração do status oficial para Aprovada.</p>
+    {% endif %}
+  </header>
+  {% if impedimentos %}
+    <section class="audit-message" role="alert">
+      <h2>Revise a seleção antes de aprovar</h2>
+      <ul>{% for impedimento in impedimentos %}<li>{{ impedimento }}</li>{% endfor %}</ul>
+      <p>Volte ao painel para ajustar a seleção ou atualizar os pareceres indicados.</p>
+    </section>
+  {% endif %}
+  <ol class="audit-approval-list" aria-label="Questões selecionadas para aprovação">
+    {% for question in questoes %}
+      <li>
+        <h2>Questão {{ question.pk }} · {{ question.componente.nome }}</h2>
+        <p>{{ question.componente.periodo }} · {{ question.componente.periodo.semestre }}</p>
+        <p>{{ question.enunciado|truncatechars:300 }}</p>
+        <p>Status atual: <strong>{{ question.get_status_display }}</strong></p>
+        {% if question.audit_is_current %}
+          {% if question.approval_exception_needed %}
+            <p class="audit-message"><strong>Aprovação com pendências:</strong> exige inspeção visual e justificativa do gestor.</p>
+          {% else %}
+            <p>Parecer atual disponível para aprovação.</p>
+          {% endif %}
+        {% else %}
+          <p class="audit-message">Parecer ausente ou desatualizado. É necessário reavaliar esta questão.</p>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ol>
+  {% if not impedimentos or form.is_bound %}
+    <section class="audit-section">
+      {% if exige_justificativa %}
+        <p class="audit-message">A seleção contém questões com pendências. Confirme que realizou a inspeção visual e registre uma justificativa objetiva, com pelo menos 20 caracteres. A justificativa será registrada em cada aprovação deste lote.</p>
+      {% else %}
+        <p>A justificativa é opcional e, quando preenchida, será registrada em cada aprovação deste lote.</p>
+      {% endif %}
+      <form method="post" action="{% url 'pre_auditoria:aprovar_lote' %}" class="audit-inline-form">
+        {% csrf_token %}
+        <input type="hidden" name="confirmacao" value="{{ confirmacao }}">
+        <input type="hidden" name="next" value="{{ return_to }}">
+        {{ form.non_field_errors }}
+        <label for="{{ form.justificativa.id_for_label }}">Justificativa do gestor{% if exige_justificativa %} (obrigatória){% endif %}</label>
+        {{ form.justificativa.errors }}
+        {{ form.justificativa }}
+        {{ form.confirmar_aprovacao.errors }}
+        <label>{{ form.confirmar_aprovacao }} Confirmo que revisei as questões selecionadas e aprovo este lote{% if exige_justificativa %}, incluindo as pendências identificadas{% endif %}.</label>
+        {% if not impedimentos %}<button class="audit-action-button" type="submit">CONFIRMAR APROVAÇÃO DE {{ questoes|length }} {{ questoes|length|pluralize:"QUESTÃO,QUESTÕES" }}</button>{% endif %}
+      </form>
+    </section>
+  {% endif %}
+  <p><a href="{{ return_to }}">Cancelar e voltar ao painel</a></p>
+</main>
+{% endblock %}

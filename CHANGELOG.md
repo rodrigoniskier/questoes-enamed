@@ -1,5 +1,13 @@
 # Alterações
 
+## 2026-11-02 — PDF e aprovação em lote no painel
+
+- Seleção compartilhada de questões, Selecionar todas da página atual e contador acessível.
+- Exportação para impressão/Salvar como PDF com imagens, gabaritos e justificativas, sem novas dependências no servidor.
+- Conferência e confirmação explícita do lote, validação das versões e transação única; justificativa preservada em falhas e expiração.
+- Testes de regressão e navegador para seleção, exportação, permissões, rollback e reenvio.
+- Atualização: [PRE_AUDITORIA_PDF_LOTE.md](docs/PRE_AUDITORIA_PDF_LOTE.md).
+
 ## 2026-10-27 — Precisa de Revisões e verificação SMTP
 
 - Nomenclatura padronizada no Admin, painel, filtros, históricos do professor e e-mails em texto/HTML.

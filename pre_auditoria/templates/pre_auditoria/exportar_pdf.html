@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Questões selecionadas · Pré-auditoria</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; color: #182c3d; background: #eef2f5; font: 16px/1.5 Arial, sans-serif; }
+    main { max-width: 900px; margin: 0 auto; }
+    .export-controls { padding: 20px; margin-bottom: 24px; background: #fff; border: 1px solid #c9d3dc; border-radius: 6px; }
+    .export-controls h1 { margin: 0 0 12px; font-size: 26px; }
+    .export-controls p { margin: 8px 0; }
+    .export-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 16px; }
+    button { padding: 12px 18px; border: 0; border-radius: 4px; background: #145679; color: #fff; font: 700 16px Arial, sans-serif; cursor: pointer; }
+    a { color: #145679; }
+    .export-question { margin: 0 0 24px; padding: 28px; color: #111; background: #fff; border: 1px solid #c9d3dc; overflow-wrap: anywhere; }
+    .export-question header { margin-bottom: 18px; padding-bottom: 10px; border-bottom: 1px solid #aaa; }
+    .export-question header h2 { margin: 0 0 6px; font-size: 18px; }
+    .export-question header p { margin: 4px 0; font-size: 13px; }
+    .question-print-preview { font-size: 11pt; line-height: 1.5; }
+    .question-preview-heading { display: none; }
+    .texto-base, .enunciado, .alternativas p, .proposicao { margin: 0 0 1em; }
+    .enunciado, .alternativas span { font-weight: 700; }
+    .alternativas p { padding-left: 1.5em; text-indent: -1.5em; }
+    .afirmativas { margin: 0 0 1em 1.5em; }
+    .question-preview-because { text-align: center; }
+    .referencia-imagem { margin-bottom: 1em; font-size: 10pt; }
+    .question-preview-annex { margin: 18px 0; }
+    .question-preview-annex h2 { font-size: 12pt; }
+    .question-preview-image { margin: 12px 0; text-align: center; break-inside: avoid; }
+    .question-preview-image img { display: block; max-width: 100%; max-height: 17cm; width: auto; height: auto; margin: 0 auto; object-fit: contain; }
+    .audit-answer-review { margin-top: 20px; padding-top: 12px; border-top: 1px solid #aaa; font-size: 10pt; line-height: 1.5; }
+    .audit-answer-review h3 { margin: 0 0 8px; font-size: 12pt; }
+    .audit-answer-review h4 { margin: 14px 0 8px; font-size: 11pt; }
+    .audit-note { font-size: 9pt; color: #555; }
+    .audit-message { padding: 10px; border-left: 3px solid #936800; background: #fff5d8; }
+    @page { size: A4; margin: 18mm; }
+    @media print {
+      body { padding: 0; color: #000; background: #fff; }
+      main { max-width: none; }
+      .export-controls { display: none; }
+      .export-question { margin: 0; padding: 0; border: 0; break-after: page; }
+      .export-question:last-child { break-after: auto; }
+      .export-question header, h2, h3, h4 { break-after: avoid; }
+      p { orphans: 3; widows: 3; }
+      .audit-answer-review { display: block; }
+    }
+    @media (max-width: 600px) {
+      body { padding: 12px; }
+      .export-question, .export-controls { padding: 16px; }
+      .export-controls h1 { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="export-controls" aria-label="Exportação em PDF">
+      <h1>{{ questoes|length }} {{ questoes|length|pluralize:"questão,questões" }} selecionada{{ questoes|length|pluralize:"s" }}</h1>
+      <p>Confira o conteúdo e clique em <strong>Salvar como PDF</strong>. Na janela de impressão do navegador, escolha o destino <strong>Salvar como PDF</strong> e papel A4.</p>
+      <p>Este documento inclui enunciados, alternativas, imagens disponíveis, gabaritos e justificativas para revisão.</p>
+      <div class="export-actions">
+        <button type="button" id="export-print">SALVAR COMO PDF</button>
+        <a href="{{ return_to }}">Voltar ao painel</a>
+      </div>
+      <noscript><p>Use a opção Imprimir do navegador para salvar este documento como PDF.</p></noscript>
+    </section>
+    {% for question in questoes %}
+      <article class="export-question">
+        <header>
+          <h2>Questão {{ question.pk }} · {{ question.get_tipo_questao_display }}</h2>
+          <p>{{ question.componente.nome }} · {{ question.componente.periodo }} · {{ question.componente.periodo.semestre }}</p>
+          <p>Status oficial: {{ question.get_status_display }}</p>
+        </header>
+        {% include "pre_auditoria/partials/questao_previa.html" with questao=question %}
+        {% include "pre_auditoria/partials/gabarito_justificativa.html" with questao=question %}
+      </article>
+    {% endfor %}
+  </main>
+  <script>
+    document.getElementById('export-print').addEventListener('click', () => window.print());
+  </script>
+</body>
+</html>

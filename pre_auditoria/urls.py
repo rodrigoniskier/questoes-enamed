@@ -7,6 +7,7 @@ app_name = "pre_auditoria"
 urlpatterns = [
     path("questao/<int:questao_id>/parecer/", views.decidir, name="decidir"),
     path("", views.lista, name="lista"),
+    path("exportar-pdf/", views.exportar_pdf, name="exportar_pdf"),
     path("questao/<int:questao_id>/", views.detalhe, name="detalhe"),
     path("questao/<int:questao_id>/editar/", views.editar, name="editar"),
     path("questao/<int:questao_id>/iniciar/", views.iniciar, name="iniciar"),

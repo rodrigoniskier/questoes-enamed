@@ -39,14 +39,38 @@
     </label>
   </form>
 
+  <style>
+    .audit-selection-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+    .audit-selection-controls label { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+    .audit-selection-controls input, .audit-card-selectors input { width: 18px; height: 18px; flex-shrink: 0; }
+    .audit-selection-message { color: #a33127; font-weight: 700; }
+    .audit-selection-help { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+    .audit-card-selectors label { display: flex; align-items: center; gap: 8px; }
+  </style>
+  <form id="audit-batch" method="post" action="{% url 'pre_auditoria:aprovar_lote' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ return_to }}"><input type="hidden" name="selecao" value="{{ selecao }}"></form>
   {% if perms.pre_auditoria.review_parecerpreauditoria %}
-    <form id="audit-batch" method="post" action="{% url 'pre_auditoria:aprovar_lote' %}">{% csrf_token %}</form>
     <form id="audit-cleanup" method="post" action="{% url 'pre_auditoria:excluir_auditorias' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ return_to }}"></form>
-    <section class="audit-batch audit-section" aria-label="Operações em lote">
+  {% endif %}
+  <section class="audit-section" aria-label="Seleção de questões">
+    <div class="audit-selection-controls">
+      <label><input id="audit-select-all" type="checkbox" {% if not questoes %}disabled{% endif %}> Selecionar todas desta página</label>
+      <span id="audit-selection-count" role="status" aria-live="polite">0 questões selecionadas</span>
+    </div>
+    <p class="audit-selection-help">A seleção vale para as questões exibidas nesta página e é reiniciada ao mudar de página ou filtro.</p>
+    <div class="audit-batch" aria-label="Operações com as questões selecionadas">
+      <button form="audit-batch" type="submit" formaction="{% url 'pre_auditoria:exportar_pdf' %}" formtarget="_blank">EXPORTAR SELECIONADAS EM PDF</button>
+      {% if perms.pre_auditoria.review_parecerpreauditoria %}
+        <button form="audit-batch" type="submit">APROVAR SELECIONADAS EM LOTE</button>
+        <button form="audit-batch" type="submit" formaction="{% url 'pre_auditoria:criar_lote' %}">INICIAR PRÉ-AUDITORIA (máx. 25)</button>
+      {% endif %}
+      <p>A exportação abre uma versão para impressão em nova aba. Nela, escolha “Salvar como PDF”.</p>
+    </div>
+    <p id="audit-selection-error" class="audit-selection-message" role="alert" hidden>Selecione pelo menos uma questão para continuar.</p>
+  </section>
+  {% if perms.pre_auditoria.review_parecerpreauditoria %}
+    <section class="audit-batch audit-section" aria-label="Limpeza de históricos">
       <button form="audit-cleanup" type="submit">EXCLUIR AUDITORIAS ANTERIORES</button>
-      <button form="audit-batch" type="submit" formaction="{% url 'pre_auditoria:criar_lote' %}">INICIAR PRÉ-AUDITORIA (máx. 25)</button>
-      <button form="audit-batch" type="submit">CONFIRMAR APROVAÇÃO DO LOTE (máx. 25)</button>
-      <p>Para limpar históricos, selecione as questões abaixo; o parecer mais recente será mantido.</p>
+      <p>Para limpar históricos, use a seleção “Selecionar pareceres anteriores” nas questões abaixo; o parecer mais recente será mantido.</p>
     </section>
   {% endif %}
 
@@ -60,8 +84,8 @@
             <p>{{ question.componente.periodo.semestre }} · {{ question.componente.periodo }}</p>
           </div>
           <div class="audit-card-selectors">
+            <label><input form="audit-batch" type="checkbox" name="questoes" value="{{ question.pk }}"> Selecionar questão {{ question.pk }}</label>
             {% if perms.pre_auditoria.review_parecerpreauditoria %}
-              <label><input form="audit-batch" type="checkbox" name="questoes" value="{{ question.pk }}"> Selecionar para auditoria em lote</label>
               {% if question.audit_count > 1 %}<label><input form="audit-cleanup" type="checkbox" name="questao_ids" value="{{ question.pk }}"> Selecionar pareceres anteriores</label>{% endif %}
             {% endif %}
           </div>
@@ -124,4 +148,34 @@
     {% if questoes.has_next %}<a href="?page={{ questoes.next_page_number }}&semestre={{ semestre_selecionado }}&periodo={{ periodo_selecionado }}&componente={{ componente_selecionado }}&status={{ status_selecionado }}">Próxima</a>{% endif %}
   </nav>
 </main>
+<script>
+(() => {
+  const form = document.getElementById('audit-batch');
+  const selectAll = document.getElementById('audit-select-all');
+  const items = Array.from(document.querySelectorAll('input[form="audit-batch"][name="questoes"]'));
+  const counter = document.getElementById('audit-selection-count');
+  const error = document.getElementById('audit-selection-error');
+  function updateSelection() {
+    const selected = items.filter(item => item.checked).length;
+    selectAll.checked = items.length > 0 && selected === items.length;
+    selectAll.indeterminate = selected > 0 && selected < items.length;
+    counter.textContent = selected === 1 ? '1 questão selecionada' : `${selected} questões selecionadas`;
+    if (selected > 0) error.hidden = true;
+  }
+  selectAll.addEventListener('change', () => {
+    items.forEach(item => { item.checked = selectAll.checked; });
+    updateSelection();
+  });
+  items.forEach(item => item.addEventListener('change', updateSelection));
+  form.addEventListener('submit', event => {
+    if (!items.some(item => item.checked)) {
+      event.preventDefault();
+      error.hidden = false;
+      selectAll.focus();
+    }
+  });
+  window.addEventListener('pageshow', updateSelection);
+  updateSelection();
+})();
+</script>
 {% endblock %}

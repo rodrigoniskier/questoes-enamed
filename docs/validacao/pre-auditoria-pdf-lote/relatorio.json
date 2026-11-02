@@ -1,0 +1,94 @@
+{
+  "plugin_version": "0.1.0",
+  "fluxo": "desenvolver",
+  "escopo": "Implementação e verificação técnica da seleção/PDF/aprovação em lote no painel Django; preparar atualização do código no GitHub. Sem execução em produção.",
+  "criterios": [
+    "Selecionar todas somente na página atual, contador e seleção parcial; exportar seleção para PDF sem novas dependências de produção.",
+    "Permissões, CSRF, seleção assinada por usuário/sessão, limites de25, expiração e coerência com filtros.",
+    "Confirmação explícita, justificativa excepcional, parecer atual, invalidação por mudanças e gravação atômica sem duplicar decisões/notificações.",
+    "Preservar justificativa em falha/expiração, versão A4 e interface responsiva; sem migrações/dependências/estáticos novos."
+  ],
+  "baseline": {
+    "versao": "e2a00ba8d3d678e971e28fd6187443ae4039d77f",
+    "ambiente": "Python3.13.16/Django5.2.18; ambiente temporário isolado; SQLite sintético; email locmem/receptor SMTP local; IA simulada",
+    "estado": "Branch feat/pre-auditoria-pdf-lote criada de origin/main; árvore originalmente limpa; baseline78 testes de pré-auditoria passaram (2 browser desabilitados)."
+  },
+  "execucoes": [
+    {
+      "comando": "python manage.py test pre_auditoria em cópia git archive do baseline, test_settings",
+      "resultado": "passou",
+      "codigo_saida": 0,
+      "evidencia": "78 testes em1.961s,2 browser desabilitados; baseline preservado em cópia temporária.",
+      "nivel": "N2"
+    },
+    {
+      "comando": "RUN_BROWSER_TESTS=1 python manage.py test --settings=gerador_provas.test_settings --noinput (Chromium local)",
+      "resultado": "passou",
+      "codigo_saida": 0,
+      "evidencia": "241 testes passaram em30.641s sem skips. Inclui21 regressões de seleção/lote,2 browser de lote, telas anteriores, importação, SMTP local e migrações. Nenhuma comunicação externa real.",
+      "nivel": "N2"
+    },
+    {
+      "comando": "python -m unittest ops.test_deploy_importacao",
+      "resultado": "passou",
+      "codigo_saida": 0,
+      "evidencia": "7 testes passaram.",
+      "nivel": "N2"
+    },
+    {
+      "comando": "python -m ruff check e python -m ruff format --check nos mesmos caminhos do CI; git diff --check",
+      "resultado": "passou",
+      "codigo_saida": 0,
+      "evidencia": "All checks passed;76 arquivos formatados; diff sem erros.",
+      "nivel": "N2"
+    },
+    {
+      "comando": "python manage.py makemigrations --check --dry-run --settings=gerador_provas.test_settings",
+      "resultado": "passou",
+      "codigo_saida": 0,
+      "evidencia": "No changes detected.",
+      "nivel": "N2"
+    },
+    {
+      "comando": "python -m pip_audit -r requirements.txt",
+      "resultado": "passou",
+      "codigo_saida": 0,
+      "evidencia": "No known vulnerabilities found; requirements não alterado.",
+      "nivel": "N2"
+    },
+    {
+      "comando": "Playwright page.pdf e extração pypdf dos documentos sintéticos; inspeção visual de capturas",
+      "resultado": "passou",
+      "codigo_saida": 0,
+      "evidencia": "PDF25 questões:26 páginas,25 gabaritos,25 justificativas,1 imagem. PDF3 questões:4 páginas,3 gabaritos,3 justificativas,1 imagem. Ordem e exclusão de não selecionadas verificadas. Sem overflow1440/390/320. Capturas de controles, formulário e exportação inspecionadas.",
+      "nivel": "N2"
+    },
+    {
+      "comando": "Auditor independente:3 reproduções próprias e21 regressões batch",
+      "resultado": "passou",
+      "codigo_saida": 0,
+      "evidencia": "24 testes passaram; ACH-001 reproduzido antes e revalidado após correção, incluindo bypass com token adulterado/estrangeiro. Relatório independente associado.",
+      "nivel": "N3"
+    }
+  ],
+  "achados": [],
+  "nao_verificado": [
+    "Aplicação e smoke test autenticado no PythonAnywhere; nenhuma instalação, migração, Reload ou aprovação de questões reais executada.",
+    "Concorrência em múltiplos workers de produção; verificados locks/transações e regressões locais.",
+    "Auditoria não calibrada por injeção sistemática de defeitos; escopo não inclui validação clínica/pedagógica das questões."
+  ],
+  "riscos": [],
+  "parecer": "evidencias_insuficientes",
+  "nivel": "N2",
+  "fundamento": "Critérios técnicos locais exercitados por241 testes integrados e revisão independente dirigida; ACH-001 corrigido e validado em N3. Há evidências para entregar a alteração de código, mas o parecer formal permanece evidencias_insuficientes para homologação integral porque produção e concorrência multiworker não foram verificadas. Nenhuma aprovação clínica/pedagógica inferida.",
+  "independencia": {
+    "realizada": true,
+    "autor": "agente principal (servidor/testes) e subagente interface (templates/browser)",
+    "validador": "subagente auditor em contexto limpo, sem editar implementação",
+    "evidencia": "Auditoria independente somente leitura;3 probes próprios e21 testes; relatório independente preservado. Verificação visual do conjunto executada por autores e coordenador, não atribuída ao auditor."
+  },
+  "decisao_humana": {
+    "status": "pendente",
+    "referencia": "Pedido do usuário autoriza preparar/publicar alteração para git pull; aprovações de questões reais e aceite em produção permanecem com gestor."
+  }
+}

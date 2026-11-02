@@ -106,7 +106,7 @@ class PreAuditoriaTests(TestCase):
         self.assertEqual(len(response.context["questoes"].object_list), 2)
         self.assertEqual(response.context["total_submetidas"], 27)
         self.assertContains(response, f"semestre={self.component.periodo.semestre_id}")
-        self.assertContains(response, "Selecionar para auditoria em lote")
+        self.assertContains(response, "Selecionar todas desta página")
 
     def test_clean_structural_result_is_ready_without_gemini(self):
         self.client.force_login(self.reviewer)
@@ -769,9 +769,15 @@ class PreAuditoriaTests(TestCase):
             Alternativa.objects.create(questao=second, texto=f"Resposta {index}", eh_correta=index == 0)
         executar_pre_auditoria(second, revisor=self.reviewer, semantica=False)
         self.client.force_login(self.reviewer)
+        dashboard = self.client.get(reverse("pre_auditoria:lista"))
+        preview = self.client.post(
+            reverse("pre_auditoria:aprovar_lote"),
+            {"questoes": [str(self.question.pk), str(second.pk)], "selecao": dashboard.context["selecao"]},
+        )
+        self.assertEqual(preview.status_code, 200)
         response = self.client.post(
             reverse("pre_auditoria:aprovar_lote"),
-            {"questoes": [str(self.question.pk), str(second.pk)]},
+            {"confirmacao": preview.context["confirmacao"], "confirmar_aprovacao": "on"},
         )
         self.assertRedirects(response, reverse("pre_auditoria:lista"))
         self.question.refresh_from_db()
