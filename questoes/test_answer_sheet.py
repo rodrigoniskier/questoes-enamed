@@ -135,37 +135,26 @@ class GeradorCartaoTests(TestCase):
         self.assertContains(resposta, 'class="cartao-bolha">E</span>', count=1)
         self.assertContains(resposta, 'class="cartao-numero">005</span>')
 
-    def test_capa_moderna_preserva_marca_e_campos_dinamicos(self):
+    def test_capa_original_preserva_periodo_componentes_e_logomarca(self):
         resposta = self.client.get(
             reverse("prova_gerada"),
-            {
-                "componentes": [self.componente.pk],
-                f"quantidade_{self.componente.pk}": 5,
-            },
+            {"componentes": [self.componente.pk], f"quantidade_{self.componente.pk}": 5},
         )
         self.assertEqual(resposta.status_code, 200)
-        self.assertContains(resposta, "PROVA INTEGRADA")
-        self.assertContains(resposta, "MEDICINA")
+        self.assertContains(resposta, 'class="capa-superior"')
+        self.assertContains(resposta, 'class="titulo-grande">integrada</h2>')
+        self.assertContains(resposta, 'class="titulo-pequeno">medicina</h2>')
         self.assertContains(resposta, "Boa Prova!")
-        self.assertContains(resposta, "INFORMAÇÕES DO ESTUDANTE")
-        self.assertContains(resposta, "Nome completo:")
-        self.assertContains(resposta, "RGM:")
-        self.assertContains(resposta, "CPF (opcional):")
-        self.assertContains(resposta, "Turma:")
-        self.assertContains(resposta, "Data:")
-        self.assertContains(resposta, "Assinatura:")
+        self.assertContains(resposta, "Informações do Estudante")
         self.assertContains(resposta, "Assinalar as disciplinas em curso:")
         self.assertContains(resposta, self.componente.nome)
         self.assertContains(resposta, "5º Período")
-        self.assertContains(resposta, resposta.context["codigo_prova"])
         self.assertContains(resposta, "images/logo.jpg")
-        self.assertContains(resposta, "capa-logo-oficial")
-        self.assertNotContains(resposta, "<svg")
+        self.assertContains(resposta, "images/capa_background.jpg")
         self.assertNotContains(resposta, "capa-arte-vetorial")
-        self.assertContains(resposta, "capa-disciplinas")
-        self.assertNotContains(resposta, "images/capa_background.jpg")
+        self.assertNotContains(resposta, "capa-conteudo")
 
-    def test_capa_cartao_e_csv_compartilham_codigo_da_selecao_real(self):
+    def test_cartao_e_csv_compartilham_codigo_da_selecao_real(self):
         resposta = self.client.get(
             reverse("prova_gerada"),
             {"componentes": [self.componente.pk], f"quantidade_{self.componente.pk}": 5},
@@ -177,9 +166,7 @@ class GeradorCartaoTests(TestCase):
         self.assertTrue(linhas)
         self.assertEqual({linha["codigo_prova"] for linha in linhas}, {codigo})
         html = resposta.content.decode()
-        capa = html.split('aria-label="Capa da avaliação"', 1)[1].split('<div class="pagina">', 1)[0]
         cartao = html.split('<section class="pagina cartao-respostas">', 1)[1]
-        self.assertIn(codigo, capa)
         self.assertIn(codigo, cartao)
 
     def test_capa_preserva_modalidades_e_identificacao_multiperiodo(self):

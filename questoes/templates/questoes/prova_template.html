@@ -27,88 +27,48 @@
             position: relative;
         }
 
-        /* Capa editorial: fluxo natural, sem arte de fundo ou posicionamento absoluto.
-           A página nomeada reserva margens também nas folhas de continuação. */
-        .capa-container {
-            --azul-unipe: #062c55;
-            --dourado-unipe: #f7c21b;
-            padding: 16mm 18mm 14mm;
-            color: var(--azul-unipe);
-            font-family: Arial, Helvetica, sans-serif;
-            box-shadow: none;
+        /* --- ESTILOS DA CAPA (Inalterado) --- */
+        .capa-container { display: flex; flex-direction: column; padding: 0; box-sizing: border-box;}
+        .capa-superior {
+            height: 14.85cm; width: 100%; position: relative;
+            background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url("{% static 'images/capa_background.jpg' %}");
+            background-size: cover; background-position: center; color: white;
+            display: flex; flex-direction: column; padding: 1.5cm; box-sizing: border-box;
+            font-family: 'Times New Roman', Times, serif;
         }
-        .capa-conteudo { min-height: 242mm; }
-        .capa-identidade { text-align: center; }
-        .capa-logo-oficial { display: block; width: 74mm; height: auto; margin: 0 auto 6mm; }
-        .capa-filete { display: flex; border-bottom: .3mm solid var(--azul-unipe); }
-        .capa-filete span { width: 14mm; border-bottom: 1mm solid var(--dourado-unipe); margin-bottom: -.3mm; }
-        .capa-titulo-bloco { text-align: center; margin: 9mm 0 0; }
-        .capa-titulo-bloco h1 {
-            margin: 0; font-size: 29pt; font-weight: 800;
-            line-height: 1.15; letter-spacing: -.6pt;
+        .capa-periodo {
+            text-align: center; font-weight: bold; font-size: 2.2rem;
+            border: 2px solid white; padding: 0.25rem; max-width: 500px;
+            margin: 0 auto 1.5rem auto; text-transform: uppercase;
         }
-        .capa-titulo-bloco h2 {
-            margin: 3mm 0 0; font-size: 17pt; line-height: 1.2;
-            font-weight: 400; letter-spacing: 3pt;
+        .capa-titulo-bloco { text-align: left; margin-left: 1cm; margin-top: 0.5rem; }
+        .capa-titulo-bloco h1, .capa-titulo-bloco .titulo-grande { font-size: 4.5rem; margin: 0; line-height: 1.0; }
+        .capa-titulo-bloco h1 { font-weight: 900; text-transform: capitalize; display: flex; align-items: center; }
+        .capa-titulo-bloco .titulo-grande { font-weight: 900; text-transform: lowercase; padding-left: 5px; }
+        .capa-titulo-bloco .titulo-pequeno { font-size: 2.2rem; font-weight: normal; margin: 0 0 0 5px; text-transform: lowercase; }
+        .check-circle { display: inline-block; width: 0.8em; height: 0.8em; margin: 0 0.05em; }
+        .capa-footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .capa-footer .boa-prova { font-size: 2.5rem; font-weight: bold; }
+        .capa-footer img { height: 70px; width: auto; margin-bottom: 70px; }
+
+        .capa-inferior {
+            height: 14.85cm;
+            padding: 1.0cm 2cm;
+            box-sizing: border-box;
+            display: flex; flex-direction: column; justify-content: center;
+            background-color: white;
+            font-family: 'Times New Roman', Times, serif;
         }
-        .capa-periodo { margin: 7mm auto 0; max-width: 160mm; text-align: center; }
-        .capa-periodo-valor {
-            font-size: 12pt; font-weight: 700; line-height: 1.4;
-            text-transform: uppercase; overflow-wrap: anywhere;
+        .capa-identificacao {
+            border: 2px solid #000; border-radius: 20px;
+            padding: 0.5rem 1.2rem; font-size: 1.0rem;
+            background-color: white; box-sizing: border-box;
         }
-        .capa-boa-prova {
-            margin: 5mm 0 5mm; text-align: center;
-            font-family: Georgia, 'Times New Roman', serif;
-            font-size: 18pt; font-style: italic; line-height: 1.2;
-        }
-        .capa-identificacao { border: .25mm solid #8b99a7; padding: 5mm; break-inside: avoid; }
-        .capa-identificacao h3 {
-            margin: 0 0 3mm; font-size: 9pt; line-height: 1.3;
-            font-weight: 700; letter-spacing: 1pt;
-        }
-        .capa-campo {
-            display: flex; align-items: baseline; gap: 2mm;
-            min-height: 10mm; font-size: 9pt; line-height: 1.3;
-        }
-        .capa-campo strong { flex: none; font-weight: 400; white-space: nowrap; }
-        .capa-campo-linha { flex: 1; height: 7mm; min-width: 8mm; border-bottom: .2mm solid #657585; }
-        .capa-identificacao-linha { display: flex; gap: 5mm; }
-        .capa-identificacao-linha > .capa-campo { flex: 1; min-width: 0; }
-        .capa-registro > .capa-campo:nth-child(2) { flex: 1.5; }
-        .capa-registro > .capa-campo:last-child { flex: .75; }
-        .capa-identificacao-linha:last-child > .capa-campo:last-child { flex: 2; }
-        .capa-disciplinas { margin-top: 7mm; }
-        .capa-lista-componentes { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .capa-lista-componentes thead { display: table-header-group; }
-        .capa-disciplinas-titulo {
-            text-align: left; padding: 0 0 3mm; font-size: 10pt;
-            line-height: 1.3; font-weight: 700;
-        }
-        .capa-lista-componentes tr { break-inside: avoid; }
-        .capa-lista-componentes td { width: 50%; padding: 1.3mm 4mm 1.3mm 0; vertical-align: top; }
-        .capa-lista-componentes td:nth-child(2) { padding-right: 0; padding-left: 3mm; }
-        .capa-componente {
-            display: flex; align-items: flex-start; gap: 2mm;
-            font-size: 10pt; line-height: 1.35; overflow-wrap: anywhere;
-        }
-        .capa-componente-quadrado {
-            width: 3.4mm; height: 3.4mm; flex: 0 0 3.4mm;
-            margin-top: .6mm; border: .25mm solid #657585; box-sizing: border-box;
-        }
-        .capa-rodape {
-            display: flex; justify-content: space-between; gap: 5mm;
-            border-top: .25mm solid #8b99a7; padding-top: 3mm; margin-top: 6mm;
-            font-size: 7.5pt; line-height: 1.4; letter-spacing: .2pt;
-            break-inside: avoid;
-        }
-        @media print {
-            @page capa { size: A4 portrait; margin: 16mm 18mm 14mm; }
-            .capa-container.pagina {
-                page: capa; width: auto; min-height: 0; padding: 0;
-                margin: 0; break-after: page;
-                -webkit-print-color-adjust: economy; print-color-adjust: economy;
-            }
-        }
+        .capa-identificacao h3 { font-weight: bold; text-align: center; text-transform: uppercase; margin-bottom: 0.5rem; }
+        .capa-identificacao-linha { display: flex; justify-content: space-between; gap: 1.5rem; margin: 0.5rem 0; }
+        .capa-disciplinas p { margin: 0.1rem 0; display: flex; justify-content: space-between; }
+        .capa-disciplinas strong { margin-bottom: 0.3rem; display: block;}
+
 
         /* --- ESTILOS DAS QUESTÕES E ANEXO DE IMAGENS --- */
         .componente-header { text-align: center; font-weight: bold; text-transform: uppercase; padding: 0.5rem; border-top: 1px solid black; border-bottom: 1px solid black; margin: 2rem 0; page-break-after: avoid; }
@@ -241,73 +201,39 @@
         </button>
     </div>
 
-    <section class="pagina page-break-after capa-container" aria-label="Capa da avaliação">
-        <div class="capa-conteudo">
-            <header class="capa-identidade">
-                <img class="capa-logo-oficial" src="{% static 'images/logo.jpg' %}"
-                     alt="UNIPÊ — Centro Universitário de João Pessoa">
-                <div class="capa-filete" aria-hidden="true"><span></span></div>
-            </header>
+    <div class="pagina page-break-after capa-container">
+        <div class="capa-superior">
+            <div class="capa-periodo">{{ titulo_topo }}</div>
             <div class="capa-titulo-bloco">
-                <h1>PROVA INTEGRADA</h1>
-                <h2>MEDICINA</h2>
+                <h1>
+                    <span>Pr</span>
+                    <svg class="check-circle" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="white" stroke-width="2.5"/><path d="M7.5 12L10.5 15L16.5 9" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>va</span>
+                </h1>
+                <h2 class="titulo-grande">integrada</h2>
+                <h2 class="titulo-pequeno">medicina</h2>
             </div>
-            <div class="capa-periodo">
-                <span class="capa-periodo-valor">{{ titulo_topo }}</span>
+            <div class="capa-footer">
+                <span class="boa-prova">Boa Prova!</span>
+                <img src="{% static 'images/logo.jpg' %}" alt="Logo UNIPÊ">
             </div>
-            <p class="capa-boa-prova">Boa Prova!</p>
-
-            <section class="capa-identificacao" aria-label="Informações do estudante">
-                <h3>INFORMAÇÕES DO ESTUDANTE</h3>
-                <div class="capa-identificacao-conteudo">
-                    <div class="capa-campo">
-                        <strong>Nome completo:</strong><span class="capa-campo-linha"></span>
-                    </div>
-                    <div class="capa-identificacao-linha capa-registro">
-                        <div class="capa-campo">
-                            <strong>RGM:</strong><span class="capa-campo-linha"></span>
-                        </div>
-                        <div class="capa-campo">
-                            <strong>CPF (opcional):</strong><span class="capa-campo-linha"></span>
-                        </div>
-                        <div class="capa-campo">
-                            <strong>Turma:</strong><span class="capa-campo-linha"></span>
-                        </div>
-                    </div>
-                    <div class="capa-identificacao-linha">
-                        <div class="capa-campo">
-                            <strong>Data:</strong><span class="capa-campo-linha"></span>
-                        </div>
-                        <div class="capa-campo">
-                            <strong>Assinatura:</strong><span class="capa-campo-linha"></span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="capa-disciplinas" aria-label="Componentes curriculares">
-                <table class="capa-lista-componentes">
-                    <thead>
-                        <tr><th colspan="2" class="capa-disciplinas-titulo">Assinalar as disciplinas em curso:</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for c in componentes %}
-                            {% if forloop.counter0|divisibleby:2 %}<tr>{% endif %}
-                                <td><div class="capa-componente">
-                                    <span class="capa-componente-quadrado" aria-hidden="true"></span>
-                                    <span>{{ c.nome }}</span>
-                                </div></td>
-                            {% if forloop.counter|divisibleby:2 %}</tr>{% elif forloop.last %}<td></td></tr>{% endif %}
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </section>
         </div>
-        <footer class="capa-rodape">
-            <span>UNIPÊ · CURSO DE MEDICINA</span>
-            <span>CÓDIGO DA PROVA: {{ codigo_prova }}</span>
-        </footer>
-    </section>
+        <div class="capa-inferior">
+            <div class="capa-identificacao">
+                <h3>Informações do Estudante</h3>
+                <div class="capa-identificacao-linha">
+                    <span><strong>NOME:</strong> _________________________________________</span>
+                    <span><strong>TURMA:</strong> _____________</span>
+                </div>
+                <div class="capa-disciplinas">
+                    <p><strong>Assinalar as disciplinas em curso:</strong></p>
+                    {% for c in componentes %}
+                        <p>{{ c.nome }} <span>( &nbsp; )</span></p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="pagina">
         {% for questao in questoes_selecionadas %}
