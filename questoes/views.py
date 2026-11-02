@@ -25,6 +25,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET
 
 from .ai_control import AIControlError, subject_key
+from .answer_layout import LayoutBalanceError, montar_layout_balanceado
 from .forms import AlternativaForm, QuestaoForm
 from .models import ComponenteCurricular, Periodo, Questao, Semestre
 from .submission import (
@@ -639,8 +640,9 @@ def prova_gerada_view(request):
             )
             return redirect("pagina_gerar_prova")
         quantidades[componente.pk] = int(valor)
-    questoes_selecionadas = []
-
+    # A prova é balanceada como um conjunto: os itens sorteados podem mudar
+    # entre tentativas, mas a disposição final é sempre reprodutível por IDs.
+    bancos = []
     for componente in componentes_da_prova:
         query_base = Q(componente=componente, status__in=Questao.STATUS_APROVADOS)
 
@@ -653,15 +655,31 @@ def prova_gerada_view(request):
         else:
             query_tipo = Q(uso_prova="INTEGRADA") | Q(uso_prova="AMBAS")
 
-        questoes_aprovadas = list(Questao.objects.filter(query_base & query_tipo))
-        num_questoes = quantidades[componente.pk]
+        aprovadas = list(Questao.objects.filter(query_base & query_tipo))
+        bancos.append((aprovadas, quantidades[componente.pk]))
 
-        if len(questoes_aprovadas) >= num_questoes:
-            questoes_sorteadas = random.sample(questoes_aprovadas, num_questoes)
+    erro_layout = None
+    for _ in range(20):
+        questoes_selecionadas = []
+        for aprovadas, quantidade in bancos:
+            sorteadas = (
+                random.sample(aprovadas, quantidade)
+                if len(aprovadas) >= quantidade
+                else aprovadas
+            )
+            questoes_selecionadas.extend(sorteadas)
+
+        try:
+            alternativas_por_questao = montar_layout_balanceado(
+                questoes_selecionadas, gerar_alternativas_multipla_escolha
+            )
+        except LayoutBalanceError as erro:
+            erro_layout = erro
         else:
-            questoes_sorteadas = questoes_aprovadas
-
-        questoes_selecionadas.extend(questoes_sorteadas)
+            break
+    else:
+        messages.error(request, str(erro_layout))
+        return redirect("pagina_gerar_prova")
 
     # ==========================================
     # LÓGICA DE EXPORTAÇÃO PARA .TXT (CORRIGIDA)
@@ -683,11 +701,8 @@ def prova_gerada_view(request):
             else:
                 cabecalho = f"MC\tComando: {enunciado}\t"
 
-            # Gera as alternativas
-            if questao.tipo_questao == "MULTIPLA_ESCOLHA":
-                alts = gerar_alternativas_multipla_escolha(questao)
-            else:
-                alts = list(questao.alternativas.all().order_by("id"))
+            # Usa exatamente o mesmo layout balanceado da prova impressa.
+            alts = alternativas_por_questao[questao.pk]
 
             alts_str_parts = []
             for alt in alts:
@@ -737,10 +752,7 @@ def prova_gerada_view(request):
     imagem_counter = 1
 
     for i, questao in enumerate(questoes_selecionadas):
-        if questao.tipo_questao == "MULTIPLA_ESCOLHA":
-            questao.alternativas_finais = gerar_alternativas_multipla_escolha(questao)
-        else:
-            questao.alternativas_finais = questao.alternativas.all().order_by("id")
+        questao.alternativas_finais = alternativas_por_questao[questao.pk]
 
         if questao.imagem:
             questao.numero_imagem_anexo = imagem_counter
@@ -780,35 +792,29 @@ def prova_gabarito_view(request):
 
     questoes = Questao.objects.filter(id__in=ids_list, status__in=Questao.STATUS_APROVADOS)
     questoes_mapeadas = {q.id: q for q in questoes}
-    questoes_ordenadas = []
+    questoes_ordenadas = [
+        questoes_mapeadas[pk] for pk in ids_list if pk in questoes_mapeadas
+    ]
+    try:
+        alternativas_por_questao = montar_layout_balanceado(
+            questoes_ordenadas, gerar_alternativas_multipla_escolha
+        )
+    except LayoutBalanceError as erro:
+        messages.error(request, str(erro))
+        return redirect("pagina_gerar_prova")
 
-    for id in ids_list:
-        if id in questoes_mapeadas:
-            questao = questoes_mapeadas[id]
-            questao.letra_gabarito = "?"
-
-            if questao.tipo_questao == "MULTIPLA_ESCOLHA":
-                # Usa a função determinística (mesma semente = mesma ordem da prova)
-                alternativas_geradas = gerar_alternativas_multipla_escolha(questao)
-
-                letras = ["A", "B", "C", "D", "E"]
-                for i, alt in enumerate(alternativas_geradas):
-                    if alt["eh_correta"]:
-                        questao.letra_gabarito = letras[i] if i < 5 else "?"
-                        break
-
-                questao.alternativas_finais_exibicao = alternativas_geradas
-
-            else:
-                alternativas = list(questao.alternativas.all().order_by("id"))
-                letras = ["A", "B", "C", "D", "E"]
-                for i, alt in enumerate(alternativas):
-                    if alt.eh_correta:
-                        questao.letra_gabarito = letras[i] if i < 5 else "?"
-                        break
-                questao.alternativas_finais_exibicao = alternativas
-
-            questoes_ordenadas.append(questao)
+    letras = "ABCDE"
+    for questao in questoes_ordenadas:
+        alternativas = alternativas_por_questao[questao.pk]
+        questao.alternativas_finais_exibicao = alternativas
+        questao.letra_gabarito = next(
+            (
+                letras[i]
+                for i, alt in enumerate(alternativas)
+                if (alt["eh_correta"] if isinstance(alt, dict) else alt.eh_correta)
+            ),
+            "?",
+        )
 
     componentes_ids = {q.componente.id for q in questoes_ordenadas}
     componentes = ComponenteCurricular.objects.filter(id__in=componentes_ids)
