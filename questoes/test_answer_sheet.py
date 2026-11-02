@@ -135,6 +135,33 @@ class GeradorCartaoTests(TestCase):
         self.assertContains(resposta, 'class="cartao-bolha">E</span>', count=1)
         self.assertContains(resposta, 'class="cartao-numero">005</span>')
 
+    def test_capa_moderna_preserva_marca_e_campos_dinamicos(self):
+        resposta = self.client.get(
+            reverse("prova_gerada"),
+            {
+                "componentes": [self.componente.pk],
+                f"quantidade_{self.componente.pk}": 5,
+            },
+        )
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, "PROVA INTEGRADA")
+        self.assertContains(resposta, "MEDICINA")
+        self.assertContains(resposta, "Boa Prova!")
+        self.assertContains(resposta, "INFORMAÇÕES DO ESTUDANTE")
+        self.assertContains(resposta, "Nome completo:")
+        self.assertContains(resposta, "RGM:")
+        self.assertContains(resposta, "CPF (opcional):")
+        self.assertContains(resposta, "Turma:")
+        self.assertContains(resposta, "Data:")
+        self.assertContains(resposta, "Assinatura:")
+        self.assertContains(resposta, "Assinalar as disciplinas em curso:")
+        self.assertContains(resposta, self.componente.nome)
+        self.assertContains(resposta, "5º Período")
+        self.assertContains(resposta, resposta.context["codigo_prova"])
+        self.assertContains(resposta, "images/logo.jpg")
+        self.assertContains(resposta, "capa-logo-oficial")
+        self.assertNotContains(resposta, "images/capa_background.jpg")
+
     def test_csv_tem_codigo_igual_ao_gabarito_impresso(self):
         ids = self.ids()
         resposta = self.client.get(reverse("prova_gabarito_csv"), {"ids": ids})
