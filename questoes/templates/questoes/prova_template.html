@@ -328,6 +328,107 @@
             }
         }
 
+        /* Arte local aprovada: elementos variáveis permanecem texto HTML. */
+        .capa-container {
+            background: #fff url("{% static 'images/capa-aprovada-vetor.svg' %}") center center / 100% 100% no-repeat;
+            position: relative;
+            display: block;
+            padding: 0;
+        }
+        .capa-container::before, .capa-container::after,
+        .capa-arco-superior, .capa-arco-inferior, .capa-filetes { display: none; }
+        .capa-identidade {
+            position: absolute; top: 11mm; left: 21%;
+            width: 62%; height: 43mm; display: flex;
+            align-items: center; justify-content: center;
+        }
+        .capa-logo-oficial { width: 100%; max-height: 43mm; object-fit: contain; }
+        .capa-titulo-bloco {
+            position: absolute; top: 58mm; left: 5%; width: 90%; margin: 0;
+            text-align: center;
+        }
+        .capa-titulo-bloco h1 { font-size: 28pt; white-space: nowrap; }
+        .capa-faixa-medicina {
+            position: absolute; top: 83mm; left: 10mm; width: 190mm;
+            height: 27mm; min-height: 27mm;
+            background: transparent; color: #062c55;
+            border: 0; border-radius: 0; overflow: visible;
+            justify-content: center; padding-left: 25mm;
+        }
+        .capa-faixa-medicina .capa-ecg, .capa-simbolo-saude { display: none; }
+        .capa-faixa-medicina h2 {
+            text-align: center; flex: 0 1 98mm;
+            font-size: 30pt; font-style: italic;
+            font-weight: 900; color: #062c55; letter-spacing: 0;
+        }
+        .capa-periodo {
+            position: absolute; top: 115mm; left: 12mm; width: 186mm;
+            margin: 0; gap: 2mm;
+        }
+        .capa-periodo-rotulo { font-size: 10pt; color: #062c55; }
+        .capa-periodo-valor {
+            max-width: 170mm; min-width: 80mm;
+            border-bottom: .4mm solid #062c55;
+            font-size: 17pt;
+        }
+        .capa-boa-prova {
+            position: absolute; top: 141mm; left: 26%; width: 48%;
+            margin: 0; padding: 2.2mm 3mm; box-sizing: border-box;
+            font-size: 22pt; text-align: center;
+            background: #fac521; color: #062c55;
+        }
+        .capa-identificacao {
+            position: absolute; top: 162mm; left: 8mm; width: 194mm;
+            margin: 0; border-radius: 5mm;
+            background: #fff; border: .6mm solid #062c55;
+        }
+        .capa-identificacao h3 {
+            padding: 2mm; font-size: 12pt; background: #062c55; color: #fff;
+        }
+        .capa-identificacao-conteudo { padding: 3mm 5mm; }
+        .capa-campo { min-height: 7mm; }
+        .capa-disciplinas {
+            position: absolute; top: 212mm; left: 12mm; width: 186mm;
+            margin: 0; padding: 0; border: none;
+        }
+        .capa-disciplinas-titulo {
+            font-size: 11pt; font-weight: 800; margin-bottom: 4mm;
+        }
+        .capa-lista-componentes {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 2.4mm 5mm;
+        }
+        .capa-componente { font-size: 8.5pt; line-height: 1.2; }
+        .capa-rodape {
+            position: absolute; top: 278mm; left: 12mm; right: 12mm;
+            margin: 0; font-size: 7.5pt; z-index: 1;
+        }
+        .capa-densa .capa-identificacao-conteudo,
+        .capa-muito-densa .capa-identificacao-conteudo { padding: 3mm 5mm; }
+        .capa-densa .capa-campo,
+        .capa-muito-densa .capa-campo { min-height: 7mm; }
+        .capa-densa .capa-lista-componentes,
+        .capa-muito-densa .capa-lista-componentes {
+            grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2mm 3mm;
+        }
+        .capa-densa .capa-componente,
+        .capa-muito-densa .capa-componente { font-size: 7pt; }
+        .capa-muito-densa .capa-identidade {
+            top: 11mm; height: 43mm;
+        }
+        .capa-muito-densa .capa-logo-oficial { width: 100%; }
+        .capa-muito-densa .capa-boa-prova { margin: 0; }
+        @media print {
+            .capa-container {
+                width: 210mm; height: 297mm; min-height: 297mm; padding: 0;
+                background-image: url("{% static 'images/capa-aprovada-vetor.svg' %}");
+                print-color-adjust: exact; -webkit-print-color-adjust: exact;
+            }
+            .capa-faixa-medicina { border: 0; background: transparent !important; }
+            .capa-boa-prova { border: .4mm solid #111; background: #fff !important; }
+            .capa-identificacao h3 { color: #111 !important; background: #fff !important; }
+        }
+
         /* --- ESTILOS DAS QUESTÕES E ANEXO DE IMAGENS --- */
         .componente-header { text-align: center; font-weight: bold; text-transform: uppercase; padding: 0.5rem; border-top: 1px solid black; border-bottom: 1px solid black; margin: 2rem 0; page-break-after: avoid; }
 
@@ -521,6 +622,9 @@
                         <strong>Assinatura:</strong><span class="capa-campo-linha"></span>
                     </div>
                 </div>
+            </div>
+        </section>
+
                 <div class="capa-disciplinas">
                     <div class="capa-disciplinas-titulo">Assinalar as disciplinas em curso:</div>
                     <div class="capa-lista-componentes">
@@ -532,8 +636,6 @@
                         {% endfor %}
                     </div>
                 </div>
-            </div>
-        </section>
 
         <footer class="capa-rodape">
             <span>UNIPÊ · CURSO DE MEDICINA</span>
