@@ -52,10 +52,7 @@ def paginas_do_cartao(questoes, alternativas_por_questao):
         lote = itens[inicio : inicio + MAXIMO_POR_FOLHA]
         numero_colunas = 2 if len(lote) <= 60 else 3
         itens_por_coluna = ceil(len(lote) / numero_colunas)
-        colunas = [
-            lote[i : i + itens_por_coluna]
-            for i in range(0, len(lote), itens_por_coluna)
-        ]
+        colunas = [lote[i : i + itens_por_coluna] for i in range(0, len(lote), itens_por_coluna)]
         paginas.append(
             {
                 "numero": len(paginas) + 1,
@@ -76,9 +73,7 @@ def linhas_do_gabarito(questoes, alternativas_por_questao):
     for numero, questao in enumerate(questoes, start=1):
         alternativas = alternativas_por_questao[questao.pk]
         letra = next(
-            LETRAS[indice]
-            for indice, alternativa in enumerate(alternativas)
-            if _correta(alternativa)
+            LETRAS[indice] for indice, alternativa in enumerate(alternativas) if _correta(alternativa)
         )
         linhas.append(
             {
