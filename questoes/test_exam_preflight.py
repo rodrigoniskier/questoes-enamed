@@ -49,19 +49,13 @@ class ExamPreflightTests(TestCase):
         }
 
     def test_previa_antecede_prova_sem_ressorteio(self):
-        resposta = self.client.get(
-            reverse("prova_gerada"), {**self.parametros(), "preflight": "1"}
-        )
+        resposta = self.client.get(reverse("prova_gerada"), {**self.parametros(), "preflight": "1"})
         self.assertEqual(resposta.status_code, 200)
         self.assertEqual(resposta["Cache-Control"], "no-store")
         dados = resposta.json()
         self.assertEqual(dados["total"], 4)
-        self.assertEqual(
-            sum(item["quantidade"] for item in dados["distribuicao"]), 4
-        )
-        self.assertEqual(
-            sum(item["percentual"] for item in dados["distribuicao"]), 100.0
-        )
+        self.assertEqual(sum(item["quantidade"] for item in dados["distribuicao"]), 4)
+        self.assertEqual(sum(item["percentual"] for item in dados["distribuicao"]), 100.0)
         destino = dados["url_abertura"]
         self.assertEqual(urlparse(destino).path, reverse("prova_gerada"))
         token = parse_qs(urlparse(destino).query)["prova_token"][0]
@@ -107,18 +101,12 @@ class ExamPreflightTests(TestCase):
         self.assertEqual(len(final.content.decode().split("\n\n")), 4)
 
     def test_link_falsificado_ou_outro_usuario_nao_abre(self):
-        previa = self.client.get(
-            reverse("prova_gerada"), {**self.parametros(), "preflight": "1"}
-        ).json()
+        previa = self.client.get(reverse("prova_gerada"), {**self.parametros(), "preflight": "1"}).json()
         endereco = previa["url_abertura"]
         self.client.force_login(self.outro_gestor)
-        self.assertRedirects(
-            self.client.get(endereco), reverse("pagina_gerar_prova")
-        )
+        self.assertRedirects(self.client.get(endereco), reverse("pagina_gerar_prova"))
         self.client.force_login(self.gestor)
-        self.assertRedirects(
-            self.client.get(endereco + "alterado"), reverse("pagina_gerar_prova")
-        )
+        self.assertRedirects(self.client.get(endereco + "alterado"), reverse("pagina_gerar_prova"))
 
     def test_retorna_erro_json_para_formulario_invalido(self):
         resposta = self.client.get(reverse("prova_gerada"), {"preflight": "1"})
