@@ -120,9 +120,10 @@ class AnswerLayoutTests(TestCase):
         previa = self.client.get(reverse("prova_gerada"), {**parametros, "preflight": "1"})
         self.assertEqual(previa.status_code, 200)
         self.assertFalse(previa.json()["equilibrado"])
-        self.assertEqual(previa.json()["codigo_prova"], self.client.get(
-            previa.json()["url_abertura"]
-        ).context["codigo_prova"])
+        self.assertEqual(
+            previa.json()["codigo_prova"],
+            self.client.get(previa.json()["url_abertura"]).context["codigo_prova"],
+        )
         self.assertEqual(
             {item["letra"]: item["quantidade"] for item in previa.json()["distribuicao"]},
             resumo["contagens_quatro"],
