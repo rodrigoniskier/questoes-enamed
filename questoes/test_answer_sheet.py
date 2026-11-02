@@ -160,9 +160,58 @@ class GeradorCartaoTests(TestCase):
         self.assertContains(resposta, resposta.context["codigo_prova"])
         self.assertContains(resposta, "images/logo.jpg")
         self.assertContains(resposta, "capa-logo-oficial")
-        self.assertContains(resposta, 'class="capa-arte-vetorial"')
+        self.assertNotContains(resposta, "<svg")
+        self.assertNotContains(resposta, "capa-arte-vetorial")
         self.assertContains(resposta, "capa-disciplinas")
         self.assertNotContains(resposta, "images/capa_background.jpg")
+
+    def test_capa_cartao_e_csv_compartilham_codigo_da_selecao_real(self):
+        resposta = self.client.get(
+            reverse("prova_gerada"),
+            {"componentes": [self.componente.pk], f"quantidade_{self.componente.pk}": 5},
+        )
+        codigo = resposta.context["codigo_prova"]
+        ids = ",".join(str(pk) for pk in resposta.context["questao_ids"])
+        csv_resposta = self.client.get(reverse("prova_gabarito_csv"), {"ids": ids})
+        linhas = list(csv.DictReader(io.StringIO(csv_resposta.content.decode("utf-8-sig"))))
+        self.assertTrue(linhas)
+        self.assertEqual({linha["codigo_prova"] for linha in linhas}, {codigo})
+        html = resposta.content.decode()
+        capa = html.split('aria-label="Capa da avaliação"', 1)[1].split('<div class="pagina">', 1)[0]
+        cartao = html.split('<section class="pagina cartao-respostas">', 1)[1]
+        self.assertIn(codigo, capa)
+        self.assertIn(codigo, cartao)
+
+    def test_capa_preserva_modalidades_e_identificacao_multiperiodo(self):
+        for tipo, uso, titulo in (
+            ("reposicao", "REPOSICAO", "PROVA DE REPOSIÇÃO"),
+            ("residencia", "RESIDENCIA", "PROVA DE RESIDÊNCIA MÉDICA - UNIPÊ"),
+            ("simulado", "SIMULADO", "SIMULADO"),
+        ):
+            with self.subTest(tipo=tipo):
+                Questao.objects.filter(componente=self.componente).update(uso_prova=uso)
+                resposta = self.client.get(
+                    reverse("prova_gerada"),
+                    {"tipo_prova": tipo, "componentes": [self.componente.pk]},
+                )
+                self.assertEqual(resposta.status_code, 200)
+                self.assertEqual(resposta.context["titulo_topo"], titulo)
+                self.assertContains(resposta, titulo)
+
+        Questao.objects.filter(componente=self.componente).update(uso_prova="INTEGRADA")
+        outro_periodo = Periodo.objects.create(nome="6º Período", semestre=self.componente.periodo.semestre)
+        outro_componente = ComponenteCurricular.objects.create(
+            nome="Clínica Integrada", periodo=outro_periodo, numero_questoes_prova=1
+        )
+        self.assercao.componente = outro_componente
+        self.assercao.save(update_fields=["componente"])
+        resposta = self.client.get(
+            reverse("prova_gerada"), {"componentes": [self.componente.pk, outro_componente.pk]}
+        )
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.context["titulo_topo"], "PROVA INTEGRADA MULTIPERÍODO")
+        self.assertContains(resposta, self.componente.nome)
+        self.assertContains(resposta, outro_componente.nome)
 
     def test_csv_tem_codigo_igual_ao_gabarito_impresso(self):
         ids = self.ids()
