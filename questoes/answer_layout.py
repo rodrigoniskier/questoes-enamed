@@ -84,12 +84,11 @@ def _encaixar(questoes_por_id, capacidades):
 
 
 def montar_layout_balanceado(questoes, gerar_multipla):
-    """Retorna alternativas finais por ID, com contagens A–D diferindo até um.
+    """Ordena respostas únicas por extensão e busca equilíbrio A–D quando viável.
 
-    Respostas únicas são ordenadas por extensão crescente ou decrescente.
-    Respostas múltiplas podem ocupar qualquer das quatro letras. Asserção-razão
-    (cinco opções) e provas legadas de cinco alternativas são preservadas fora
-    do cálculo A–D. Se o balanceamento for impossível, a prova não é gerada.
+    Se as restrições impedirem equilíbrio exato, conserva a ordenação por
+    extensão e distribui as letras disponíveis, sem bloquear a prova.
+    Questões de cinco alternativas ficam fora do objetivo A–D.
     """
     fixas = {}
     candidatas = {}
@@ -116,8 +115,59 @@ def montar_layout_balanceado(questoes, gerar_multipla):
                 **{questao_id: candidatas[questao_id][letra] for questao_id, letra in atribuicoes.items()},
             }
 
-    raise LayoutBalanceError(
-        "Não é possível equilibrar A, B, C e D mantendo todas as alternativas "
-        "em ordem crescente ou decrescente de extensão. Selecione outra "
-        "combinação de questões ou revise a extensão das alternativas."
-    )
+    # Prioridade pedagógica: jamais quebrar a monotonicidade das respostas
+    # únicas para forçar letras do gabarito. Distribui as posições possíveis.
+    atribuicoes = {}
+    frequencias = [0, 0, 0, 0]
+    ordem = sorted(candidatas, key=lambda pk: (len(candidatas[pk]), pk))
+    for questao_id in ordem:
+        letra = min(candidatas[questao_id], key=lambda indice: (frequencias[indice], indice))
+        atribuicoes[questao_id] = letra
+        frequencias[letra] += 1
+    return {
+        **fixas,
+        **{questao_id: candidatas[questao_id][letra] for questao_id, letra in atribuicoes.items()},
+    }
+
+
+def resumo_gabarito(questoes, alternativas_por_questao):
+    """Contagens e percentuais reais, sem ocultar itens A–E.
+
+    'equilibrado' verifica somente itens com quatro alternativas, como a
+    política atual do gerador. As proporções exibidas usam o total da prova.
+    """
+    contagens = {letra: 0 for letra in "ABCDE"}
+    contagens_quatro = {letra: 0 for letra in "ABCD"}
+    for questao in questoes:
+        alternativas = alternativas_por_questao[questao.pk]
+        indices = [
+            indice
+            for indice, alternativa in enumerate(alternativas)
+            if (alternativa["eh_correta"] if isinstance(alternativa, dict) else alternativa.eh_correta)
+        ]
+        if len(indices) != 1 or indices[0] >= len("ABCDE"):
+            raise LayoutBalanceError(f"Questão {questao.pk}: gabarito inválido.")
+        letra = "ABCDE"[indices[0]]
+        contagens[letra] += 1
+        if len(alternativas) == 4:
+            contagens_quatro[letra] += 1
+
+    total = len(questoes)
+    equilibrado = max(contagens_quatro.values()) - min(contagens_quatro.values()) <= 1
+    distribuicao = [
+        {
+            "letra": letra,
+            "quantidade": quantidade,
+            "percentual": round(100 * quantidade / total, 1) if total else 0.0,
+        }
+        for letra, quantidade in contagens.items()
+        if letra != "E" or quantidade
+    ]
+    return {
+        "total": total,
+        "equilibrado": equilibrado,
+        "quatro_alternativas": sum(contagens_quatro.values()),
+        "cinco_alternativas": total - sum(contagens_quatro.values()),
+        "distribuicao": distribuicao,
+        "contagens_quatro": contagens_quatro,
+    }
