@@ -58,7 +58,7 @@ class AnswerLayoutTests(TestCase):
     def layout(self, questoes):
         return montar_layout_balanceado(questoes, gerar_alternativas_multipla_escolha)
 
-    def testar_balanceamento(self, questoes, layout):
+    def _verificar_balanceamento(self, questoes, layout):
         contagens = [0, 0, 0, 0]
         for questao in questoes:
             alternativas = layout[questao.pk]
@@ -74,7 +74,7 @@ class AnswerLayoutTests(TestCase):
     def test_quatro_unicas_ficam_balanceadas_e_ordenadas(self):
         questoes = [self.criar_unica(indice) for indice in range(4)]
         layout = self.layout(questoes)
-        self.testar_balanceamento(questoes, layout)
+        self._verificar_balanceamento(questoes, layout)
         for questao in questoes:
             extensoes = [len(a.texto) for a in layout[questao.pk]]
             self.assertIn(
@@ -91,14 +91,14 @@ class AnswerLayoutTests(TestCase):
         questoes = [self.criar_unica(0) for _ in range(4)]
         questoes.extend([self.criar_multipla(), self.criar_multipla()])
         layout = self.layout(questoes)
-        self.testar_balanceamento(questoes, layout)
+        self._verificar_balanceamento(questoes, layout)
         for questao in questoes[-2:]:
             self.assertEqual(len(layout[questao.pk]), 4)
             self.assertEqual(len({a["texto"] for a in layout[questao.pk]}), 4)
 
     def test_empates_de_extensao_permitidos(self):
         questoes = [self.criar_unica(0, comprimentos=(6, 6, 6, 6)) for _ in range(4)]
-        self.testar_balanceamento(questoes, self.layout(questoes))
+        self._verificar_balanceamento(questoes, self.layout(questoes))
 
     def test_distribuicao_exata_impossivel_bloqueia_geracao(self):
         questoes = [self.criar_unica(0) for _ in range(4)]
@@ -132,7 +132,7 @@ class AnswerLayoutTests(TestCase):
         self.assertEqual(prova.status_code, 200)
         selecionadas = prova.context["questoes_selecionadas"]
         self.assertEqual(set(questoes), set(selecionadas))
-        self.testar_balanceamento(
+        self._verificar_balanceamento(
             selecionadas,
             {q.pk: q.alternativas_finais for q in selecionadas},
         )
