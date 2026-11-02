@@ -27,48 +27,306 @@
             position: relative;
         }
 
-        /* --- ESTILOS DA CAPA (Inalterado) --- */
-        .capa-container { display: flex; flex-direction: column; padding: 0; box-sizing: border-box;}
-        .capa-superior {
-            height: 14.85cm; width: 100%; position: relative;
-            background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url("{% static 'images/capa_background.jpg' %}");
-            background-size: cover; background-position: center; color: white;
-            display: flex; flex-direction: column; padding: 1.5cm; box-sizing: border-box;
-            font-family: 'Times New Roman', Times, serif;
-        }
-        .capa-periodo {
-            text-align: center; font-weight: bold; font-size: 2.2rem;
-            border: 2px solid white; padding: 0.25rem; max-width: 500px;
-            margin: 0 auto 1.5rem auto; text-transform: uppercase;
-        }
-        .capa-titulo-bloco { text-align: left; margin-left: 1cm; margin-top: 0.5rem; }
-        .capa-titulo-bloco h1, .capa-titulo-bloco .titulo-grande { font-size: 4.5rem; margin: 0; line-height: 1.0; }
-        .capa-titulo-bloco h1 { font-weight: 900; text-transform: capitalize; display: flex; align-items: center; }
-        .capa-titulo-bloco .titulo-grande { font-weight: 900; text-transform: lowercase; padding-left: 5px; }
-        .capa-titulo-bloco .titulo-pequeno { font-size: 2.2rem; font-weight: normal; margin: 0 0 0 5px; text-transform: lowercase; }
-        .check-circle { display: inline-block; width: 0.8em; height: 0.8em; margin: 0 0.05em; }
-        .capa-footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; width: 100%; }
-        .capa-footer .boa-prova { font-size: 2.5rem; font-weight: bold; }
-        .capa-footer img { height: 70px; width: auto; margin-bottom: 70px; }
-
-        .capa-inferior {
-            height: 14.85cm;
-            padding: 1.0cm 2cm;
+        /* --- CAPA INSTITUCIONAL: CSS editável, logo oficial preservada --- */
+        .capa-container {
+            --azul-unipe: #062c55;
+            --dourado-unipe: #f7c21b;
+            width: 210mm;
+            height: 297mm;
+            min-height: 297mm;
+            padding: 15mm 16mm 12mm;
             box-sizing: border-box;
-            display: flex; flex-direction: column; justify-content: center;
-            background-color: white;
-            font-family: 'Times New Roman', Times, serif;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            font-family: Arial, Helvetica, sans-serif;
+            color: var(--azul-unipe);
+            background: #fff;
+            isolation: isolate;
+        }
+        .capa-container::before {
+            content: "";
+            position: absolute;
+            left: -37mm; top: -42mm;
+            width: 110mm; height: 70mm;
+            border-radius: 0 0 95% 0;
+            background: var(--azul-unipe);
+            transform: rotate(-17deg);
+            z-index: -1;
+        }
+        .capa-container::after {
+            content: "";
+            position: absolute;
+            right: -40mm; bottom: -41mm;
+            width: 125mm; height: 64mm;
+            border-radius: 90% 0 0 0;
+            border-top: 3mm solid var(--dourado-unipe);
+            background: var(--azul-unipe);
+            transform: rotate(-10deg);
+            z-index: -1;
+        }
+        .capa-arco-superior {
+            position: absolute;
+            top: 12mm; left: -7mm;
+            width: 68mm; height: 28mm;
+            border-top: 1.2mm solid var(--dourado-unipe);
+            border-radius: 60% 0 0 0;
+            transform: rotate(-30deg);
+            pointer-events: none;
+        }
+        .capa-arco-inferior {
+            position: absolute;
+            bottom: 8mm; right: -12mm;
+            width: 110mm; height: 26mm;
+            border-top: .7mm solid var(--dourado-unipe);
+            border-radius: 90% 0 0 0;
+            transform: rotate(-9deg);
+            pointer-events: none;
+        }
+        .capa-identidade {
+            height: 48mm;
+            flex: 0 0 48mm;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            position: relative;
+        }
+        .capa-logo-oficial {
+            display: block;
+            width: 119mm;
+            max-width: 100%;
+            height: auto;
+            object-fit: contain;
+        }
+        .capa-titulo-bloco { text-align: center; margin-top: 2mm; }
+        .capa-titulo-bloco h1 {
+            font-size: 32pt;
+            font-weight: 900;
+            line-height: 1.06;
+            letter-spacing: -.4pt;
+            margin: 0;
+            color: var(--azul-unipe);
+        }
+        .capa-filetes {
+            height: 2mm;
+            margin: 5mm 6mm 6mm;
+            display: flex;
+            gap: 15mm;
+            align-items: center;
+        }
+        .capa-filetes::before, .capa-filetes::after {
+            content: ""; flex: 1; height: .8mm; background: var(--dourado-unipe);
+        }
+        .capa-faixa-medicina {
+            display: flex;
+            align-items: center;
+            height: 21mm;
+            min-height: 21mm;
+            border-radius: 7mm 6mm 6mm 7mm;
+            background: var(--azul-unipe);
+            overflow: hidden;
+            color: white;
+        }
+        .capa-faixa-medicina .capa-ecg {
+            width: 30mm;
+            height: 12mm;
+            margin: 0 5mm 0 5mm;
+            flex: 0 0 auto;
+        }
+        .capa-faixa-medicina h2 {
+            margin: 0;
+            font-size: 29pt;
+            font-weight: 900;
+            letter-spacing: .3pt;
+            line-height: 1;
+            flex: 1;
+        }
+        .capa-simbolo-saude {
+            width: 31mm;
+            height: 21mm;
+            flex: 0 0 31mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--dourado-unipe);
+            border-left: 1.8mm solid #fff;
+            transform: skewX(-17deg);
+            transform-origin: left top;
+        }
+        .capa-simbolo-saude svg { width: 12mm; height: 12mm; transform: skewX(17deg); }
+        .capa-periodo {
+            margin: 6mm auto 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5mm;
+            max-width: 100%;
+        }
+        .capa-periodo-rotulo {
+            font-size: 9pt;
+            line-height: 1.2;
+            font-weight: 800;
+            letter-spacing: 1pt;
+            color: #4d6077;
+        }
+        .capa-periodo-valor {
+            font-size: 17pt;
+            line-height: 1.15;
+            font-weight: 800;
+            text-align: center;
+            overflow-wrap: anywhere;
+            border-bottom: .5mm solid var(--azul-unipe);
+            min-width: 63mm;
+            padding: 0 2mm 2mm;
+            text-transform: uppercase;
+        }
+        .capa-boa-prova {
+            align-self: center;
+            margin: 7mm 0 0;
+            padding: 2mm 16mm;
+            border-radius: 6mm;
+            background: var(--dourado-unipe);
+            color: var(--azul-unipe);
+            font-size: 23pt;
+            font-weight: 900;
+            font-style: italic;
+            line-height: 1.25;
+            white-space: nowrap;
         }
         .capa-identificacao {
-            border: 2px solid #000; border-radius: 20px;
-            padding: 0.5rem 1.2rem; font-size: 1.0rem;
-            background-color: white; box-sizing: border-box;
+            margin-top: auto;
+            border: .65mm solid var(--azul-unipe);
+            border-radius: 6mm;
+            overflow: hidden;
+            background: white;
+            color: var(--azul-unipe);
+            position: relative;
         }
-        .capa-identificacao h3 { font-weight: bold; text-align: center; text-transform: uppercase; margin-bottom: 0.5rem; }
-        .capa-identificacao-linha { display: flex; justify-content: space-between; gap: 1.5rem; margin: 0.5rem 0; }
-        .capa-disciplinas p { margin: 0.1rem 0; display: flex; justify-content: space-between; }
-        .capa-disciplinas strong { margin-bottom: 0.3rem; display: block;}
+        .capa-identificacao h3 {
+            margin: 0;
+            padding: 2.6mm 2mm;
+            background: var(--azul-unipe);
+            color: #fff;
+            font-size: 13.5pt;
+            text-align: center;
+            font-weight: 800;
+            letter-spacing: .4pt;
+        }
+        .capa-identificacao-conteudo { padding: 4mm 5mm 4mm; }
+        .capa-campo {
+            display: flex;
+            align-items: baseline;
+            gap: 2mm;
+            min-height: 8mm;
+            font-size: 10pt;
+            line-height: 1.25;
+        }
+        .capa-campo strong { flex: none; white-space: nowrap; }
+        .capa-campo-linha {
+            flex: 1;
+            height: 5mm;
+            min-width: 6mm;
+            border-bottom: .3mm solid var(--azul-unipe);
+        }
+        .capa-identificacao-linha { display: flex; gap: 5mm; }
+        .capa-identificacao-linha > .capa-campo { flex: 1; min-width: 0; }
+        .capa-identificacao-linha > .capa-campo:first-child { flex: 1.2; }
+        .capa-disciplinas {
+            margin-top: 2.5mm;
+            padding-top: 2.5mm;
+            border-top: .3mm solid #c6d0dc;
+        }
+        .capa-disciplinas-titulo {
+            font-size: 9.5pt;
+            font-weight: 800;
+            margin-bottom: 2mm;
+        }
+        .capa-lista-componentes {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.3mm 5mm;
+        }
+        .capa-componente {
+            display: flex;
+            align-items: flex-start;
+            gap: 1.5mm;
+            font-size: 9pt;
+            line-height: 1.3;
+            overflow-wrap: anywhere;
+        }
+        .capa-componente-quadrado {
+            width: 3.6mm;
+            height: 3.6mm;
+            flex: 0 0 3.6mm;
+            margin-top: .25mm;
+            border: .3mm solid var(--azul-unipe);
+            box-sizing: border-box;
+        }
+        .capa-rodape {
+            display: flex;
+            justify-content: space-between;
+            gap: 4mm;
+            font-size: 7.5pt;
+            font-weight: 700;
+            letter-spacing: .15pt;
+            color: var(--azul-unipe);
+            margin: 3mm 4mm 0;
+        }
+        .capa-densa .capa-identificacao-conteudo { padding: 2.5mm 4mm; }
+        .capa-densa .capa-campo { min-height: 7mm; }
+        .capa-densa .capa-lista-componentes {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1mm 3mm;
+        }
+        .capa-densa .capa-componente { font-size: 7.5pt; }
+        .capa-muito-densa .capa-identidade { height: 38mm; flex-basis: 38mm; }
+        .capa-muito-densa .capa-logo-oficial { width: 104mm; }
+        .capa-muito-densa .capa-boa-prova { margin-top: 4mm; }
+        .capa-muito-densa .capa-identificacao-conteudo { padding: 2mm 3mm; }
+        .capa-muito-densa .capa-campo { min-height: 6.3mm; }
+        .capa-muito-densa .capa-lista-componentes {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: .6mm 2mm;
+        }
+        .capa-muito-densa .capa-componente { font-size: 7pt; }
+        .capa-muito-densa .capa-componente-quadrado { width: 3mm; height: 3mm; flex-basis: 3mm; }
 
+        @media print {
+            .capa-container {
+                width: 210mm; height: 297mm; min-height: 297mm;
+                margin: 0; padding: 15mm 16mm 12mm;
+                break-after: page;
+                page-break-inside: avoid;
+                box-shadow: none;
+            }
+            /* Identificação e titulação legíveis mesmo sem imprimir fundos. */
+            .capa-faixa-medicina {
+                background: #fff !important;
+                border: .6mm solid #111;
+                color: #111 !important;
+            }
+            .capa-faixa-medicina h2 { color: #111 !important; }
+            .capa-faixa-medicina .capa-ecg { stroke: #111 !important; }
+            .capa-simbolo-saude {
+                background: #fff !important;
+                border-left: .5mm solid #111;
+            }
+            .capa-boa-prova {
+                background: #fff !important;
+                border: .5mm solid #111;
+                color: #111 !important;
+            }
+            .capa-identificacao h3 {
+                color: #111 !important;
+                background: #fff !important;
+                border-bottom: .5mm solid #111;
+            }
+            .capa-container::before, .capa-container::after,
+            .capa-arco-superior, .capa-arco-inferior {
+                opacity: .25;
+            }
+        }
 
         /* --- ESTILOS DAS QUESTÕES E ANEXO DE IMAGENS --- */
         .componente-header { text-align: center; font-weight: bold; text-transform: uppercase; padding: 0.5rem; border-top: 1px solid black; border-bottom: 1px solid black; margin: 2rem 0; page-break-after: avoid; }
@@ -201,38 +459,86 @@
         </button>
     </div>
 
-    <div class="pagina page-break-after capa-container">
-        <div class="capa-superior">
-            <div class="capa-periodo">{{ titulo_topo }}</div>
-            <div class="capa-titulo-bloco">
-                <h1>
-                    <span>Pr</span>
-                    <svg class="check-circle" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="white" stroke-width="2.5"/><path d="M7.5 12L10.5 15L16.5 9" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span>va</span>
-                </h1>
-                <h2 class="titulo-grande">integrada</h2>
-                <h2 class="titulo-pequeno">medicina</h2>
-            </div>
-            <div class="capa-footer">
-                <span class="boa-prova">Boa Prova!</span>
-                <img src="{% static 'images/logo.jpg' %}" alt="Logo UNIPÊ">
-            </div>
+    <div class="pagina page-break-after capa-container{% if componentes|length > 20 %} capa-muito-densa{% elif componentes|length > 8 %} capa-densa{% endif %}">
+        <span class="capa-arco-superior" aria-hidden="true"></span>
+        <span class="capa-arco-inferior" aria-hidden="true"></span>
+
+        <header class="capa-identidade">
+            <img class="capa-logo-oficial" src="{% static 'images/logo.jpg' %}"
+                 alt="UNIPÊ — Centro Universitário de João Pessoa">
+        </header>
+
+        <div class="capa-titulo-bloco">
+            <h1>PROVA INTEGRADA</h1>
         </div>
-        <div class="capa-inferior">
-            <div class="capa-identificacao">
-                <h3>Informações do Estudante</h3>
+        <div class="capa-filetes" aria-hidden="true"></div>
+
+        <div class="capa-faixa-medicina">
+            <svg class="capa-ecg" viewBox="0 0 120 48" fill="none"
+                 stroke="white" stroke-width="3.3" stroke-linecap="round"
+                 stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 25H23L31 18L44 34L56 5L70 44L83 23L91 25H117"></path>
+            </svg>
+            <h2>MEDICINA</h2>
+            <span class="capa-simbolo-saude" aria-hidden="true">
+                <svg viewBox="0 0 50 50" fill="none" stroke="#062c55"
+                     stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M25 5V45M6 25H44"></path>
+                    <path d="M15 15L35 35M35 15L15 35" stroke-width="1.6" opacity=".35"></path>
+                </svg>
+            </span>
+        </div>
+
+        <div class="capa-periodo">
+            <span class="capa-periodo-rotulo">PERÍODO / MODALIDADE</span>
+            <span class="capa-periodo-valor">{{ titulo_topo }}</span>
+        </div>
+
+        <p class="capa-boa-prova">Boa Prova!</p>
+
+        <section class="capa-identificacao" aria-label="Informações do estudante">
+            <h3>INFORMAÇÕES DO ESTUDANTE</h3>
+            <div class="capa-identificacao-conteudo">
+                <div class="capa-campo">
+                    <strong>Nome completo:</strong><span class="capa-campo-linha"></span>
+                </div>
                 <div class="capa-identificacao-linha">
-                    <span><strong>NOME:</strong> _________________________________________</span>
-                    <span><strong>TURMA:</strong> _____________</span>
+                    <div class="capa-campo">
+                        <strong>RGM:</strong><span class="capa-campo-linha"></span>
+                    </div>
+                    <div class="capa-campo">
+                        <strong>CPF (opcional):</strong><span class="capa-campo-linha"></span>
+                    </div>
+                    <div class="capa-campo">
+                        <strong>Turma:</strong><span class="capa-campo-linha"></span>
+                    </div>
+                </div>
+                <div class="capa-identificacao-linha">
+                    <div class="capa-campo">
+                        <strong>Data:</strong><span class="capa-campo-linha"></span>
+                    </div>
+                    <div class="capa-campo">
+                        <strong>Assinatura:</strong><span class="capa-campo-linha"></span>
+                    </div>
                 </div>
                 <div class="capa-disciplinas">
-                    <p><strong>Assinalar as disciplinas em curso:</strong></p>
-                    {% for c in componentes %}
-                        <p>{{ c.nome }} <span>( &nbsp; )</span></p>
-                    {% endfor %}
+                    <div class="capa-disciplinas-titulo">Assinalar as disciplinas em curso:</div>
+                    <div class="capa-lista-componentes">
+                        {% for c in componentes %}
+                            <div class="capa-componente">
+                                <span class="capa-componente-quadrado" aria-hidden="true"></span>
+                                <span>{{ c.nome }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
-        </div>
+        </section>
+
+        <footer class="capa-rodape">
+            <span>UNIPÊ · CURSO DE MEDICINA</span>
+            <span>CÓDIGO DA PROVA: {{ codigo_prova }}</span>
+        </footer>
     </div>
 
     <div class="pagina">
