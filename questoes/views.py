@@ -16,7 +16,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
 from django.forms import formset_factory
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.middleware.csrf import get_token
@@ -166,7 +166,17 @@ def visualizar_questoes_view(request):
                     continue
         return redirect(f"{request.path}?componente={componente_id}")
 
-    questoes = Questao.objects.filter(componente=componente).prefetch_related("alternativas").order_by("-id")
+    from pre_auditoria.models import DecisaoPreAuditoria
+
+    feedback = DecisaoPreAuditoria.objects.filter(
+        questao_id=OuterRef("pk"), acao__in=["REPROVADA", "APROVADA_SUGESTOES"]
+    ).exclude(justificativa="")
+    questoes = (
+        Questao.objects.filter(componente_id__in=componente.ids_compartilhados())
+        .annotate(ultimo_parecer=Subquery(feedback.values("justificativa")[:1]))
+        .prefetch_related("alternativas")
+        .order_by("-id")
+    )
     opcoes_uso = Questao.USO_PROVA_CHOICES
 
     context = {

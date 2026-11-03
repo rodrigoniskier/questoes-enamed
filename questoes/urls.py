@@ -3,6 +3,7 @@
 from django.urls import path
 
 from . import views
+from .revisao import editar_questao_enviada
 
 urlpatterns = [
     # --- NOVAS URLS PARA O FLUXO DE SUBMISSÃO ---
@@ -40,4 +41,7 @@ urlpatterns = [
     path("montador-manual/", views.montador_manual_view, name="montador_manual"),
     # --- FIM DA ALTERAÇÃO ---
     path("submeter/visualizar/", views.visualizar_questoes_view, name="submeter_visualizar_questoes"),
+    path(
+        "submeter/visualizar/<int:questao_id>/editar/", editar_questao_enviada, name="submeter_editar_questao"
+    ),
 ]
