@@ -1,0 +1,79 @@
+{% extends "pre_auditoria/base.html" %}
+{% load questao_filters %}
+{% block title %}Editar e reenviar questão · QUESTÕES MEDICINA{% endblock %}
+{% block content %}
+<style>
+  .question-editor { max-width: 900px; margin: 0 auto; overflow-wrap: anywhere; }
+  .question-editor h1 { color: var(--accent-deep); font-size: 28px; margin: 12px 0; }
+  .question-editor .editor-note, .question-editor details { padding: 16px; margin: 16px 0; background: var(--soft); border: 1px solid var(--line); }
+  .question-editor form { display: grid; gap: 16px; }
+  .question-editor .editor-field { display: grid; min-width: 0; gap: 6px; }
+  .question-editor label, .question-editor legend { font-weight: 700; }
+  .question-editor input:not([type=checkbox]):not([type=hidden]), .question-editor textarea, .question-editor select { width: 100%; min-width: 0; max-width: 100%; padding: 10px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface); color: var(--ink); }
+  .question-editor fieldset { min-width: 0; padding: 16px; border: 1px solid var(--line); }
+  .question-editor .alternative-editor { padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .question-editor .editor-check { display: flex; align-items: start; gap: 10px; margin: 10px 0; }
+  .question-editor input[type=checkbox] { width: 20px; height: 20px; flex-shrink: 0; }
+  .question-editor .editor-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin: 12px 0 24px; }
+  .question-editor button { min-height: 44px; padding: 10px 16px; background: var(--accent-deep); color: white; border-radius: 5px; white-space: normal; }
+  .question-editor button:disabled { opacity: .5; }
+  .question-editor .errorlist { color: #a33127; padding-left: 20px; }
+  .question-editor .helptext { color: var(--muted); font-size: 13px; }
+</style>
+<main class="question-editor">
+  <a href="{{ return_url }}">Voltar às questões do componente</a>
+  <h1>Editar e reenviar questão {{ questao.pk }}</h1>
+  <p>Status atual: <strong>{{ questao.get_status_display }}</strong></p>
+  {% include "pre_auditoria/partials/data_envio.html" %}
+  <p class="editor-note">Você pode corrigir a identificação, o componente, o tipo, o destino, os textos, a imagem, as alternativas, o gabarito e a justificativa. Ao reenviar, a questão ficará <strong>Pendente</strong> para avaliação humana, com uma nova verificação estrutural. Os pareceres anteriores e a data original de envio serão preservados.</p>
+  {% if erro_edicao %}<p class="notice error" role="alert">{{ erro_edicao }}</p>{% endif %}
+  <details {% if questao.status == "REPROVADA" or questao.status == "APROVADA_SUGESTOES" %}open{% endif %}>
+    <summary>Pareceres e orientações anteriores</summary>
+    {% for parecer in pareceres %}<article><p><strong>{{ parecer.get_acao_display }} · {{ parecer.criada_em|date:"d/m/Y H:i" }}</strong></p><p>{{ parecer.justificativa|feedback_pedagogico|linebreaksbr }}</p></article>{% empty %}<p>Nenhum parecer registrado.</p>{% endfor %}
+    {% if questao.comentario_validacao %}<p><strong>Observação registrada na questão:</strong> {{ questao.comentario_validacao|feedback_pedagogico|linebreaksbr }}</p>{% endif %}
+  </details>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}<input type="hidden" name="edicao_token" value="{{ edicao_token }}">
+    {{ form.non_field_errors }}
+    {% for field in form %}{% if field.name != "confirmar_reenvio" %}
+      <div class="editor-field">{{ field.label_tag }} {{ field }} {{ field.errors }}{% if field.help_text %}<p class="helptext">{{ field.help_text }}</p>{% endif %}</div>
+    {% endif %}{% endfor %}
+    <fieldset><legend>Alternativas, afirmativas e gabarito</legend>
+      <p>Resposta única: marque uma alternativa correta e mantenha a quantidade exigida pelo componente. Resposta múltipla: preencha de 3 a 5 afirmativas, com pelo menos uma verdadeira e uma falsa. Para reduzir a quantidade, marque “Remover”. Campos extras vazios serão ignorados.</p>
+      <details><summary>Usar as cinco alternativas padrão de asserção-razão</summary>
+        <p>Asserção-razão exige as opções padrão A a E, uma resposta correta e as duas proposições.</p>
+        <label for="assertion-key">Gabarito da asserção-razão</label>
+        <select id="assertion-key"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option><option value="4">E</option></select>
+        <button id="fill-assertion" type="button">Substituir pelas cinco alternativas padrão</button>
+      </details>
+      {{ formset.management_form }}{{ formset.non_form_errors }}
+      {% for alternative in formset %}
+        <div class="alternative-editor">
+          {{ alternative.id }}{{ alternative.non_field_errors }}
+          <label for="{{ alternative.texto.id_for_label }}">Alternativa ou afirmativa {{ forloop.counter }}</label>
+          {{ alternative.texto }}{{ alternative.texto.errors }}
+          <label class="editor-check" for="{{ alternative.eh_correta.id_for_label }}">{{ alternative.eh_correta }} Correta / verdadeira</label>
+          <label class="editor-check" for="{{ alternative.DELETE.id_for_label }}">{{ alternative.DELETE }} Remover</label>
+          {{ alternative.eh_correta.errors }}{{ alternative.id.errors }}{{ alternative.DELETE.errors }}
+        </div>
+      {% endfor %}
+    </fieldset>
+    <label class="editor-check" for="{{ form.confirmar_reenvio.id_for_label }}">{{ form.confirmar_reenvio }} {{ form.confirmar_reenvio.label }}</label>{{ form.confirmar_reenvio.errors }}
+    <div class="editor-actions"><button type="submit" {% if bloqueada %}disabled{% endif %}>SALVAR E REENVIAR PARA ANÁLISE</button><a href="{{ return_url }}">Cancelar</a>{% if bloqueada %}<a href="{{ request.get_full_path }}" target="_blank" rel="noopener">Abrir a versão atual em outra aba</a>{% endif %}</div>
+    {% if form.errors or formset.errors %}<p role="alert">Revise os campos indicados. Seus textos foram mantidos. Se anexou uma nova imagem, selecione o arquivo novamente antes de reenviar.</p>{% endif %}
+  </form>
+</main>
+{{ assertion_answers|json_script:"assertion-answers" }}
+<script>
+document.getElementById('fill-assertion').addEventListener('click', () => {
+  if (!window.confirm('Substituir os textos das alternativas e o gabarito pelos valores padrão de asserção-razão?')) return;
+  const answers = JSON.parse(document.getElementById('assertion-answers').textContent);
+  const key = Number(document.getElementById('assertion-key').value);
+  answers.forEach((text, index) => {
+    document.getElementById(`id_alternativas-${index}-texto`).value = text;
+    document.getElementById(`id_alternativas-${index}-eh_correta`).checked = index === key;
+    document.getElementById(`id_alternativas-${index}-DELETE`).checked = false;
+  });
+});
+</script>
+{% endblock %}

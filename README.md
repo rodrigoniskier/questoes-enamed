@@ -30,6 +30,10 @@ Testes usam banco em memória, e-mail simulado e IA simulada. Nenhuma geração 
 
 ## Implantação no PythonAnywhere
 
+Atualização de 03/11/2026 — **Edição completa e reenvio:** em `/app/submeter/visualizar/?componente=<id>`, cada questão tem a ação **EDITAR E REENVIAR** para administradores com permissão de alterar questões. O editor permite corrigir identificação do professor, componente ativo do mesmo semestre, tipo, destino, textos, imagem, alternativas, gabarito e justificativa. Pareceres anteriores ficam disponíveis para consulta, inclusive quando a questão precisa de revisões ou foi aprovada com sugestões.
+
+Ao confirmar **SALVAR E REENVIAR PARA ANÁLISE**, a mesma questão retorna a **Pendente**, recebe uma nova pré-auditoria estrutural e aguarda decisão humana. A data original e o histórico são preservados, e os links antigos de correção expiram. Não há chamada paga de IA nem envio de e-mail nesse reenvio. Repetições não duplicam registros; alterações concorrentes bloqueiam sobrescritas e mantêm os textos do formulário. Esta etapa não acrescenta migrações ou dependências, mas a atualização da data de envio abaixo exige a migração `0018`. Um único pull e a execução do script de deploy abaixo aplicam os dois ajustes.
+
 Atualização de 03/11/2026: **Data de envio** na listagem (com ordenação e filtro) e edição do Django Admin, nos cartões e nos detalhes da pré-auditoria, em `dd/mm/aaaa hh:mm`, no fuso local da aplicação. A migração `questoes.0018` adiciona o registro automático para todas as novas questões, inclusive lotes e importações. Edições e decisões preservam a data original. Para cópias entre componentes, a data corresponde à entrada da cópia no destino.
 
 A migração recupera datas antigas dos recibos de submissão vinculados e dos registros de importação das cópias. Questões sem esses registros exibem **Não registrada**; a data da atualização não é usada como data de envio. Lotes antigos podem ter recibo apenas da última questão, portanto a data das demais não é estimada. Esta atualização exige `migrate` antes de recarregar a aplicação; use o script abaixo, que faz backup e verifica a preservação dos registros.
