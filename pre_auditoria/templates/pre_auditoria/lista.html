@@ -82,6 +82,7 @@
             <p class="eyebrow">QUESTÃO {{ question.pk }} · {{ question.get_tipo_questao_display }}</p>
             <h2>{{ question.componente.nome }}</h2>
             <p>{{ question.componente.periodo.semestre }} · {{ question.componente.periodo }}</p>
+            {% include "pre_auditoria/partials/data_envio.html" with questao=question %}
           </div>
           <div class="audit-card-selectors">
             <label><input form="audit-batch" type="checkbox" name="questoes" value="{{ question.pk }}"> Selecionar questão {{ question.pk }}</label>

@@ -7,6 +7,7 @@
     <p class="eyebrow">QUESTÃO {{ questao.pk }} · {{ questao.get_tipo_questao_display }}</p>
     <h1>{{ questao.componente.nome }}</h1>
     <p>{{ questao.componente.periodo.semestre }} · {{ questao.componente.periodo }} · Status oficial: <strong>{{ questao.get_status_display }}</strong></p>
+    {% include "pre_auditoria/partials/data_envio.html" with questao=questao %}
   </header>
   <div class="audit-detail-grid">
     <div>

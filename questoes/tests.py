@@ -94,11 +94,16 @@ class SubmissionTests(TestCase):
 
     def test_replayed_post_creates_only_one_question(self):
         data = self.payload()
+        data["enviada_em"] = "2000-01-01T00:00:00Z"
         self.client.post(self.form_url(), data)
+        submitted = Questao.objects.get().enviada_em
+        self.assertIsNotNone(submitted)
+        self.assertNotEqual(submitted.year, 2000)
         self.client.post(self.form_url(), data)
         self.assertEqual(Questao.objects.count(), 1)
         self.assertEqual(Alternativa.objects.count(), 5)
         self.assertEqual(SubmissionReceipt.objects.count(), 1)
+        self.assertEqual(Questao.objects.get().enviada_em, submitted)
 
     def test_deleted_question_cannot_be_recreated_by_replayed_post(self):
         for action in ("finish", "same_style", "other_style"):
