@@ -15,6 +15,60 @@ from questoes.submission import ASSERTION_ANSWERS
 
 @skipUnless(os.environ.get("RUN_BROWSER_TESTS") == "1", "Habilite RUN_BROWSER_TESTS=1 para Chromium")
 class BrowserPreAuditoriaTests(StaticLiveServerTestCase):
+    def test_submission_date_is_read_only_in_admin_on_desktop_and_mobile(self):
+        from datetime import datetime, timezone
+
+        from playwright.sync_api import sync_playwright
+
+        semester = Semestre.objects.create(nome="2026.2")
+        period = Periodo.objects.create(nome="2º Período", semestre=semester)
+        component = ComponenteCurricular.objects.create(nome="Clínica", periodo=period)
+        question = Questao.objects.create(
+            componente=component, enunciado="Questão sintética", justificativa="Justificativa sintética"
+        )
+        Questao.objects.filter(pk=question.pk).update(
+            enviada_em=datetime(2026, 11, 4, 1, 5, tzinfo=timezone.utc)
+        )
+        reviewer = get_user_model().objects.create_superuser("admin-datas", "admin@example.com", "teste")
+        self.client.force_login(reviewer)
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                headless=True, executable_path=os.environ.get("BROWSER_EXECUTABLE") or None
+            )
+            page = browser.new_page()
+            page.context.add_cookies(
+                [
+                    {
+                        "name": "sessionid",
+                        "value": self.client.cookies["sessionid"].value,
+                        "url": self.live_server_url,
+                    }
+                ]
+            )
+            for name, route in (
+                ("lista", reverse("admin:questoes_questao_changelist")),
+                ("edicao", reverse("admin:questoes_questao_change", args=[question.pk])),
+            ):
+                for width, height in ((1440, 1100), (390, 844)):
+                    page.set_viewport_size({"width": width, "height": height})
+                    page.goto(self.live_server_url + route)
+                    page.wait_for_function("""() => {
+                        const sidebar = document.querySelector('.main-sidebar').getBoundingClientRect();
+                        const content = document.querySelector('.content-wrapper').getBoundingClientRect();
+                        return innerWidth < 768 ? sidebar.right <= 1 : content.left >= sidebar.right - 1;
+                    }""")
+                    self.assertEqual(page.locator("input[name=enviada_em]").count(), 0)
+                    self.assertTrue(page.get_by_text("03/11/2026 22:05", exact=True).is_visible())
+                    self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                    if os.environ.get("BROWSER_SCREENSHOT"):
+                        screenshot = Path(os.environ["BROWSER_SCREENSHOT"])
+                        screenshot.parent.mkdir(parents=True, exist_ok=True)
+                        page.screenshot(
+                            path=str(screenshot.with_name(f"data-envio-admin-{name}-{width}.png")),
+                            full_page=True,
+                        )
+            browser.close()
+
     def test_text_move_and_long_institutional_decision_on_real_forms(self):
         from playwright.sync_api import expect, sync_playwright
 
@@ -116,6 +170,8 @@ class BrowserPreAuditoriaTests(StaticLiveServerTestCase):
         )
 
     def test_answers_visible_on_desktop_and_mobile_and_hidden_when_printing(self):
+        from datetime import datetime, timezone
+
         from playwright.sync_api import sync_playwright
 
         semester = Semestre.objects.create(nome="2026.2")
@@ -143,6 +199,10 @@ class BrowserPreAuditoriaTests(StaticLiveServerTestCase):
                 Alternativa.objects.create(questao=question, texto=text, eh_correta=correct)
             questions.append(question)
 
+        Questao.objects.filter(pk__in=[q.pk for q in questions]).update(
+            enviada_em=datetime(2026, 11, 4, 1, 5, tzinfo=timezone.utc)
+        )
+
         self.client.force_login(reviewer)
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(
@@ -169,6 +229,10 @@ class BrowserPreAuditoriaTests(StaticLiveServerTestCase):
                         "region", name="Gabarito e justificativas para conferência visual"
                     )
                     self.assertEqual(reviews.count(), count)
+                    dates = page.locator(".audit-submission-date")
+                    self.assertEqual(dates.count(), count)
+                    for date in dates.all():
+                        self.assertIn("03/11/2026 22:05", date.inner_text())
                     for review in reviews.all():
                         self.assertTrue(review.is_visible())
                         self.assertIn("Gabarito:", review.inner_text())

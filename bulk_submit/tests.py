@@ -62,6 +62,15 @@ class BulkImportTests(TestCase):
         self.assertEqual(self.client.post(reverse("bulk_submit_form"), data).status_code, 302)
         self.assertEqual(Questao.objects.count(), 1)
 
+    def test_every_question_in_batch_records_its_submission_date(self):
+        data = self.payload()
+        items = json.loads(data["arquivo_backup"].read())
+        items.append({**items[0], "enunciado": "Segunda questão sintética"})
+        data["arquivo_backup"] = SimpleUploadedFile("backup.json", json.dumps(items).encode())
+        self.assertEqual(self.client.post(reverse("bulk_submit_form"), data).status_code, 302)
+        self.assertEqual(Questao.objects.count(), 2)
+        self.assertEqual(Questao.objects.filter(enviada_em__isnull=False).count(), 2)
+
     def test_invalid_boolean_rolls_back_whole_batch(self):
         data = self.payload()
         items = json.loads(data["arquivo_backup"].read())

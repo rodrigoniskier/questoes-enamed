@@ -489,8 +489,16 @@ class RegrasEnamedImportacaoTests(DadosImportacao, TestCase):
             questao=self.questao, resultado="APROVADA", fingerprint="f" * 64
         )
         recibo = SubmissionReceipt.objects.create(token=uuid.uuid4(), questao=self.questao)
+        from datetime import datetime, timezone
+
+        data_origem = datetime(2026, 1, 10, 12, tzinfo=timezone.utc)
+        Questao.objects.filter(pk=self.questao.pk).update(enviada_em=data_origem)
         self.importar()
         copia = ImportacaoQuestao.objects.get(origem=self.questao).copia
+        self.assertIsNotNone(copia.enviada_em)
+        self.assertGreater(copia.enviada_em, data_origem)
+        self.questao.refresh_from_db()
+        self.assertEqual(self.questao.enviada_em, data_origem)
         self.assertFalse(copia.pareceres_pre_auditoria.exists())
         self.assertFalse(SubmissionReceipt.objects.filter(questao=copia).exists())
         parecer.refresh_from_db()

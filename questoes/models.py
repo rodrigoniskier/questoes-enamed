@@ -103,6 +103,9 @@ class Questao(models.Model):
     componente = models.ForeignKey(ComponenteCurricular, on_delete=models.CASCADE, related_name="questoes")
     tipo_questao = models.CharField(max_length=20, choices=TIPO_QUESTAO_CHOICES, default="RESPOSTA_UNICA")
     uso_prova = models.CharField(max_length=20, choices=USO_PROVA_CHOICES, default="INTEGRADA")
+    enviada_em = models.DateTimeField(
+        "Data de envio", auto_now_add=True, null=True, blank=True, db_index=True
+    )
 
     # Conteúdo
     texto_base = models.TextField(blank=True, null=True)

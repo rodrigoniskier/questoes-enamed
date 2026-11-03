@@ -14,6 +14,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
+from django.utils import timezone
 from django.utils.html import format_html
 
 from .avaliacao import registrar_decisao
@@ -93,6 +94,7 @@ class QuestaoAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "enunciado_curto",
+        "data_envio",
         "get_componente",
         "get_periodo",
         "get_semestre",
@@ -102,6 +104,7 @@ class QuestaoAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "status",
+        "enviada_em",
         "componente__periodo__semestre",
         "componente__periodo",
         "componente",
@@ -109,10 +112,10 @@ class QuestaoAdmin(admin.ModelAdmin):
         "uso_prova",
     )
     search_fields = ("enunciado", "texto_base", "professor_nome", "professor_email")
-    readonly_fields = ("professor_nome", "professor_email", "status", "registrar_parecer")
+    readonly_fields = ("professor_nome", "professor_email", "data_envio", "status", "registrar_parecer")
 
     fieldsets = (
-        ("Identificação do Professor", {"fields": ("professor_nome", "professor_email")}),
+        ("Identificação do Professor", {"fields": ("professor_nome", "professor_email", "data_envio")}),
         (
             "Classificação",
             {"fields": ("componente", "tipo_questao", "uso_prova", "status", "registrar_parecer")},
@@ -134,6 +137,12 @@ class QuestaoAdmin(admin.ModelAdmin):
         "definir_uso_integrada",
         "definir_uso_ambas",
     ]
+
+    @admin.display(description="Data de envio", ordering="enviada_em")
+    def data_envio(self, obj):
+        if obj.enviada_em is None:
+            return "Não registrada"
+        return timezone.localtime(obj.enviada_em).strftime("%d/%m/%Y %H:%M")
 
     @admin.action(description="💾 Exportar Backup Completo (JSON)")
     def exportar_backup_json(self, request, queryset):

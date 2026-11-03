@@ -30,6 +30,10 @@ Testes usam banco em memória, e-mail simulado e IA simulada. Nenhuma geração 
 
 ## Implantação no PythonAnywhere
 
+Atualização de 03/11/2026: **Data de envio** na listagem (com ordenação e filtro) e edição do Django Admin, nos cartões e nos detalhes da pré-auditoria, em `dd/mm/aaaa hh:mm`, no fuso local da aplicação. A migração `questoes.0018` adiciona o registro automático para todas as novas questões, inclusive lotes e importações. Edições e decisões preservam a data original. Para cópias entre componentes, a data corresponde à entrada da cópia no destino.
+
+A migração recupera datas antigas dos recibos de submissão vinculados e dos registros de importação das cópias. Questões sem esses registros exibem **Não registrada**; a data da atualização não é usada como data de envio. Lotes antigos podem ter recibo apenas da última questão, portanto a data das demais não é estimada. Esta atualização exige `migrate` antes de recarregar a aplicação; use o script abaixo, que faz backup e verifica a preservação dos registros.
+
 Atualização de 02/11/2026: [seleção, exportação em PDF e aprovação em lote](docs/PRE_AUDITORIA_PDF_LOTE.md). Esta mudança não adiciona migrações/dependências/estáticos; sobre a versão anterior já instalada, requer pull e Reload.
 
 Atualização de nomenclatura e verificação do envio automático: [Precisa de Revisões e feedback SMTP](docs/FEEDBACK_PRECISA_REVISOES.md).
