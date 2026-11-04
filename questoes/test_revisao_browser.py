@@ -1,11 +1,13 @@
 """Edição e reenvio pela navegação real, com dados exclusivamente sintéticos."""
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import skipUnless
 
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.db import close_old_connections
 from django.urls import reverse
 
 from pre_auditoria.models import DecisaoPreAuditoria
@@ -185,3 +187,84 @@ class RevisaoEnviadasBrowserTests(StaticLiveServerTestCase):
                 )
                 if stage == "historico-admin":
                     page.screenshot(path=str(screenshot.with_name(f"historico-viewport-{width}.png")))
+
+    def test_custom_multiple_prompt_manual_combinations_and_exam_cover(self):
+        from playwright.sync_api import sync_playwright
+
+        def db_call(operation):
+            def run():
+                close_old_connections()
+                try:
+                    return operation()
+                finally:
+                    close_old_connections()
+
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                return executor.submit(run).result()
+
+        semester = Semestre.objects.create(nome="2026.2")
+        period = Periodo.objects.create(nome="4º Período", semestre=semester)
+        component = ComponenteCurricular.objects.create(
+            nome="Clínica múltipla", periodo=period, numero_questoes_prova=1
+        )
+        user = get_user_model().objects.create_superuser("comb-browser", "comb@example.com", "teste")
+        self.client.force_login(user)
+        custom = "Analise o caso clínico e selecione as afirmativas verdadeiras."
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                headless=True, executable_path=os.environ.get("BROWSER_EXECUTABLE") or None
+            )
+            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page.context.add_cookies(
+                [
+                    {
+                        "name": "sessionid",
+                        "value": self.client.cookies["sessionid"].value,
+                        "url": self.live_server_url,
+                    }
+                ]
+            )
+            page.goto(
+                self.live_server_url + reverse("submeter_resposta_multipla") + f"?componente={component.pk}"
+            )
+            prompt = page.get_by_label("Enunciado", exact=True)
+            self.assertEqual(
+                prompt.input_value(), "Considerando o texto apresentado, avalie as afirmações a seguir."
+            )
+            prompt.fill(custom)
+            page.locator('[name="professor_nome"]').fill("Docente sintético")
+            page.locator('[name="professor_email"]').fill("docente@example.com")
+            page.get_by_label("Texto-base", exact=True).fill("Contexto clínico sintético.")
+            page.get_by_label("Justificativa", exact=True).fill(
+                "I e II são verdadeiras; III é falsa, conforme o caso."
+            )
+            for i in range(3):
+                page.locator(f"#id_alternativas-{i}-texto").fill(f"Afirmativa {i + 1}")
+                if i < 2:
+                    page.locator(f"#id_alternativas-{i}-eh_correta").check()
+            for checkbox in page.locator(".checklist-item").all():
+                checkbox.check()
+            self.check_layout(page, "formulario-multipla")
+            page.get_by_role("button", name="Enviar e concluir", exact=True).click()
+            page.wait_for_url(self.live_server_url + reverse("submeter_selecao"))
+            question = db_call(lambda: Questao.objects.get(componente=component))
+            self.assertEqual(question.enunciado, custom)
+            page.goto(self.live_server_url + reverse("admin:questoes_questao_change", args=[question.pk]))
+            page.get_by_role("tab", name="Alternativas", exact=True).click()
+            page.locator("#id_alternativas-0-texto").fill("Afirmativa I revista pela gestão")
+            page.get_by_role("tab", name="Combinações A–D", exact=True).click()
+            page.get_by_role("button", name="Carregar combinações atuais para editar").click()
+            field = page.get_by_label("Combinações finais A–D", exact=True)
+            self.assertTrue(field.input_value())
+            field.fill("A) I, II\nB) I, III\nC) II\nD) III")
+            self.check_layout(page, "combinacoes-admin")
+            page.locator('[name="_continue"]').click()
+            page.wait_for_load_state()
+            db_call(question.refresh_from_db)
+            self.assertEqual(question.combinacoes_personalizadas, [[1, 2], [1, 3], [2], [3]])
+            db_call(lambda: Questao.objects.filter(pk=question.pk).update(status="APROVADA"))
+            page.goto(self.live_server_url + reverse("prova_gerada") + f"?componentes={component.pk}")
+            self.assertEqual(page.locator(".capa-semestre").inner_text(), "Semestre 2026.2")
+            self.assertEqual(page.locator(".enunciado").inner_text(), custom)
+            self.assertIn("Afirmativa I revista pela gestão", page.locator("body").inner_text())
+            browser.close()

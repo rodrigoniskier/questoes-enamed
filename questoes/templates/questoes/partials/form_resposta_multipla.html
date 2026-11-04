@@ -17,11 +17,16 @@
     </div>
 
     <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
+        <label for="id_enunciado" class="font-semibold block mb-2 text-gray-900 dark:text-white">Enunciado</label>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">O enunciado padrão já está preenchido. Você pode adaptá-lo ao comando da questão; esse texto aparecerá na prova.</p>
+        {{ questao_form.enunciado }}
+    </div>
+
+    <div class="glass-effect rounded-2xl p-6 shadow-xl border border-white/20">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div class="lg:col-span-2 space-y-4">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center"><div class="w-6 h-6 bg-pink-500 rounded-full flex items-center justify-center text-white font-bold text-xs mr-3">B</div>Afirmativas (I, II, III...)</h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Preencha as afirmativas abaixo e marque as que forem corretas. O enunciado padrão ("Avalie as afirmações...") e as alternativas finais (A, B, C...) serão gerados automaticamente.</p>
-                <input type="hidden" name="enunciado" value="Considerando o texto apresentado, avalie as afirmações a seguir.">
+                <p class="text-sm text-gray-600 dark:text-gray-400">Preencha as afirmativas abaixo e marque as que forem corretas. As quatro alternativas finais (A, B, C e D) serão combinadas automaticamente a partir dessas marcações.</p>
                 <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
                     {{ alternativa_formset.management_form }}
                     <div class="space-y-4">

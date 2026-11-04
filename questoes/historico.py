@@ -1,6 +1,7 @@
 """Comparações legíveis a partir das versões já preservadas na pré-auditoria."""
 
 from .models import ComponenteCurricular, Questao
+from .multiple_choice import linhas_combinacoes
 
 FIELDS = (
     ("professor_nome", "Nome do professor"),
@@ -13,6 +14,7 @@ FIELDS = (
     ("enunciado", "Enunciado / Proposição I"),
     ("proposicao_dois", "Proposição II"),
     ("justificativa", "Justificativa"),
+    ("combinacoes_personalizadas", "Combinações finais (A–D)"),
     ("status", "Situação da questão"),
     ("comentario_validacao", "Feedback de validação"),
 )
@@ -27,6 +29,8 @@ def orientacao_anterior(question):
 
 
 def _display(field, value, snapshot, components):
+    if field == "combinacoes_personalizadas":
+        return linhas_combinacoes(value) if value else "Geradas automaticamente"
     if field == "componente_id":
         return snapshot.get("componente_nome") or components.get(value, f"Componente {value}")
     choices = {
@@ -46,6 +50,9 @@ def comparar_versoes(before, after, components=None):
     components = components or {}
     rows = []
     for field, label in FIELDS:
+        if field == "combinacoes_personalizadas" and (field in before or field in after):
+            before = {field: [], **before}
+            after = {field: [], **after}
         if field not in before or field not in after or (before[field] or "") == (after[field] or ""):
             continue
         old = _display(field, before[field], before, components)

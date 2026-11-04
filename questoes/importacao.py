@@ -125,6 +125,7 @@ def importar_questoes(*, usuario, semestre_id, doador_id, receptor_id, questao_i
                     professor_nome=origem.professor_nome,
                     professor_email=origem.professor_email,
                     tipo_questao=origem.tipo_questao,
+                    combinacoes_personalizadas=origem.combinacoes_personalizadas,
                     uso_prova=origem.uso_prova,
                     proposicao_dois=origem.proposicao_dois,
                     comentario_validacao=None,

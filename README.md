@@ -30,6 +30,16 @@ Testes usam banco em memória, e-mail simulado e IA simulada. Nenhuma geração 
 
 ## Implantação no PythonAnywhere
 
+Atualização de 04/11/2026 — **Resposta múltipla e semestre na capa:** o enunciado de novas questões de resposta múltipla aparece preenchido com o padrão, pode ser editado pelo professor e é preservado na prova e nas prévias. No admin, a aba **Alternativas** permite revisar as afirmativas; a nova aba **Combinações A–D** permite carregar e editar as quatro combinações finais. Deixar o campo vazio reativa a geração automática. O servidor valida as combinações contra as afirmativas salvas na mesma operação, exige quatro opções distintas, exatamente uma correta e cada afirmativa presente em duas opções e ausente em duas. Essa regra também vale para a geração automática e elimina o atalho de identificar uma única alternativa conhecendo apenas uma afirmativa. As combinações personalizadas entram no histórico e acompanham as cópias entre componentes; as letras podem mudar na prova para equilibrar o gabarito. Se uma revisão das afirmativas invalidar uma personalização anterior, o editor de reenvio volta à geração automática e registra essa mudança. A capa informa o semestre dos componentes selecionados, logo abaixo do período.
+
+Esta atualização adiciona somente a migração `questoes.0019_questao_combinacoes_personalizadas`, necessária para guardar as combinações editadas. Ela preserva o conteúdo e as alternativas existentes, mantendo o modo automático como padrão. Não há novas dependências. **Após o pull, aplique a migração antes de recarregar o site**, usando o procedimento de backup e atualização já existente, com o ambiente `myenv` ativo:
+
+```sh
+git pull --ff-only origin main && bash ops/deploy_pre_auditoria.sh
+```
+
+Depois, clique em **Reload** na aba Web do PythonAnywhere. Esse mesmo pull inclui o popup e a aba de histórico descritos abaixo; não é necessário fazer duas atualizações separadas.
+
 Atualização de 04/11/2026 — **Escolha de nova questão ou reenvio e histórico no admin:** ao avançar na seleção de período, componente e tipo, um popup oferece **Nova questão** (abre o formulário selecionado) e **Reenvio de questão ajustada** (abre o banco daquele componente, com a ação de editar e reenviar conforme as permissões existentes). Cancelar ou pressionar Escape mantém as seleções.
 
 Na edição de uma questão no Django Admin, a aba **Histórico de Alterações** exibe data, responsável, orientação recebida e comparação dos campos antes/depois, incluindo alternativas e gabarito. Também permite comparar a primeira versão disponível com a última versão registrada. Versões antigas já preservadas são aproveitadas; alterações que nunca tiveram histórico não são reconstruídas. Novos reenvios preservam a orientação e registram inclusive a ausência de mudanças. O histórico é somente leitura e respeita o acesso ao admin da questão. Não há novas migrações, dependências ou arquivos estáticos nesta atualização: sobre a versão de 03/11 já instalada com a migração `0018`, basta `git pull --ff-only origin main` e **Reload** na aba Web do PythonAnywhere. Não é necessário executar o script de deploy completo para estes dois ajustes.

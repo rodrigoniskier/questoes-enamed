@@ -85,6 +85,11 @@ class CapaProvaBrowserTests(StaticLiveServerTestCase):
                     )
                 )
                 self.assertIn("4º PERÍODO", capa.locator(".capa-periodo").inner_text())
+                self.assertEqual(capa.locator(".capa-semestre").inner_text(), "Semestre 2026.2")
+                self.assertGreater(
+                    capa.locator(".capa-semestre").bounding_box()["y"],
+                    capa.locator(".capa-periodo").bounding_box()["y"],
+                )
                 self.assertEqual(
                     capa.locator(".capa-disciplinas p").all_text_contents()[1:],
                     [f"{c.nome} ( \xa0 )" for c in selecionados],

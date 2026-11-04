@@ -25,6 +25,13 @@ from .historico import contexto_historico
 # Modelos e utils
 from .importacao_admin import importar_view
 from .models import AIPrompt, Alternativa, ComponenteCurricular, ImportacaoQuestao, Periodo, Questao, Semestre
+from .multiple_choice import (
+    gerar_alternativas_multipla_escolha,
+    interpretar_combinacoes,
+    linhas_combinacoes,
+    validar_combinacoes,
+)
+from .submission import validate_alternatives
 from .utils import avaliar_questao_com_ia
 
 
@@ -51,6 +58,24 @@ class AlternativaFormSet(BaseInlineFormSet):
                 texto = form.cleaned_data.get("texto")
                 if not texto and form.instance.pk:
                     form.cleaned_data["DELETE"] = True
+        if any(self.errors):
+            return
+        if self.instance.tipo_questao != "MULTIPLA_ESCOLHA":
+            self.instance.combinacoes_personalizadas = []
+            return
+        afirmativas = [
+            {
+                "texto": form.cleaned_data.get("texto", ""),
+                "eh_correta": form.cleaned_data.get("eh_correta", False),
+            }
+            for form in self.forms
+            if form.cleaned_data
+            and not form.cleaned_data.get("DELETE")
+            and (form.cleaned_data.get("texto") or form.cleaned_data.get("eh_correta"))
+        ]
+        validate_alternatives(afirmativas, "MULTIPLA_ESCOLHA", 5)
+        if self.instance.combinacoes_personalizadas:
+            validar_combinacoes(self.instance.combinacoes_personalizadas, afirmativas)
 
 
 class AlternativaInline(admin.TabularInline):
@@ -66,10 +91,35 @@ class AlternativaInline(admin.TabularInline):
     }
 
 
+class CombinacoesWidget(forms.Textarea):
+    template_name = "admin/questoes/questao/combinacoes_widget.html"
+
+
 class QuestaoAdminForm(forms.ModelForm):
+    combinacoes_personalizadas = forms.CharField(
+        required=False,
+        max_length=200,
+        label="Combinações finais A–D",
+        widget=CombinacoesWidget(attrs={"rows": 5, "style": "width: 100%;"}),
+        help_text="Uma combinação por linha, usando I, II, III, IV ou V separados por vírgulas. Deixe vazio para geração automática. As letras podem mudar na prova para equilibrar o gabarito; as combinações serão preservadas.",
+    )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.initial["comentario_validacao"] = texto_pedagogico(self.initial.get("comentario_validacao"))
+        if "combinacoes_personalizadas" in self.fields:
+            self.initial["combinacoes_personalizadas"] = linhas_combinacoes(
+                self.instance.combinacoes_personalizadas or []
+            )
+            if self.instance.pk and self.instance.tipo_questao == "MULTIPLA_ESCOLHA":
+                options = gerar_alternativas_multipla_escolha(self.instance)
+                if all("indices" in option for option in options):
+                    self.fields["combinacoes_personalizadas"].widget.attrs["data-combinacoes"] = (
+                        linhas_combinacoes([o["indices"] for o in options])
+                    )
+
+    def clean_combinacoes_personalizadas(self):
+        return interpretar_combinacoes(self.cleaned_data["combinacoes_personalizadas"])
 
     class Meta:
         model = Questao
@@ -121,6 +171,7 @@ class QuestaoAdmin(admin.ModelAdmin):
         "status",
         "registrar_parecer",
         "historico_alteracoes",
+        "combinacoes_atuais",
     )
 
     fieldsets = (
@@ -150,6 +201,30 @@ class QuestaoAdmin(admin.ModelAdmin):
         "definir_uso_integrada",
         "definir_uso_ambas",
     ]
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = list(super().get_fieldsets(request, obj))
+        if obj and obj.tipo_questao == "MULTIPLA_ESCOLHA":
+            fieldsets.insert(
+                -1,
+                (
+                    "Combinações A–D",
+                    {
+                        "fields": ("combinacoes_atuais", "combinacoes_personalizadas"),
+                        "classes": ("combinacoes-tab",),
+                    },
+                ),
+            )
+        return fieldsets
+
+    @admin.display(description="Combinações utilizadas")
+    def combinacoes_atuais(self, obj):
+        return render_to_string(
+            "admin/questoes/questao/combinacoes_preview.html",
+            {
+                "opcoes": gerar_alternativas_multipla_escolha(obj),
+            },
+        )
 
     @admin.display(description="Data de envio", ordering="enviada_em")
     def data_envio(self, obj):
@@ -182,6 +257,7 @@ class QuestaoAdmin(admin.ModelAdmin):
                 "texto_base": q.texto_base,
                 "enunciado": q.enunciado,
                 "justificativa": q.justificativa,
+                "combinacoes_personalizadas": q.combinacoes_personalizadas,
                 "comentario_validacao": q.comentario_validacao,
                 "alternativas": [
                     {"texto": alt.texto, "correta": alt.eh_correta} for alt in q.alternativas.all()

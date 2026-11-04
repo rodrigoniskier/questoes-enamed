@@ -323,6 +323,7 @@
             let generating = false;
 
             const tipoSelecionado = "{{ tipo_questao }}";
+            const enunciadoPadraoMultipla = "{{ enunciado_padrao_multipla|escapejs }}";
             const numAlternativas = {{ num_alternativas }};
             // Read CSRF at each request: another tab/login may have rotated the cookie.
             form.addEventListener('submit', () => { form.elements['csrfmiddlewaretoken'].value = currentCsrfToken(); });
@@ -428,7 +429,7 @@
                 if (tipoSelecionado === 'RESPOSTA_UNICA') {
                     camposObrigatorios = camposObrigatorios.concat(['texto_base', 'enunciado', 'justificativa']);
                 } else if (tipoSelecionado === 'MULTIPLA_ESCOLHA') {
-                    camposObrigatorios = camposObrigatorios.concat(['texto_base', 'enunciado', 'proposicao_dois', 'justificativa']);
+                    camposObrigatorios = camposObrigatorios.concat(['texto_base', 'enunciado', 'justificativa']);
                 } else if (tipoSelecionado === 'ASSERCAO_RAZAO') {
                     camposObrigatorios = camposObrigatorios.concat(['texto_base', 'enunciado', 'proposicao_dois', 'justificativa']);
                 }
@@ -518,9 +519,11 @@
                 const promptDoProfessor = recover ? lastGenerationPayload.prompt_professor : iaPromptText.value;
                 const apiUrl = iaGenerateButton.dataset.apiUrl;
                 if (!promptDoProfessor.trim()) { alert('Informe o tema ou comando para gerar o rascunho.'); return; }
-                const contentNames = tipoSelecionado === 'MULTIPLA_ESCOLHA'
-                    ? ['texto_base', 'justificativa'] : ['texto_base', 'enunciado', 'proposicao_dois', 'justificativa'];
-                const hasContent = contentNames.some(name => form.elements[name]?.value.trim()) || Array.from(form.querySelectorAll('[name$="-texto"]')).some(el => el.value.trim());
+                const contentNames = ['texto_base', 'enunciado', 'proposicao_dois', 'justificativa'];
+                const hasContent = contentNames.some(name => {
+                    const value = form.elements[name]?.value.trim();
+                    return value && !(name === 'enunciado' && tipoSelecionado === 'MULTIPLA_ESCOLHA' && value === enunciadoPadraoMultipla);
+                }) || Array.from(form.querySelectorAll('[name$="-texto"]')).some(el => el.value.trim());
                 if (hasContent && !confirm((recover ? 'Recuperar o último rascunho' : 'Gerar um novo rascunho') + ' substituirá o conteúdo atual da questão. Continuar?')) return;
                 const controller = new AbortController();
                 const timeout = setTimeout(() => controller.abort(), 75000);

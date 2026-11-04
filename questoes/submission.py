@@ -8,6 +8,8 @@ from django.db import transaction
 
 from .models import Alternativa, ComponenteCurricular, SubmissionReceipt
 
+MULTIPLE_STATEMENT_PROMPT = "Considerando o texto apresentado, avalie as afirmações a seguir."
+
 FORM_ROUTES = {
     "RESPOSTA_UNICA": "submeter_resposta_unica",
     "MULTIPLA_ESCOLHA": "submeter_resposta_multipla",
