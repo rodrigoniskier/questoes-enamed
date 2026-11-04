@@ -701,7 +701,7 @@ def prova_gerada_view(request):
         linhas_txt = []
         for questao in questoes_selecionadas:
             texto_base = questao.texto_base.strip() if questao.texto_base else ""
-            enunciado = questao.enunciado.strip() if questao.enunciado else ""
+            enunciado = questao.enunciado_para_prova
 
             # 1. Remove TODAS as quebras de linha do texto-base e enunciado
             # Isso garante que a questão inteira fique na mesma linha
@@ -710,7 +710,10 @@ def prova_gerada_view(request):
 
             # 2. Monta o cabeçalho na mesma linha, separado por espaço e terminando com TAB
             if texto_base:
-                cabecalho = f"MC\tContexto: {texto_base} Comando: {enunciado}\t"
+                cabecalho = f"MC\tContexto: {texto_base}"
+                if enunciado:
+                    cabecalho += f" Comando: {enunciado}"
+                cabecalho += "\t"
             else:
                 cabecalho = f"MC\tComando: {enunciado}\t"
 
