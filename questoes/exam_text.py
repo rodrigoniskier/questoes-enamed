@@ -12,6 +12,17 @@ def _normalizar(texto):
     return re.sub(r"\s+", " ", texto).strip().rstrip(" .:;!?")
 
 
+def _comando_generico(comando):
+    # Aceita somente instruções genéricas completas. Complementos de tema,
+    # negação ou tarefas adicionais continuam sendo comandos personalizados.
+    return re.fullmatch(
+        r"(?:(?:considerando o|com base no) texto(?:[- ]base| apresentado)?,? )?"
+        r"(?:avalie|analise|julgue) as (?:afirmacoes|afirmativas|assertivas)"
+        r"(?: a seguir| abaixo)?",
+        comando,
+    )
+
+
 def enunciado_para_prova(questao):
     enunciado = (questao.enunciado or "").strip()
     if questao.tipo_questao != "MULTIPLA_ESCOLHA":
@@ -31,13 +42,13 @@ def enunciado_para_prova(questao):
     comando = _normalizar(enunciado)
     if comando in (ultimo_trecho, ultima_frase):
         return ""
-    if comando != _normalizar(MULTIPLE_STATEMENT_PROMPT):
+    if not _comando_generico(comando):
         return enunciado
 
     instrucao = re.compile(
         r"(?:^|[,;:]\s*)(?:avalie|analise|julgue|examine|considere|verifique)\b"
         r"[^.!?]*\b(?:afirmacoes|afirmativas|assertivas|assercoes|proposicoes|itens)\b"
-        r"|(?:^|[,;:]\s*)(?:assinale|marque|selecione|indique)\b"
+        r"|(?:^|[,;:]\s*|\be\s+)(?:assinale|marque|selecione|indique)\b"
         r"[^.!?]*\b(?:alternativa|opcao|afirmativas|afirmacoes|assertivas|itens)\b"
     )
     return "" if any(instrucao.search(trecho) for trecho in (ultimo_trecho, ultima_frase)) else enunciado
