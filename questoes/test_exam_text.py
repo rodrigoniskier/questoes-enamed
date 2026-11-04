@@ -13,6 +13,12 @@ from django.urls import reverse
 from .models import Alternativa, ComponenteCurricular, Periodo, Questao, Semestre
 from .submission import MULTIPLE_STATEMENT_PROMPT
 
+COMANDO_DA_IMAGEM = (
+    "Considerando o contexto clínico-epidemiológico e as bases moleculares e celulares "
+    "da patologia descrita, analises as afirmativas e marque a alternativa que informa apenas as corretas."
+)
+ENUNCIADO_DA_IMAGEM = "Considerando o texto-base, analise as afirmativas a seguir:"
+
 
 class ExamPromptTests(SimpleTestCase):
     def question(self, texto_base, enunciado=MULTIPLE_STATEMENT_PROMPT, tipo="MULTIPLA_ESCOLHA"):
@@ -40,6 +46,42 @@ class ExamPromptTests(SimpleTestCase):
             "  Considerando o texto apresentado,   avalie as afirmações a seguir.  ",
         )
         self.assertEqual(questao.enunciado_para_prova, "")
+
+    def test_reported_image_omits_generic_variant_after_existing_compound_command(self):
+        questao = self.question(f"Contexto clínico do lactente. {COMANDO_DA_IMAGEM}", ENUNCIADO_DA_IMAGEM)
+        self.assertEqual(questao.enunciado_para_prova, "")
+
+    def test_compound_selection_command_also_suppresses_current_default(self):
+        self.assertEqual(self.question(f"Contexto. {COMANDO_DA_IMAGEM}").enunciado_para_prova, "")
+
+    def test_generic_variants_are_omitted_only_when_base_has_instruction(self):
+        for comando in (
+            ENUNCIADO_DA_IMAGEM,
+            "Considerando o texto, avalie as afirmações a seguir.",
+            "Considerando o texto base, analise as afirmativas abaixo.",
+            "Analise as afirmativas a seguir:",
+            "Com base no texto apresentado, julgue as assertivas abaixo.",
+        ):
+            with self.subTest(comando=comando):
+                self.assertEqual(
+                    self.question("Contexto. Avalie as afirmativas a seguir.", comando).enunciado_para_prova,
+                    "",
+                )
+                self.assertEqual(
+                    self.question("Contexto sem comando.", comando).enunciado_para_prova, comando
+                )
+
+    def test_custom_scope_and_negative_instructions_are_not_treated_as_generic(self):
+        for comando in (
+            "Considerando o texto-base, analise as afirmativas incorretas a seguir:",
+            "Considerando o texto-base, analise apenas as afirmativas sobre imunidade celular.",
+            "Considerando o contexto clínico, analise as afirmativas a seguir:",
+            "Analise as afirmativas a seguir e justifique cada resposta.",
+        ):
+            with self.subTest(comando=comando):
+                self.assertEqual(
+                    self.question(f"Contexto. {COMANDO_DA_IMAGEM}", comando).enunciado_para_prova, comando
+                )
 
     def test_wrapped_instructions_and_paragraph_without_final_period(self):
         for texto_base in (
@@ -163,6 +205,21 @@ class ExamPromptIntegrationTests(TestCase):
             with self.subTest(formato_txt=formato_txt):
                 self.assertContains(self.gerar(formato_txt=formato_txt), personalizado, count=1)
 
+    def test_reported_image_keeps_only_base_command_in_print_and_txt(self):
+        Questao.objects.filter(pk=self.questao.pk).update(
+            texto_base=f"Contexto clínico do lactente. {COMANDO_DA_IMAGEM}",
+            enunciado=ENUNCIADO_DA_IMAGEM,
+        )
+        antes = Questao.objects.values().get(pk=self.questao.pk)
+        for formato_txt in ("0", "1"):
+            with self.subTest(formato_txt=formato_txt):
+                previa = self.gerar(preflight="1", formato_txt=formato_txt)
+                self.assertEqual(previa.status_code, 200)
+                prova = self.client.get(previa.json()["url_abertura"])
+                self.assertContains(prova, COMANDO_DA_IMAGEM, count=1)
+                self.assertNotContains(prova, ENUNCIADO_DA_IMAGEM)
+        self.assertEqual(Questao.objects.values().get(pk=self.questao.pk), antes)
+
 
 @skipUnless(os.environ.get("RUN_BROWSER_TESTS") == "1", "Habilite RUN_BROWSER_TESTS=1 para Chromium")
 class ExamPromptBrowserTests(StaticLiveServerTestCase):
@@ -171,6 +228,10 @@ class ExamPromptBrowserTests(StaticLiveServerTestCase):
 
         get_user_model().objects.create_superuser("admin-comando", "admin@example.com", "teste-comando")
         questao = criar_questao()
+        Questao.objects.filter(pk=questao.pk).update(
+            texto_base=f"Contexto clínico do lactente. {COMANDO_DA_IMAGEM}",
+            enunciado=ENUNCIADO_DA_IMAGEM,
+        )
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(
                 headless=True, executable_path=os.environ.get("BROWSER_EXECUTABLE") or None
@@ -188,8 +249,9 @@ class ExamPromptBrowserTests(StaticLiveServerTestCase):
                 for media in ("screen", "print"):
                     page.emulate_media(media=media)
                     item = page.locator(".questao")
-                    self.assertEqual(item.inner_text().count("Analise as afirmativas a seguir:"), 1)
+                    self.assertEqual(item.inner_text().count(COMANDO_DA_IMAGEM), 1)
                     self.assertNotIn(MULTIPLE_STATEMENT_PROMPT, item.inner_text())
+                    self.assertNotIn(ENUNCIADO_DA_IMAGEM, item.inner_text())
                     self.assertEqual(item.locator(".enunciado").count(), 0)
                     self.assertEqual(item.locator(".afirmativas p").count(), 3)
                     self.assertEqual(item.locator(".alternativas p").count(), 4)
