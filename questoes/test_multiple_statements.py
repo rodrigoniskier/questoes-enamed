@@ -9,7 +9,7 @@ from django.urls import reverse
 
 from bulk_submit.utils import validate_import
 from questoes.models import ComponenteCurricular, Periodo, Questao, Semestre
-from questoes.submission import new_submission_token
+from questoes.submission import MULTIPLE_STATEMENT_PROMPT, new_submission_token
 from questoes.utils import gerar_questao_com_ia
 from questoes.views import gerar_alternativas_multipla_escolha
 
@@ -61,6 +61,20 @@ class MultipleStatementTests(TestCase):
         self.assertContains(response, 'id="id_alternativas-4-texto"')
         single = self.client.get(reverse("submeter_resposta_unica") + f"?componente={self.component.pk}")
         self.assertEqual(single.context["alternativa_formset"].total_form_count(), 4)
+
+    def test_prompt_is_prefilled_editable_required_and_preserved_when_another_field_fails(self):
+        response = self.client.get(self.form_url())
+        self.assertEqual(response.context["questao_form"]["enunciado"].value(), MULTIPLE_STATEMENT_PROMPT)
+        self.assertContains(response, 'id="id_enunciado"')
+        custom = "Considere o caso e selecione todas as afirmativas verdadeiras."
+        data = self.submission(3)
+        data["enunciado"] = custom
+        response = self.client.post(self.form_url(), {**data, "professor_email": "inválido"})
+        self.assertEqual(response.context["questao_form"]["enunciado"].value(), custom)
+        self.assertEqual(self.client.post(self.form_url(), {**data, "enunciado": ""}).status_code, 200)
+        self.assertFalse(Questao.objects.exists())
+        self.assertEqual(self.client.post(self.form_url(), data).status_code, 302)
+        self.assertEqual(Questao.objects.get().enunciado, custom)
 
     def test_three_four_five_statements_save_and_generate_four_unique_options(self):
         for count in (3, 4, 5):

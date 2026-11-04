@@ -141,7 +141,7 @@ class BatchSelectionTests(TestCase):
         for question in response.context["questoes"]:
             self.assertEqual(question.gabarito_preview, displayed[question.pk].gabarito_preview)
         self.assertContains(response, "PORQUE")
-        self.assertContains(response, "Considerando o texto apresentado")
+        self.assertContains(response, multiple.enunciado)
 
     def test_invalid_empty_oversized_or_outside_page_selection_is_rejected(self):
         selection = self.selection()

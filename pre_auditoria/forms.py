@@ -4,6 +4,7 @@ from django.forms.models import BaseInlineFormSet
 
 from questoes.avaliacao import MAX_PARECER
 from questoes.models import Alternativa, Questao
+from questoes.multiple_choice import validar_combinacoes
 from questoes.submission import alternative_count, validate_alternatives
 
 
@@ -14,6 +15,10 @@ class QuestaoRevisaoForm(forms.ModelForm):
         self.fields[
             "texto_base"
         ].help_text = "Pode ficar vazio ao reorganizar o conteúdo. A estrutura será reavaliada após salvar."
+        if self.instance.combinacoes_personalizadas:
+            self.fields[
+                "tipo_questao"
+            ].help_text = "Se as alterações nas afirmativas invalidarem as combinações personalizadas, a geração automática será reativada ao salvar."
 
     def clean(self):
         cleaned = super().clean()
@@ -63,6 +68,19 @@ class CorrecaoProfessorForm(QuestaoRevisaoForm):
 
 
 class RevisaoAlternativasFormSet(BaseInlineFormSet):
+    def save(self, commit=True):
+        saved = super().save(commit=commit)
+        if commit and self.instance.combinacoes_personalizadas:
+            afirmativas = list(self.instance.alternativas.order_by("pk").values("eh_correta"))
+            try:
+                if self.instance.tipo_questao != "MULTIPLA_ESCOLHA":
+                    raise forms.ValidationError("O tipo da questão mudou.")
+                validar_combinacoes(self.instance.combinacoes_personalizadas, afirmativas)
+            except forms.ValidationError:
+                self.instance.combinacoes_personalizadas = []
+                self.instance.save(update_fields=["combinacoes_personalizadas"])
+        return saved
+
     def clean(self):
         super().clean()
         if any(self.errors):

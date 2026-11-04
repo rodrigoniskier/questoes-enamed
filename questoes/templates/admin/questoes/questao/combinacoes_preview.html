@@ -1,0 +1,8 @@
+<style>
+  .combinacoes-tab .row > label, .combinacoes-tab .col-sm-7 { flex: 0 0 100%; max-width: 100%; }
+  .combinacoes-tab .card-body { padding: 20px !important; }
+  .combinacoes-tab button { max-width: 100%; white-space: normal; }
+</style>
+<ol style="list-style-type: upper-alpha; padding-left: 24px; overflow-wrap: anywhere;">
+{% for opcao in opcoes %}<li style="margin-bottom: 8px;">{{ opcao.texto }}{% if opcao.eh_correta %} <strong>(Gabarito)</strong>{% endif %}</li>{% endfor %}
+</ol>

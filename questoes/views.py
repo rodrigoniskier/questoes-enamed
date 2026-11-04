@@ -7,7 +7,6 @@ import math
 import random
 import re
 import uuid
-from itertools import combinations
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -31,9 +30,11 @@ from .answer_layout import LayoutBalanceError, montar_layout_balanceado, resumo_
 from .answer_sheet import codigo_prova, linhas_do_gabarito, paginas_do_cartao
 from .forms import AlternativaForm, QuestaoForm
 from .models import ComponenteCurricular, Periodo, Questao, Semestre
+from .multiple_choice import gerar_alternativas_multipla_escolha
 from .submission import (
     ASSERTION_ANSWERS,
     FORM_ROUTES,
+    MULTIPLE_STATEMENT_PROMPT,
     allowed_styles,
     alternative_count,
     get_header,
@@ -47,100 +48,6 @@ from .submission import (
 from .utils import gerar_questao_com_ia
 
 logger = logging.getLogger(__name__)
-
-
-# --- FUNÇÃO AUXILIAR (ATUALIZADA: BALANCEAMENTO E 4 ALTERNATIVAS) ---
-def gerar_alternativas_multipla_escolha(questao):
-    """
-    Gera exatas 4 alternativas finais para uma questão de Resposta Múltipla.
-    REGRAS APLICADAS:
-    1. Exatamente 4 alternativas (1 correta e 3 falsas).
-    2. Sem "Nenhuma das afirmativas está correta".
-    3. Dimensionamento balanceado da frequência de cada afirmativa.
-    4. Ordem crescente na sequência lógica (I, II e III).
-    """
-    afirmativas = list(questao.alternativas.all().order_by("id"))
-    indices_romanos = {i + 1: r for i, r in enumerate(["I", "II", "III", "IV", "V", "VI", "VII"])}
-
-    # 1. Identifica os índices da resposta correta na base de dados
-    indices_corretos = tuple(sorted([i + 1 for i, af in enumerate(afirmativas) if af.eh_correta]))
-
-    def formatar_texto(indices):
-        # Como a opção vazia foi removida, garantimos que indices sempre tem elementos
-        romanos = [indices_romanos[i] for i in sorted(indices)]  # Garante ordem crescente
-        if len(romanos) == 1:
-            return f"Apenas a afirmativa {romanos[0]} está correta."
-
-        prefixo = "Apenas as afirmativas"
-        parte_romanos = " e ".join([", ".join(romanos[:-1]), romanos[-1]])
-        return f"{prefixo} {parte_romanos} estão corretas."
-
-    if not indices_corretos or len(afirmativas) < 3 or len(afirmativas) > 5:
-        return [{"texto": "Questão com afirmativas inválidas: revise no banco.", "eh_correta": False}]
-    texto_correto = formatar_texto(indices_corretos)
-
-    # 2. Gera TODAS as combinações possíveis (excluindo a vazia/nenhuma)
-    todos_indices = list(range(1, len(afirmativas) + 1))
-    todas_combinacoes = []
-
-    # Começa em 1 para excluir combinações com 0 elementos ("Nenhuma")
-    for i in range(1, len(todos_indices) + 1):
-        todas_combinacoes.extend(list(combinations(todos_indices, i)))
-
-    # Retira o gabarito real da lista de possíveis distratores (respostas erradas)
-    if indices_corretos in todas_combinacoes:
-        todas_combinacoes.remove(indices_corretos)
-
-    # 3. Lógica de Dimensionamento (Balanceamento de Frequência)
-    melhores_conjuntos = []
-    menor_desequilibrio = float("inf")
-
-    # Testa todos os agrupamentos de 3 distratores possíveis
-    for conjunto_distratores in combinations(todas_combinacoes, 3):
-        # Conta a frequência de cada algarismo romano neste cenário da prova (1 certa + 3 erradas)
-        frequencias = {i: 0 for i in todos_indices}
-
-        # Pontua os que aparecem na resposta correta
-        for idx in indices_corretos:
-            frequencias[idx] += 1
-
-        # Pontua os que aparecem nos distratores sorteados
-        for distrator in conjunto_distratores:
-            for idx in distrator:
-                frequencias[idx] += 1
-
-        # Mede o nível de desequilíbrio matemático da questão
-        max_freq = max(frequencias.values())
-        min_freq = min(frequencias.values())
-        desequilibrio = max_freq - min_freq
-
-        # Guarda apenas os conjuntos mais perfeitamente balanceados
-        if desequilibrio < menor_desequilibrio:
-            menor_desequilibrio = desequilibrio
-            melhores_conjuntos = [conjunto_distratores]
-        elif desequilibrio == menor_desequilibrio:
-            melhores_conjuntos.append(conjunto_distratores)
-
-    # 4. Seleção Determinística da Prova (Garante que não muda no reload)
-    rng = random.Random(questao.id)
-    melhores_conjuntos.sort()  # Ordena matematicamente antes de escolher
-
-    if melhores_conjuntos:
-        conjunto_escolhido = rng.choice(melhores_conjuntos)
-    else:
-        # Fallback de segurança, caso a questão tenha combinações limitadas
-        conjunto_escolhido = rng.sample(todas_combinacoes, min(3, len(todas_combinacoes)))
-
-    # 5. Montagem Final (Junta a correta com as 3 falsas escolhidas)
-    alternativas_finais = [{"texto": texto_correto, "eh_correta": True}]
-
-    for combo in conjunto_escolhido:
-        alternativas_finais.append({"texto": formatar_texto(combo), "eh_correta": False})
-
-    # Embaralha a posição final (A, B, C, D) usando a semente fixa
-    rng.shuffle(alternativas_finais)
-
-    return alternativas_finais
 
 
 # --- VIEW DE GESTÃO DO PROFESSOR (VISUALIZAR/EDITAR USO) ---
@@ -236,6 +143,8 @@ def submeter_form_view(request, tipo_questao):
         absolute_max=num_alternativas,
     )
     initial = {**get_header(request, componente), "componente": componente, "tipo_questao": tipo_questao}
+    if tipo_questao == "MULTIPLA_ESCOLHA":
+        initial["enunciado"] = MULTIPLE_STATEMENT_PROMPT
     submission_token = new_submission_token(componente, tipo_questao)
     action = request.POST.get("submit_action", "finish")
     if request.method == "POST":
@@ -352,6 +261,7 @@ def submeter_form_view(request, tipo_questao):
             "alternativa_formset": alternativa_formset,
             "componente": componente,
             "tipo_questao": tipo_questao,
+            "enunciado_padrao_multipla": MULTIPLE_STATEMENT_PROMPT,
             "num_alternativas": num_alternativas,
             "submission_token": submission_token,
             "assercao_gabarito": request.POST.get("assercao_gabarito", ""),
@@ -663,7 +573,11 @@ def prova_gerada_view(request):
             return falha("A seleção da prova foi modificada. Gere uma nova prova.")
         questoes_selecionadas = [mapa[pk] for pk in ids]
         componentes_ids = {questao.componente_id for questao in questoes_selecionadas}
-        componentes_da_prova = ComponenteCurricular.objects.filter(pk__in=componentes_ids).order_by("nome")
+        componentes_da_prova = (
+            ComponenteCurricular.objects.filter(pk__in=componentes_ids)
+            .select_related("periodo__semestre")
+            .order_by("nome")
+        )
         tipo_prova = dados["tipo_prova"]
         exportar_txt = dados["exportar_txt"]
         try:
@@ -686,7 +600,11 @@ def prova_gerada_view(request):
         canonicos = {c.consolidado_em_id or c.pk for c in selecionados}
         if not canonicos:
             return falha("Selecione pelo menos um componente válido para a prova.")
-        componentes_da_prova = ComponenteCurricular.objects.filter(pk__in=canonicos).order_by("nome")
+        componentes_da_prova = (
+            ComponenteCurricular.objects.filter(pk__in=canonicos)
+            .select_related("periodo__semestre")
+            .order_by("nome")
+        )
         quantidades = {}
         for componente in componentes_da_prova:
             valor = request.GET.get(f"quantidade_{componente.pk}", str(componente.numero_questoes_prova))
@@ -881,6 +799,13 @@ def prova_gerada_view(request):
         "questoes_selecionadas": questoes_selecionadas,
         "questao_ids": questao_ids,
         "titulo_topo": titulo_topo,
+        "semestres_prova": sorted(
+            {
+                componente.periodo.semestre.nome
+                for componente in componentes_da_prova
+                if componente.periodo.semestre_id
+            }
+        ),
         "tipo_prova": tipo_prova,
         "anexo_imagens": anexo_imagens,
         "meio": meio,

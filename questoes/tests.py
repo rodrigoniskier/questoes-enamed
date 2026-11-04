@@ -8,7 +8,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from .models import Alternativa, ComponenteCurricular, Periodo, Questao, Semestre, SubmissionReceipt
-from .submission import new_submission_token
+from .submission import MULTIPLE_STATEMENT_PROMPT, new_submission_token
 
 
 class SubmissionTests(TestCase):
@@ -71,7 +71,10 @@ class SubmissionTests(TestCase):
                 self.assertEqual(form["componente"].value(), self.component.pk)
                 self.assertEqual(form["tipo_questao"].value(), style)
                 for field in ("texto_base", "enunciado", "proposicao_dois", "justificativa", "imagem"):
-                    self.assertFalse(form[field].value())
+                    if style == "MULTIPLA_ESCOLHA" and field == "enunciado":
+                        self.assertEqual(form[field].value(), MULTIPLE_STATEMENT_PROMPT)
+                    else:
+                        self.assertFalse(form[field].value())
                 self.assertTrue(all(not f["texto"].value() for f in response.context["alternativa_formset"]))
                 self.assertEqual(response.context["assercao_gabarito"], "")
         self.assertEqual(Questao.objects.count(), 3)

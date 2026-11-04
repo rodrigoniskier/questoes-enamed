@@ -152,7 +152,7 @@ class PreAuditoriaTests(TestCase):
             .split('<section class="question-print-preview"', 1)[1]
             .split("</section>", 1)[0]
         )
-        self.assertIn("Considerando o texto apresentado", preview)
+        self.assertIn(self.question.enunciado, preview)
         self.assertIn("I.", preview)
         self.assertIn("Apenas a afirmativa I está correta.", preview)
         self.assertEqual(

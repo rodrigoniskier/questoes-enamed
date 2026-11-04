@@ -72,7 +72,7 @@ def snapshot_questao(questao):
             image = {"name": questao.imagem.name, "sha256": digest.hexdigest()}
         except (OSError, ValueError):
             image = {"name": questao.imagem.name, "unreadable": True}
-    return {
+    snapshot = {
         "tipo_questao": questao.tipo_questao,
         "uso_prova": questao.uso_prova,
         "texto_base": questao.texto_base or "",
@@ -86,6 +86,10 @@ def snapshot_questao(questao):
             for alternativa in questao.alternativas.order_by("pk")
         ],
     }
+    # A ausência de personalização preserva os fingerprints dos pareceres anteriores.
+    if questao.combinacoes_personalizadas:
+        snapshot["combinacoes_personalizadas"] = questao.combinacoes_personalizadas
+    return snapshot
 
 
 def fingerprint_questao(questao):
