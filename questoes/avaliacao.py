@@ -151,7 +151,8 @@ def notificar_decisao(decision_id, base_url=""):
         if decision.notificacao_estado not in {"PENDENTE", "FALHOU"}:
             return
         if (
-            decision.questao.decisoes_pre_auditoria.first().pk != decision.pk
+            decision.questao.excluida_em is not None
+            or decision.questao.decisoes_pre_auditoria.first().pk != decision.pk
             or decision.questao.status != decision.acao
             or fingerprint_questao(decision.questao) != decision.fingerprint
         ):

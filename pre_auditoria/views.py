@@ -200,7 +200,9 @@ def _parse_cleanup_selection(post_data):
 def _cleanup_report_ids(report_ids, question_ids):
     if question_ids and Questao.objects.filter(pk__in=question_ids).count() != len(question_ids):
         raise ValidationError("Uma ou mais questões selecionadas não estão disponíveis.")
-    if report_ids and ParecerPreAuditoria.objects.filter(pk__in=report_ids).count() != len(report_ids):
+    if report_ids and ParecerPreAuditoria.objects.filter(
+        pk__in=report_ids, questao__excluida_em__isnull=True
+    ).count() != len(report_ids):
         raise ValidationError("Um ou mais pareceres selecionados não estão disponíveis.")
 
     candidate_ids = set(report_ids)
@@ -780,6 +782,10 @@ def processar_proximo(request, lote_id):
 @require_POST
 def registrar_evidencia(request, parecer_id):
     report = get_object_or_404(ParecerPreAuditoria.objects.select_related("questao"), pk=parecer_id)
+    if report.questao.excluida_em is not None:
+        return HttpResponseGone(
+            "Esta questão foi excluída. O histórico está disponível somente para consulta."
+        )
     if report.fingerprint != fingerprint_questao(report.questao):
         return HttpResponseGone("O conteúdo da questão mudou. Execute nova pré-auditoria.")
     form = EvidenciaRevisorForm(request.POST)
@@ -1080,7 +1086,9 @@ def correcao_professor(request, token):
         )
         if correction is None or correction.utilizada_em is not None or correction.expira_em <= now:
             return HttpResponseGone("Este link já foi utilizado ou expirou.")
-        question = Questao.objects.select_for_update().get(pk=correction.questao_id)
+        question = Questao.objects.select_for_update().filter(pk=correction.questao_id).first()
+        if question is None:
+            return HttpResponseGone("Esta questão foi excluída. O link de correção não está mais disponível.")
         before = snapshot_questao(question)
         if (
             question.status not in {"PENDENTE", "REPROVADA"}

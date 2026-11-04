@@ -74,7 +74,18 @@ class ComponenteCurricular(models.Model):
 # ==========================================
 
 
+class QuestoesAtivasManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(excluida_em__isnull=True)
+
+
 class Questao(models.Model):
+    objects = QuestoesAtivasManager()
+    todos_objetos = models.Manager()
+
+    class Meta:
+        base_manager_name = "todos_objetos"
+
     STATUS_APROVADOS = ("APROVADA", "APROVADA_SUGESTOES")
     STATUS_CHOICES = [
         ("PENDENTE", "Pendente de Validação"),
@@ -111,6 +122,16 @@ class Questao(models.Model):
     )
     enviada_em = models.DateTimeField(
         "Data de envio", auto_now_add=True, null=True, blank=True, db_index=True
+    )
+    excluida_em = models.DateTimeField("Excluída em", null=True, blank=True, editable=False, db_index=True)
+    excluida_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="questoes_excluidas",
+        verbose_name="Excluída por",
     )
 
     # Conteúdo
@@ -177,6 +198,14 @@ class Questao(models.Model):
                 print(f"Erro ao comprimir imagem da questão ID {self.id}: {e}")
 
         super().save(*args, **kwargs)
+
+
+class QuestaoExcluida(Questao):
+    class Meta:
+        proxy = True
+        verbose_name = "Questão excluída (histórico)"
+        verbose_name_plural = "Questões excluídas (histórico)"
+        default_permissions = ()
 
 
 # ==========================================
