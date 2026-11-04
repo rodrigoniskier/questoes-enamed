@@ -303,6 +303,26 @@ class PareceresNapedTests(TestCase):
         self.assertEqual(
             self.question.pareceres_pre_auditoria.first().fingerprint, fingerprint_questao(self.question)
         )
+
+    def test_professor_resubmission_without_changes_preserves_request_and_logs_once(self):
+        note = "Revise o comando antes de reenviar."
+        self.decide("REPROVADA", note)
+        link = (
+            mail.outbox[0]
+            .body.split("Acesse o link seguro para revisar e reenviar a questão: ")[1]
+            .split()[0]
+        )
+        data = self.edit_data()
+        self.client.logout()
+        self.assertContains(self.client.post(link, data), "Correção reenviada")
+        self.assertEqual(self.client.post(link, data).status_code, 410)
+        history = self.question.alteracoes_pre_auditoria.get()
+        self.assertEqual(history.antes["_orientacao_reenvio"], note)
+        self.assertEqual(history.antes["enunciado"], history.depois["enunciado"])
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("admin:questoes_questao_change", args=[self.question.pk]))
+        self.assertContains(response, note)
+        self.assertContains(response, "Nenhuma alteração no conteúdo da questão foi registrada")
         self.assertEqual(self.client.get(link).status_code, 410)
         self.assertEqual(len(mail.outbox), 1)
 

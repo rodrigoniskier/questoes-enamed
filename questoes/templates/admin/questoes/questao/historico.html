@@ -1,0 +1,42 @@
+<style>
+  .historico-tab .field-historico_alteracoes > .row > label,
+  .historico-tab .col-sm-7.field-historico_alteracoes { flex: 0 0 100%; max-width: 100%; }
+  .historico-tab .card-body { padding: 20px !important; }
+  .question-history { width: 100%; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+  .question-history p { white-space: normal; }
+  .question-history details { margin: 16px 0; padding: 16px; border: 1px solid #76818c; border-radius: 6px; }
+  .question-history summary { cursor: pointer; font-weight: 700; white-space: normal; }
+  .question-history .history-guidance { white-space: pre-wrap; margin: 12px 0; padding: 12px; border-left: 4px solid #17a2b8; }
+  .question-history table { width: 100%; table-layout: fixed; margin: 16px 0; }
+  .question-history th, .question-history td { padding: 12px; border: 1px solid #76818c; vertical-align: top; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .question-history th:first-child { width: 22%; }
+  .question-history h3 { margin: 18px 0 8px; font-size: 18px; }
+  @media (max-width: 767px) {
+    .question-history table, .question-history tbody, .question-history tr, .question-history td, .question-history th { display: block; width: 100% !important; }
+    .question-history thead { display: none; }
+    .question-history tr { margin-bottom: 16px; }
+    .question-history td::before { content: attr(data-label); display: block; font-weight: 700; margin-bottom: 6px; }
+  }
+</style>
+<div class="question-history">
+  {% if registros %}
+    <p>Confira a orientação recebida e os campos efetivamente alterados em cada edição ou reenvio. Os registros mais recentes aparecem primeiro.</p>
+    <details>
+      <summary>Comparar com a versão original registrada</summary>
+      <p>A referência é a versão anterior à primeira alteração disponível no histórico, de {{ primeiro_registro.criada_em|date:"d/m/Y H:i" }}. A comparação usa a última versão registrada, de {{ ultimo_registro.criada_em|date:"d/m/Y H:i" }}. Alterações anteriores sem registro não podem ser recuperadas.</p>
+      {% include "admin/questoes/questao/comparacao.html" with campos=comparacao_original titulo_antes="Versão original registrada" titulo_depois="Última versão registrada" %}
+    </details>
+    {% for item in registros %}
+      <details{% if forloop.first %} open{% endif %}>
+        <summary>Alteração {{ item.numero }} · {{ item.registro.criada_em|date:"d/m/Y H:i" }} · {{ item.registro.get_origem_display }} · {{ item.registro.revisor_nome|default:"Usuário não identificado" }}</summary>
+        <h3>Orientação recebida antes desta alteração</h3>
+        <div class="history-guidance">{{ item.orientacao|default:"Nenhuma orientação de ajuste registrada para esta versão." }}</div>
+        <h3>O que foi efetivamente alterado</h3>
+        {% if not item.conteudo_alterado %}<p>Nenhuma alteração no conteúdo da questão foi registrada.</p>{% endif %}
+        {% include "admin/questoes/questao/comparacao.html" with campos=item.campos titulo_antes="Antes do ajuste" titulo_depois="Após o ajuste" %}
+      </details>
+    {% endfor %}
+  {% else %}
+    <p>Nenhuma alteração registrada para esta questão. Após uma edição ou reenvio, a comparação das versões aparecerá aqui.</p>
+  {% endif %}
+</div>

@@ -14,9 +14,15 @@ from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
 
-from pre_auditoria.models import DecisaoPreAuditoria, ParecerPreAuditoria, SolicitacaoCorrecao
+from pre_auditoria.models import (
+    AlteracaoPreAuditoria,
+    DecisaoPreAuditoria,
+    ParecerPreAuditoria,
+    SolicitacaoCorrecao,
+)
 from pre_auditoria.services import executar_pre_auditoria, fingerprint_questao, snapshot_questao
 
+from .historico import comparar_versoes, contexto_historico
 from .models import Alternativa, ComponenteCurricular, Periodo, Questao, Semestre
 from .submission import ASSERTION_ANSWERS
 
@@ -183,6 +189,131 @@ class RevisaoEnviadasTests(TestCase):
         change = self.question.alteracoes_pre_auditoria.get()
         self.assertEqual(change.antes["status"], "REPROVADA")
         self.assertEqual(change.depois["status"], "PENDENTE")
+
+    def test_admin_history_compares_requested_changes_and_original_without_using_future_feedback(self):
+        decision = DecisaoPreAuditoria.objects.create(
+            questao=self.question,
+            acao="REPROVADA",
+            fingerprint=fingerprint_questao(self.question),
+            justificativa="Esclareça o comando e ajuste o gabarito.",
+        )
+        data = self.payload()
+        data["alternativas-0-eh_correta"] = ""
+        data["alternativas-1-eh_correta"] = "on"
+        data["alternativas-1-texto"] = "Alternativa B ajustada"
+        self.assertEqual(self.client.post(self.url(), data).status_code, 302)
+        DecisaoPreAuditoria.objects.create(
+            questao=self.question,
+            acao="REPROVADA",
+            fingerprint="f" * 64,
+            justificativa="Orientação posterior, sem relação com o primeiro reenvio.",
+        )
+        history = contexto_historico(self.question)
+        self.assertEqual(history["registros"][0]["orientacao"], decision.justificativa)
+        fields = {row["campo"]: row for row in history["registros"][0]["campos"]}
+        self.assertEqual(fields["Enunciado / Proposição I"]["antes"], "Qual a conduta?")
+        self.assertEqual(fields["Enunciado / Proposição I"]["depois"], "Enunciado reformulado")
+        self.assertEqual(fields["Alternativa B"]["depois"], "Alternativa B ajustada")
+        self.assertEqual(fields["Gabarito"]["antes"], "A")
+        self.assertEqual(fields["Gabarito"]["depois"], "B")
+        admin_url = reverse("admin:questoes_questao_change", args=[self.question.pk])
+        response = self.client.get(admin_url)
+        for text in ("Histórico de Alterações", decision.justificativa, "Antes do ajuste", "Após o ajuste"):
+            self.assertContains(response, text)
+        self.assertContains(response, '<div class="question-history">', html=False)
+        self.assertNotContains(response, "Orientação posterior, sem relação")
+
+        # O segundo reenvio usa a nova orientação, mas a referência original permanece intacta.
+        second = self.payload()
+        second["enunciado"] = "Segundo ajuste do comando"
+        self.assertEqual(self.client.post(self.url(), second).status_code, 302)
+        history = contexto_historico(self.question)
+        self.assertIn("Orientação posterior", history["registros"][0]["orientacao"])
+        self.assertEqual(history["registros"][1]["orientacao"], decision.justificativa)
+        original = {row["campo"]: row for row in history["comparacao_original"]}
+        self.assertEqual(original["Enunciado / Proposição I"]["antes"], "Qual a conduta?")
+        self.assertEqual(original["Enunciado / Proposição I"]["depois"], "Segundo ajuste do comando")
+
+    def test_resubmission_without_changes_is_recorded_once_and_explained_in_admin(self):
+        data = self.payload()
+        data["enunciado"] = self.question.enunciado
+        self.assertEqual(self.client.post(self.url(), data).status_code, 302)
+        self.assertEqual(self.client.post(self.url(), data).status_code, 302)
+        self.assertEqual(self.question.alteracoes_pre_auditoria.count(), 1)
+        self.assertEqual(contexto_historico(self.question)["registros"][0]["campos"], [])
+        response = self.client.get(reverse("admin:questoes_questao_change", args=[self.question.pk]))
+        self.assertContains(response, "Nenhuma alteração no conteúdo da questão foi registrada")
+        # A tramitação de Precisa de Revisões para Pendente não conta como ajuste do conteúdo.
+        Questao.objects.filter(pk=self.question.pk).update(status="REPROVADA")
+        data = self.payload()
+        data["enunciado"] = self.question.enunciado
+        self.assertEqual(self.client.post(self.url(), data).status_code, 302)
+        self.assertFalse(contexto_historico(self.question)["registros"][0]["conteudo_alterado"])
+
+    def test_legacy_history_uses_correction_request_or_prior_decision_and_escapes_content(self):
+        report = executar_pre_auditoria(self.question)
+        correction = SolicitacaoCorrecao.objects.create(
+            questao=self.question,
+            parecer=report,
+            mensagem="Orientação do link de correção",
+            expira_em=timezone.now() + timedelta(days=7),
+        )
+        before = snapshot_questao(self.question)
+        change = AlteracaoPreAuditoria.objects.create(
+            questao=self.question,
+            revisor_nome="Docente sintético",
+            antes=before,
+            depois={**before, "enunciado": '<script>alert("teste")</script>'},
+            origem="PROFESSOR",
+            solicitacao_correcao=correction,
+        )
+        DecisaoPreAuditoria.objects.create(
+            questao=self.question,
+            acao="REPROVADA",
+            fingerprint="f" * 64,
+            justificativa="Solicitação de outro momento",
+        )
+        self.assertEqual(contexto_historico(self.question)["registros"][0]["orientacao"], correction.mensagem)
+        response = self.client.get(reverse("admin:questoes_questao_change", args=[self.question.pk]))
+        self.assertContains(response, "&lt;script&gt;")
+        self.assertNotContains(response, '<script>alert("teste")</script>')
+        change.solicitacao_correcao = None
+        change.save()
+        self.assertEqual(contexto_historico(self.question)["registros"][0]["orientacao"], "")
+
+    def test_history_respects_admin_access_and_handles_empty_and_deleted_user(self):
+        url = reverse("admin:questoes_questao_change", args=[self.question.pk])
+        self.assertContains(self.client.get(url), "Nenhuma alteração registrada para esta questão")
+        viewer = get_user_model().objects.create_user("leitor-historico", is_staff=True)
+        self.client.force_login(viewer)
+        self.assertEqual(self.client.get(url).status_code, 403)
+        viewer.user_permissions.add(Permission.objects.get(codename="view_questao"))
+        self.assertEqual(self.client.get(url).status_code, 200)
+        self.assertEqual(self.client.post(url, {"enunciado": "Sobrescrita"}).status_code, 403)
+        self.client.force_login(self.user)
+        self.client.post(self.url(), self.payload())
+        self.question.alteracoes_pre_auditoria.update(revisor=None)
+        self.assertContains(self.client.get(url), "editor")
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)
+
+    def test_comparison_detects_removed_alternative_image_and_legacy_missing_fields(self):
+        before = {
+            "imagem": {"name": "imagem.jpg", "sha256": "antigo"},
+            "alternativas": [
+                {"texto": "Opção A", "eh_correta": True},
+                {"texto": "Opção B", "eh_correta": False},
+            ],
+        }
+        after = {
+            "professor_nome": "Não deve ser tratado como alteração sem versão anterior",
+            "imagem": {"name": "imagem.jpg", "sha256": "novo"},
+            "alternativas": [{"texto": "Opção A", "eh_correta": True}],
+        }
+        fields = {row["campo"]: row for row in comparar_versoes(before, after)}
+        self.assertEqual(set(fields), {"Imagem", "Alternativa B"})
+        self.assertIn("conteúdo do arquivo alterado", fields["Imagem"]["depois"])
+        self.assertEqual(fields["Alternativa B"]["depois"], "Alternativa removida")
 
     def test_repeat_does_not_duplicate_audit_decision_history_or_overwrite_later_changes(self):
         data = self.payload()
