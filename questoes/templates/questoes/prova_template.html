@@ -263,7 +263,9 @@
                         {% endfor %}
                     </div>
                 {% elif questao.tipo_questao == 'MULTIPLA_ESCOLHA' %}
-                    <div class="enunciado">{{ questao.enunciado|default:"Considerando o texto apresentado, avalie as afirmações a seguir."|linebreaksbr }}</div>
+                    {% with comando=questao.enunciado_para_prova %}
+                        {% if comando %}<div class="enunciado">{{ comando|linebreaksbr }}</div>{% endif %}
+                    {% endwith %}
                     <div class="afirmativas">
                         {% for afirmativa in questao.alternativas.all %}
                             <p><strong>{% if forloop.counter == 1 %}I{% elif forloop.counter == 2 %}II{% elif forloop.counter == 3 %}III{% elif forloop.counter == 4 %}IV{% else %}V{% endif %}.</strong> {{ afirmativa.texto | limpar_prefixo }}</p>

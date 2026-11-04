@@ -139,6 +139,12 @@ class Questao(models.Model):
     def __str__(self):
         return (self.enunciado[:50] + "...") if self.enunciado else "(Questão sem enunciado)"
 
+    @property
+    def enunciado_para_prova(self):
+        from .exam_text import enunciado_para_prova
+
+        return enunciado_para_prova(self)
+
     # Lógica de compressão mantida do arquivo original
     def save(self, *args, **kwargs):
         if self.imagem and not self.imagem._committed and not getattr(self, "_imagem_comprimida", False):
