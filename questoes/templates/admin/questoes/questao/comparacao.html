@@ -1,0 +1,10 @@
+{% if campos %}
+<table>
+  <thead><tr><th scope="col">Campo alterado</th><th scope="col">{{ titulo_antes }}</th><th scope="col">{{ titulo_depois }}</th></tr></thead>
+  <tbody>
+    {% for campo in campos %}<tr><th scope="row">{{ campo.campo }}</th><td data-label="{{ titulo_antes }}">{{ campo.antes }}</td><td data-label="{{ titulo_depois }}">{{ campo.depois }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>Nenhum campo alterado entre estas versões.</p>
+{% endif %}

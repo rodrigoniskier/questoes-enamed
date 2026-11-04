@@ -20,6 +20,15 @@
         }
         .dark #tipo-questao-container label { background-color: #374151; border-color: #4b5563; color: #d1d5db; }
         .dark #tipo-questao-container input[type="radio"]:checked + label { background-color: #5D5CDE; border-color: #a5b4fc; }
+        #modal-submissao { width: min(520px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; padding: 28px; border: 0; border-radius: 16px; background: #fff; color: #17213b; box-shadow: 0 24px 64px #0005; }
+        #modal-submissao::backdrop { background: #111827b3; }
+        #modal-submissao h2 { font-size: 24px; font-weight: 700; margin-bottom: 12px; }
+        #modal-submissao p { margin-bottom: 18px; overflow-wrap: anywhere; }
+        #modal-submissao .modal-opcoes { display: grid; gap: 12px; }
+        #modal-submissao a, #modal-submissao button { display: block; width: 100%; padding: 14px; border: 1px solid #4338ca; border-radius: 8px; text-align: center; font-weight: 700; }
+        #modal-submissao a { background: #4338ca; color: #fff; }
+        #modal-submissao button { background: #fff; color: #4338ca; }
+        #modal-submissao :focus-visible { outline: 3px solid #059669; outline-offset: 3px; }
     </style>
     <link rel="stylesheet" href="{% static 'questoes/tailwind.css' %}">
     <link rel="stylesheet" href="{% static 'questoes/app.css' %}?v=medicina-2026-2-20261007">
@@ -102,12 +111,22 @@
                     </div>
 
                     <div id="bloco-botao" class="hidden text-center pt-8 border-t border-gray-200 dark:border-gray-700">
-                        <button id="btn-avancar" class="px-8 py-4 bg-gradient-to-r from-accent to-green-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+                        <button type="button" id="btn-avancar" class="px-8 py-4 bg-gradient-to-r from-accent to-green-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
                             Avançar para o Formulário
                         </button>
                     </div>
 
                 </div>
+                <dialog id="modal-submissao" aria-labelledby="modal-submissao-titulo" aria-describedby="modal-submissao-descricao">
+                    <h2 id="modal-submissao-titulo">Como deseja continuar?</h2>
+                    <p id="modal-submissao-descricao">Escolha entre criar uma nova questão ou editar e reenviar uma questão ajustada deste componente.</p>
+                    <p id="modal-submissao-componente"></p>
+                    <div class="modal-opcoes">
+                        <a id="modal-nova-questao" href="#">Nova questão</a>
+                        <a id="modal-reenvio-questao" href="#">Reenvio de questão ajustada</a>
+                        <button type="button" id="modal-submissao-cancelar">Voltar à seleção</button>
+                    </div>
+                </dialog>
                 {% endif %}
             </div>
         </div>
@@ -127,6 +146,9 @@
 
             const btnAvancar = document.getElementById('btn-avancar');
             const btnVisualizar = document.getElementById('btn-visualizar');
+            const modalSubmissao = document.getElementById('modal-submissao');
+            document.getElementById('modal-submissao-cancelar').addEventListener('click', () => modalSubmissao.close());
+            modalSubmissao.addEventListener('close', () => btnAvancar.focus());
 
             // Seletores dos LABELS que funcionam como botões
             const labelRespostaUnica = document.querySelector('label[for="tipo-ru"]');
@@ -229,7 +251,10 @@
                     url_base = "{% url 'submeter_assercao_razao' %}";
                 }
 
-                window.location.href = `${url_base}?componente=${componenteId}`;
+                document.getElementById('modal-nova-questao').href = `${url_base}?componente=${encodeURIComponent(componenteId)}`;
+                document.getElementById('modal-reenvio-questao').href = `${baseUrlVisualizar}?componente=${encodeURIComponent(componenteId)}`;
+                document.getElementById('modal-submissao-componente').textContent = seletorComponente.options[seletorComponente.selectedIndex].text;
+                modalSubmissao.showModal();
             });
         });
     </script>

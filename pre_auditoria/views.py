@@ -1106,16 +1106,15 @@ def correcao_professor(request, token):
                 alternative_formset.save()
                 question.refresh_from_db()
                 after = snapshot_questao(question)
-                if before != after:
-                    AlteracaoPreAuditoria.objects.create(
-                        questao=question,
-                        revisor=None,
-                        revisor_nome=question.professor_nome,
-                        antes=before,
-                        depois=after,
-                        origem=AlteracaoPreAuditoria.Origem.PROFESSOR,
-                        solicitacao_correcao=correction,
-                    )
+                AlteracaoPreAuditoria.objects.create(
+                    questao=question,
+                    revisor=None,
+                    revisor_nome=question.professor_nome,
+                    antes={**before, "_orientacao_reenvio": correction.mensagem},
+                    depois=after,
+                    origem=AlteracaoPreAuditoria.Origem.PROFESSOR,
+                    solicitacao_correcao=correction,
+                )
                 question.status = "PENDENTE"
                 question.notified_status = ""
                 question.save(update_fields=["status", "notified_status"])

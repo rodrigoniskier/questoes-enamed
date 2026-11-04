@@ -25,6 +25,7 @@ from pre_auditoria.models import AlteracaoPreAuditoria, ReciboDecisao
 from pre_auditoria.services import executar_pre_auditoria, snapshot_questao
 
 from .avaliacao import registrar_decisao
+from .historico import orientacao_anterior
 from .models import Alternativa, ComponenteCurricular, Questao
 from .submission import ASSERTION_ANSWERS, allowed_styles
 
@@ -129,6 +130,7 @@ def _snapshot(question):
         "professor_nome": question.professor_nome,
         "professor_email": question.professor_email,
         "componente_id": question.componente_id,
+        "componente_nome": str(question.componente),
         "status": question.status,
     }
 
@@ -247,6 +249,7 @@ def editar_questao_enviada(request, questao_id):
                 if error:
                     form.add_error(None, error)
                 elif valid_form and valid_alternatives:
+                    guidance = orientacao_anterior(question) or before.get("comentario_validacao", "")
                     form.save()
                     formset.save()
                     question.refresh_from_db()
@@ -262,14 +265,14 @@ def editar_questao_enviada(request, questao_id):
                     )
                     question.refresh_from_db()
                     after = _snapshot(question)
-                    if before != after:
-                        AlteracaoPreAuditoria.objects.create(
-                            questao=question,
-                            revisor=request.user,
-                            revisor_nome=request.user.get_username(),
-                            antes=before,
-                            depois=after,
-                        )
+                    # O reenvio sem mudança também precisa ficar visível para a gestão.
+                    AlteracaoPreAuditoria.objects.create(
+                        questao=question,
+                        revisor=request.user,
+                        revisor_nome=request.user.get_username(),
+                        antes={**before, "_orientacao_reenvio": guidance},
+                        depois=after,
+                    )
                     success_url = (
                         reverse("submeter_visualizar_questoes")
                         + "?"

@@ -12,6 +12,7 @@ from django.forms import Textarea
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
+from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils import timezone
@@ -19,6 +20,7 @@ from django.utils.html import format_html
 
 from .avaliacao import registrar_decisao
 from .feedback import texto_pedagogico
+from .historico import contexto_historico
 
 # Modelos e utils
 from .importacao_admin import importar_view
@@ -112,7 +114,14 @@ class QuestaoAdmin(admin.ModelAdmin):
         "uso_prova",
     )
     search_fields = ("enunciado", "texto_base", "professor_nome", "professor_email")
-    readonly_fields = ("professor_nome", "professor_email", "data_envio", "status", "registrar_parecer")
+    readonly_fields = (
+        "professor_nome",
+        "professor_email",
+        "data_envio",
+        "status",
+        "registrar_parecer",
+        "historico_alteracoes",
+    )
 
     fieldsets = (
         ("Identificação do Professor", {"fields": ("professor_nome", "professor_email", "data_envio")}),
@@ -122,6 +131,10 @@ class QuestaoAdmin(admin.ModelAdmin):
         ),
         ("Conteúdo da Questão", {"fields": ("texto_base", "imagem", "enunciado", "proposicao_dois")}),
         ("Gabarito e Feedback", {"fields": ("justificativa", "comentario_validacao")}),
+        (
+            "Histórico de Alterações",
+            {"fields": ("historico_alteracoes",), "classes": ("historico-tab",)},
+        ),
     )
 
     actions = [
@@ -143,6 +156,12 @@ class QuestaoAdmin(admin.ModelAdmin):
         if obj.enviada_em is None:
             return "Não registrada"
         return timezone.localtime(obj.enviada_em).strftime("%d/%m/%Y %H:%M")
+
+    @admin.display(description="Comparação das versões")
+    def historico_alteracoes(self, obj):
+        if not obj or not obj.pk:
+            return "Salve a questão para consultar seu histórico."
+        return render_to_string("admin/questoes/questao/historico.html", contexto_historico(obj))
 
     @admin.action(description="💾 Exportar Backup Completo (JSON)")
     def exportar_backup_json(self, request, queryset):

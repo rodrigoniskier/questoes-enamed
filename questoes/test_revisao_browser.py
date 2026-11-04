@@ -65,7 +65,11 @@ class RevisaoEnviadasBrowserTests(StaticLiveServerTestCase):
             page.goto(self.live_server_url + reverse("submeter_selecao"))
             page.get_by_label("Período", exact=True).select_option(str(period.pk))
             page.get_by_label("Componente curricular", exact=True).select_option(str(component.pk))
-            page.get_by_role("link", name="Visualizar e Gerir Questões Enviadas").click()
+            page.get_by_label("Resposta Única", exact=True).check()
+            page.get_by_role("button", name="Avançar para o Formulário").click()
+            self.assertTrue(page.get_by_role("dialog").is_visible())
+            self.check_layout(page, "popup")
+            page.get_by_role("link", name="Reenvio de questão ajustada", exact=True).click()
             bank_url = (
                 self.live_server_url + reverse("submeter_visualizar_questoes") + f"?componente={component.pk}"
             )
@@ -96,6 +100,16 @@ class RevisaoEnviadasBrowserTests(StaticLiveServerTestCase):
             page.get_by_label("Confirmo o reenvio", exact=False).check()
             page.get_by_role("button", name="SALVAR E REENVIAR PARA ANÁLISE", exact=True).click()
             page.wait_for_url(bank_url)
+            page.goto(self.live_server_url + reverse("admin:questoes_questao_change", args=[question.pk]))
+            page.get_by_role("tab", name="Histórico de Alterações", exact=True).click()
+            history = page.locator(".question-history")
+            history.wait_for(state="visible")
+            self.assertTrue(history.is_visible())
+            self.assertIn("Reformule o comando", history.inner_text())
+            self.assertIn("Segunda proposição sintética.", history.inner_text())
+            page.get_by_text("Comparar com a versão original registrada", exact=True).click()
+            self.assertIn("Enunciado a reformular.", history.inner_text())
+            self.check_layout(page, "historico-admin")
             self.assertEqual(errors, [])
             browser.close()
         question.refresh_from_db()
@@ -107,6 +121,58 @@ class RevisaoEnviadasBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(DecisaoPreAuditoria.objects.filter(pk=decision.pk).exists())
         self.assertEqual(Questao.objects.count(), 1)
 
+    def test_popup_new_question_routes_cancel_keyboard_and_public_component_scope(self):
+        from playwright.sync_api import sync_playwright
+
+        semester = Semestre.objects.create(nome="2026.2")
+        period = Periodo.objects.create(nome="2º Período", semestre=semester)
+        component = ComponenteCurricular.objects.create(nome="Componente escolhido", periodo=period)
+        other = ComponenteCurricular.objects.create(nome="Outro componente", periodo=period)
+        Questao.objects.create(componente=component, enunciado="Questão deste componente", justificativa="J")
+        Questao.objects.create(componente=other, enunciado="Questão de outro componente", justificativa="J")
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                headless=True, executable_path=os.environ.get("BROWSER_EXECUTABLE") or None
+            )
+            page = browser.new_page()
+            for width in (1440, 390):
+                page.set_viewport_size({"width": width, "height": 1000})
+                for label, route in (
+                    ("Resposta Única", "submeter_resposta_unica"),
+                    ("Resposta Múltipla", "submeter_resposta_multipla"),
+                    ("Asserção-Razão", "submeter_assercao_razao"),
+                ):
+                    page.goto(self.live_server_url + reverse("submeter_selecao"))
+                    page.get_by_label("Período", exact=True).select_option(str(period.pk))
+                    page.get_by_label("Componente curricular", exact=True).select_option(str(component.pk))
+                    page.get_by_label(label, exact=True).check()
+                    advance = page.get_by_role("button", name="Avançar para o Formulário")
+                    advance.click()
+                    self.assertTrue(page.get_by_role("dialog").is_visible())
+                    page.keyboard.press("Escape")
+                    self.assertFalse(page.get_by_role("dialog").is_visible())
+                    self.assertTrue(advance.evaluate("el => el === document.activeElement"))
+                    self.assertEqual(
+                        page.get_by_label("Componente curricular").input_value(), str(component.pk)
+                    )
+                    self.assertTrue(page.get_by_label(label, exact=True).is_checked())
+                    advance.click()
+                    page.get_by_role("button", name="Voltar à seleção", exact=True).click()
+                    self.assertFalse(page.get_by_role("dialog").is_visible())
+                    advance.click()
+                    self.assertEqual(page.get_by_role("dialog").get_by_role("link").count(), 2)
+                    page.get_by_role("link", name="Nova questão", exact=True).click()
+                    page.wait_for_url(self.live_server_url + reverse(route) + f"?componente={component.pk}")
+                    self.assertEqual(page.locator("#id_texto_base").input_value(), "")
+            page.goto(
+                self.live_server_url + reverse("submeter_visualizar_questoes") + f"?componente={component.pk}"
+            )
+            self.assertIn("Questão deste componente", page.locator("body").inner_text())
+            self.assertNotIn("Questão de outro componente", page.locator("body").inner_text())
+            self.assertEqual(page.get_by_role("link", name="EDITAR E REENVIAR", exact=True).count(), 0)
+            browser.close()
+        self.assertEqual(Questao.objects.count(), 2)
+
     def check_layout(self, page, stage):
         for width, height in ((1440, 1100), (390, 844)):
             page.set_viewport_size({"width": width, "height": height})
@@ -117,3 +183,5 @@ class RevisaoEnviadasBrowserTests(StaticLiveServerTestCase):
                 page.screenshot(
                     path=str(screenshot.with_name(f"reenvio-{stage}-{width}.png")), full_page=True
                 )
+                if stage == "historico-admin":
+                    page.screenshot(path=str(screenshot.with_name(f"historico-viewport-{width}.png")))
