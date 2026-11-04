@@ -1,12 +1,14 @@
 # questoes/admin.py
 
 import json
+import logging
 import uuid
 
 from django import forms
 from django.contrib import admin, messages
+from django.contrib.admin.actions import delete_selected
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import DatabaseError, models
+from django.db import DatabaseError, models, transaction
 from django.db.models import Count, Q
 from django.forms import Textarea
 from django.forms.models import BaseInlineFormSet
@@ -19,12 +21,22 @@ from django.utils import timezone
 from django.utils.html import format_html
 
 from .avaliacao import registrar_decisao
+from .exclusao import arquivar_questoes
 from .feedback import texto_pedagogico
 from .historico import contexto_historico
 
 # Modelos e utils
 from .importacao_admin import importar_view
-from .models import AIPrompt, Alternativa, ComponenteCurricular, ImportacaoQuestao, Periodo, Questao, Semestre
+from .models import (
+    AIPrompt,
+    Alternativa,
+    ComponenteCurricular,
+    ImportacaoQuestao,
+    Periodo,
+    Questao,
+    QuestaoExcluida,
+    Semestre,
+)
 from .multiple_choice import (
     gerar_alternativas_multipla_escolha,
     interpretar_combinacoes,
@@ -33,6 +45,8 @@ from .multiple_choice import (
 )
 from .submission import validate_alternatives
 from .utils import avaliar_questao_com_ia
+
+logger = logging.getLogger(__name__)
 
 
 # ==========================================
@@ -141,6 +155,54 @@ class QuestaoAdminForm(forms.ModelForm):
 class QuestaoAdmin(admin.ModelAdmin):
     form = QuestaoAdminForm
     inlines = [AlternativaInline]
+    delete_confirmation_template = "admin/questoes/questao/confirmar_exclusao.html"
+    delete_selected_confirmation_template = delete_confirmation_template
+
+    def get_deleted_objects(self, objs, request):
+        # O fluxo apenas retira questões do banco ativo: nenhum registro
+        # relacionado será apagado. A permissão exigida continua sendo a da questão.
+        questoes = list(objs)
+        permissoes = {
+            self.opts.verbose_name for questao in questoes if not self.has_delete_permission(request, questao)
+        }
+        return (
+            [str(questao) for questao in questoes],
+            {self.opts.verbose_name_plural: len(questoes)},
+            permissoes,
+            [],
+        )
+
+    def delete_model(self, request, obj):
+        arquivar_questoes(Questao.objects.filter(pk=obj.pk), request.user)
+
+    def delete_queryset(self, request, queryset):
+        arquivar_questoes(queryset, request.user)
+
+    def delete_view(self, request, object_id, extra_context=None):
+        try:
+            return super().delete_view(request, object_id, extra_context)
+        except DatabaseError as erro:
+            logger.error("Question archival failed: %s", type(erro).__name__)
+            self.message_user(
+                request,
+                "Não foi possível concluir a exclusão. A questão foi preservada. Tente novamente.",
+                messages.ERROR,
+            )
+            return redirect("admin:questoes_questao_delete", object_id)
+
+    @admin.action(description="Excluir questões selecionadas", permissions=["delete"])
+    def delete_selected(self, request, queryset):
+        # Inclui o registro administrativo e o arquivamento na mesma transação.
+        try:
+            with transaction.atomic():
+                return delete_selected(self, request, queryset)
+        except DatabaseError as erro:
+            logger.error("Question batch archival failed: %s", type(erro).__name__)
+            self.message_user(
+                request,
+                "Não foi possível concluir a exclusão. As questões foram preservadas. Tente novamente.",
+                messages.ERROR,
+            )
 
     # Adicionado 'get_semestre' na visualização e o filtro superior no menu lateral
     list_display = (
@@ -189,6 +251,7 @@ class QuestaoAdmin(admin.ModelAdmin):
     )
 
     actions = [
+        "delete_selected",
         "exportar_backup_json",
         "avaliar_com_ia",
         "aprovar_e_notificar",
@@ -497,15 +560,25 @@ class SemestreAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.annotate(
-            _total=Count("periodos__componentes__questoes", distinct=True),
+            _total=Count(
+                "periodos__componentes__questoes",
+                filter=Q(periodos__componentes__questoes__excluida_em__isnull=True),
+                distinct=True,
+            ),
             _aprovadas=Count(
                 "periodos__componentes__questoes",
-                filter=Q(periodos__componentes__questoes__status__in=Questao.STATUS_APROVADOS),
+                filter=Q(
+                    periodos__componentes__questoes__status__in=Questao.STATUS_APROVADOS,
+                    periodos__componentes__questoes__excluida_em__isnull=True,
+                ),
                 distinct=True,
             ),
             _pendentes=Count(
                 "periodos__componentes__questoes",
-                filter=Q(periodos__componentes__questoes__status="PENDENTE"),
+                filter=Q(
+                    periodos__componentes__questoes__status="PENDENTE",
+                    periodos__componentes__questoes__excluida_em__isnull=True,
+                ),
                 distinct=True,
             ),
         )
@@ -542,14 +615,25 @@ class PeriodoAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.annotate(
-            _total=Count("componentes__questoes", distinct=True),
+            _total=Count(
+                "componentes__questoes",
+                filter=Q(componentes__questoes__excluida_em__isnull=True),
+                distinct=True,
+            ),
             _aprovadas=Count(
                 "componentes__questoes",
-                filter=Q(componentes__questoes__status__in=Questao.STATUS_APROVADOS),
+                filter=Q(
+                    componentes__questoes__status__in=Questao.STATUS_APROVADOS,
+                    componentes__questoes__excluida_em__isnull=True,
+                ),
                 distinct=True,
             ),
             _pendentes=Count(
-                "componentes__questoes", filter=Q(componentes__questoes__status="PENDENTE"), distinct=True
+                "componentes__questoes",
+                filter=Q(
+                    componentes__questoes__status="PENDENTE", componentes__questoes__excluida_em__isnull=True
+                ),
+                distinct=True,
             ),
         )
 
@@ -587,11 +671,17 @@ class ComponenteCurricularAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.annotate(
-            _total=Count("questoes", distinct=True),
+            _total=Count("questoes", filter=Q(questoes__excluida_em__isnull=True), distinct=True),
             _aprovadas=Count(
-                "questoes", filter=Q(questoes__status__in=Questao.STATUS_APROVADOS), distinct=True
+                "questoes",
+                filter=Q(questoes__status__in=Questao.STATUS_APROVADOS, questoes__excluida_em__isnull=True),
+                distinct=True,
             ),
-            _pendentes=Count("questoes", filter=Q(questoes__status="PENDENTE"), distinct=True),
+            _pendentes=Count(
+                "questoes",
+                filter=Q(questoes__status="PENDENTE", questoes__excluida_em__isnull=True),
+                distinct=True,
+            ),
         )
 
     @admin.display(description="Semestre")
@@ -626,6 +716,65 @@ class AIPromptAdmin(admin.ModelAdmin):
 admin.site.register(Periodo, PeriodoAdmin)
 admin.site.register(ComponenteCurricular, ComponenteCurricularAdmin)
 admin.site.register(Questao, QuestaoAdmin)
+
+
+class AlternativaHistoricaInline(admin.TabularInline):
+    model = Alternativa
+    readonly_fields = ("texto", "eh_correta")
+    can_delete = False
+    extra = 0
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.has_perm("questoes.view_questao") or request.user.has_perm(
+            "questoes.change_questao"
+        )
+
+
+@admin.register(QuestaoExcluida)
+class QuestaoExcluidaAdmin(QuestaoAdmin):
+    actions = None
+    inlines = [AlternativaHistoricaInline]
+    list_display = ("id", "enunciado_curto", "excluida_em", "excluida_por", "get_componente")
+    list_filter = ("excluida_em", "componente__periodo__semestre", "componente")
+    readonly_fields = tuple(field.name for field in Questao._meta.fields) + QuestaoAdmin.readonly_fields
+
+    def get_queryset(self, request):
+        return QuestaoExcluida.todos_objetos.filter(excluida_em__isnull=False)
+
+    def get_fieldsets(self, request, obj=None):
+        return [("Exclusão do banco ativo", {"fields": ("excluida_em", "excluida_por")})] + list(
+            super().get_fieldsets(request, obj)
+        )
+
+    def get_urls(self):
+        return admin.ModelAdmin.get_urls(self)
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.has_perm("questoes.view_questao") or request.user.has_perm(
+            "questoes.change_questao"
+        )
+
+    def has_module_permission(self, request):
+        return self.has_view_permission(request)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Parecer institucional")
+    def registrar_parecer(self, obj):
+        return "Questão excluída do banco ativo. Pareceres preservados somente para consulta."
 
 
 @admin.register(ImportacaoQuestao)

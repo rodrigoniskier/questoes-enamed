@@ -358,6 +358,8 @@ def _semantic_review(questao, request_id=None):
 
 
 def executar_pre_auditoria(questao, revisor=None, semantica=False, request_id=None):
+    if questao.excluida_em is not None:
+        raise ValidationError("Esta questão foi excluída e está disponível somente para consulta histórica.")
     questao = Questao.objects.select_related("componente__periodo__semestre").get(pk=questao.pk)
     findings = validar_estrutura(questao)
     semantic_checked = False
