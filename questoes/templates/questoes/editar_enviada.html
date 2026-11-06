@@ -25,13 +25,13 @@
   <h1>Editar e reenviar questão {{ questao.pk }}</h1>
   <p>Status atual: <strong>{{ questao.get_status_display }}</strong></p>
   {% include "pre_auditoria/partials/data_envio.html" %}
-  <p class="editor-note">Você pode corrigir a identificação, o componente, o tipo, o destino, os textos, a imagem, as alternativas, o gabarito e a justificativa. Ao reenviar, a questão ficará <strong>Pendente</strong> para avaliação humana, com uma nova verificação estrutural. Os pareceres anteriores e a data original de envio serão preservados.</p>
+  <p class="editor-note">Você pode corrigir {% if acesso_gestao %}a identificação, o componente, o destino, {% endif %}o tipo, os textos, a imagem, as alternativas, o gabarito e a justificativa. Ao reenviar, a questão ficará <strong>Pendente</strong> para avaliação humana, com uma nova verificação estrutural. Os pareceres anteriores e a data original de envio serão preservados.</p>
   {% if erro_edicao %}<p class="notice error" role="alert">{{ erro_edicao }}</p>{% endif %}
-  <details {% if questao.status == "REPROVADA" or questao.status == "APROVADA_SUGESTOES" %}open{% endif %}>
+  {% if acesso_gestao %}<details {% if questao.status == "REPROVADA" or questao.status == "APROVADA_SUGESTOES" %}open{% endif %}>
     <summary>Pareceres e orientações anteriores</summary>
     {% for parecer in pareceres %}<article><p><strong>{{ parecer.get_acao_display }} · {{ parecer.criada_em|date:"d/m/Y H:i" }}</strong></p><p>{{ parecer.justificativa|feedback_pedagogico|linebreaksbr }}</p></article>{% empty %}<p>Nenhum parecer registrado.</p>{% endfor %}
     {% if questao.comentario_validacao %}<p><strong>Observação registrada na questão:</strong> {{ questao.comentario_validacao|feedback_pedagogico|linebreaksbr }}</p>{% endif %}
-  </details>
+  </details>{% endif %}
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}<input type="hidden" name="edicao_token" value="{{ edicao_token }}">
     {{ form.non_field_errors }}

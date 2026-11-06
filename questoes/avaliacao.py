@@ -17,6 +17,7 @@ from .utils import enviar_email_status
 logger = logging.getLogger(__name__)
 CORRECTION_SIGNING_SALT = "pre_auditoria.correcao.v1"
 MAX_PARECER = 20000
+AUTOR_REENVIO_SEM_LOGIN = "App Submeter (sem login)"
 
 
 def _notificar_apos_commit(decision_id, base_url):
@@ -31,9 +32,6 @@ def _notificar_apos_commit(decision_id, base_url):
 def registrar_decisao(
     questao_id, revisor, classificacao, parecer="", *, fingerprint=None, request_id=None, base_url=""
 ):
-    from pre_auditoria.models import DecisaoPreAuditoria, ReciboDecisao, SolicitacaoCorrecao
-    from pre_auditoria.services import fingerprint_questao, tem_pendencias_obrigatorias, validar_aprovacao
-
     if (
         not revisor
         or not revisor.is_authenticated
@@ -43,6 +41,34 @@ def registrar_decisao(
         )
     ):
         raise PermissionDenied
+    return _registrar_decisao(
+        questao_id,
+        revisor,
+        classificacao,
+        parecer,
+        fingerprint=fingerprint,
+        request_id=request_id,
+        base_url=base_url,
+    )
+
+
+def registrar_reenvio(questao_id, autor, *, request_id):
+    """Registra a tramitação a partir do reenvio validado pelo app Submeter."""
+    return _registrar_decisao(
+        questao_id,
+        autor,
+        "PENDENTE",
+        "Questão reenviada pelo banco de questões para análise ou reanálise.",
+        request_id=request_id,
+    )
+
+
+def _registrar_decisao(
+    questao_id, revisor, classificacao, parecer, *, fingerprint=None, request_id=None, base_url=""
+):
+    from pre_auditoria.models import DecisaoPreAuditoria, ReciboDecisao, SolicitacaoCorrecao
+    from pre_auditoria.services import fingerprint_questao, tem_pendencias_obrigatorias, validar_aprovacao
+
     if classificacao not in dict(Questao.STATUS_CHOICES):
         raise ValidationError("Classificação inválida.")
     parecer = (parecer or "").replace("\r\n", "\n").replace("\r", "\n").strip()
@@ -112,7 +138,7 @@ def registrar_decisao(
             questao=question,
             parecer=report,
             revisor=revisor,
-            revisor_nome=revisor.get_username(),
+            revisor_nome=revisor.get_username() if revisor else AUTOR_REENVIO_SEM_LOGIN,
             acao=classificacao,
             fingerprint=current_fingerprint,
             justificativa=parecer,
