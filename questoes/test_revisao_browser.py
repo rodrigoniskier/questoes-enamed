@@ -130,7 +130,16 @@ class RevisaoEnviadasBrowserTests(StaticLiveServerTestCase):
         period = Periodo.objects.create(nome="2º Período", semestre=semester)
         component = ComponenteCurricular.objects.create(nome="Componente escolhido", periodo=period)
         other = ComponenteCurricular.objects.create(nome="Outro componente", periodo=period)
-        Questao.objects.create(componente=component, enunciado="Questão deste componente", justificativa="J")
+        question = Questao.objects.create(
+            componente=component,
+            enunciado="Questão deste componente",
+            justificativa="Justificativa da questão",
+            status="REPROVADA",
+        )
+        for index in range(4):
+            Alternativa.objects.create(
+                questao=question, texto=f"Alternativa {index + 1}", eh_correta=index == 0
+            )
         Questao.objects.create(componente=other, enunciado="Questão de outro componente", justificativa="J")
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(
@@ -166,14 +175,24 @@ class RevisaoEnviadasBrowserTests(StaticLiveServerTestCase):
                     page.get_by_role("link", name="Nova questão", exact=True).click()
                     page.wait_for_url(self.live_server_url + reverse(route) + f"?componente={component.pk}")
                     self.assertEqual(page.locator("#id_texto_base").input_value(), "")
-            page.goto(
-                self.live_server_url + reverse("submeter_visualizar_questoes") + f"?componente={component.pk}"
-            )
+            page.goto(self.live_server_url + reverse("submeter_selecao"))
+            page.get_by_label("Período", exact=True).select_option(str(period.pk))
+            page.get_by_label("Componente curricular", exact=True).select_option(str(component.pk))
+            page.get_by_role("link", name="Visualizar e Gerir Questões Enviadas").click()
             self.assertIn("Questão deste componente", page.locator("body").inner_text())
             self.assertNotIn("Questão de outro componente", page.locator("body").inner_text())
-            self.assertEqual(page.get_by_role("link", name="EDITAR E REENVIAR", exact=True).count(), 0)
+            bank_url = page.url
+            page.get_by_role("link", name="EDITAR E REENVIAR", exact=True).click()
+            self.check_layout(page, "editor-publico")
+            page.get_by_label("Enunciado / Proposição I").fill("Comando reformulado sem login.")
+            page.get_by_label("Confirmo o reenvio", exact=False).check()
+            page.get_by_role("button", name="SALVAR E REENVIAR PARA ANÁLISE", exact=True).click()
+            page.wait_for_url(bank_url)
+            self.assertIn("Comando reformulado sem login.", page.locator("body").inner_text())
             browser.close()
         self.assertEqual(Questao.objects.count(), 2)
+        question.refresh_from_db()
+        self.assertEqual(question.status, "PENDENTE")
 
     def check_layout(self, page, stage):
         for width, height in ((1440, 1100), (390, 844)):

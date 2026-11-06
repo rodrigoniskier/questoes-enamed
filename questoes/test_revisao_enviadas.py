@@ -109,20 +109,72 @@ class RevisaoEnviadasTests(TestCase):
         self.assertNotIn("status", response.context["form"].fields)
         self.assertNotIn("comentario_validacao", response.context["form"].fields)
 
-    def test_editor_requires_staff_and_question_change_permission_and_csrf(self):
+    def test_guest_can_edit_and_resubmit_with_own_session_and_csrf(self):
+        self.client = Client(enforce_csrf_checks=True)
+        bank = reverse("submeter_visualizar_questoes") + f"?componente={self.component.pk}"
+        response = self.client.get(bank)
+        self.assertContains(response, self.url())
+        self.assertIn("no-store", response.headers["Cache-Control"])
+        editor = self.client.get(self.url())
+        self.assertIn("no-store", editor.headers["Cache-Control"])
+        self.assertNotContains(editor, self.question.professor_email)
+        for field in ("professor_nome", "professor_email", "componente", "uso_prova"):
+            self.assertNotIn(field, editor.context["form"].fields)
+
         data = self.payload()
-        self.client.logout()
-        self.assertEqual(self.client.get(self.url()).status_code, 302)
-        self.assertEqual(self.client.post(self.url(), data).status_code, 302)
-        staff = get_user_model().objects.create_user("sem-permissao", is_staff=True)
-        self.client.force_login(staff)
-        self.assertEqual(self.client.get(self.url()).status_code, 403)
         self.assertEqual(self.client.post(self.url(), data).status_code, 403)
+        other_browser = Client(enforce_csrf_checks=True)
+        other_browser.get(self.url())
+        foreign_token = other_browser.cookies["csrftoken"].value
+        self.assertEqual(
+            other_browser.post(self.url(), data, HTTP_X_CSRFTOKEN=foreign_token).status_code, 400
+        )
+        self.assertFalse(self.question.alteracoes_pre_auditoria.exists())
+
+        csrf = self.client.cookies["csrftoken"].value
+        self.assertEqual(
+            self.client.post(bank, {"uso_prova_1": "SIMULADO"}, HTTP_X_CSRFTOKEN=csrf).status_code, 403
+        )
+        data.update(
+            professor_nome="Nome forjado",
+            professor_email="forjado@example.com",
+            componente=self.other.pk,
+            uso_prova="SIMULADO",
+            status="APROVADA",
+        )
+        original = self.question
+        self.assertRedirects(self.client.post(self.url(), data, HTTP_X_CSRFTOKEN=csrf), bank)
+        self.assertRedirects(self.client.post(self.url(), data, HTTP_X_CSRFTOKEN=csrf), bank)
+        updated = Questao.objects.get(pk=original.pk)
+        self.assertEqual(updated.enunciado, "Enunciado reformulado")
+        self.assertEqual(updated.status, "PENDENTE")
+        self.assertEqual(updated.professor_nome, original.professor_nome)
+        self.assertEqual(updated.professor_email, original.professor_email)
+        self.assertEqual(updated.componente_id, original.componente_id)
+        self.assertEqual(updated.uso_prova, original.uso_prova)
+        self.assertEqual(updated.enviada_em, original.enviada_em)
+        self.assertEqual(updated.pareceres_pre_auditoria.count(), 1)
+        decision = updated.decisoes_pre_auditoria.get()
+        self.assertEqual(decision.notificacao_estado, "SEM_ENVIO")
+        self.assertIsNone(decision.revisor)
+        change = updated.alteracoes_pre_auditoria.get()
+        self.assertEqual(change.origem, AlteracaoPreAuditoria.Origem.PROFESSOR)
+        self.assertEqual(change.revisor_nome, "App Submeter (sem login)")
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_ordinary_accounts_can_resubmit_and_only_management_can_change_metadata(self):
+        for is_staff in (False, True):
+            with self.subTest(is_staff=is_staff):
+                user = get_user_model().objects.create_user(f"usuario-{is_staff}", is_staff=is_staff)
+                self.client.force_login(user)
+                response = self.client.get(self.url())
+                self.assertEqual(response.status_code, 200)
+                self.assertNotIn("professor_email", response.context["form"].fields)
+                self.assertEqual(self.client.post(self.url(), self.payload()).status_code, 302)
+        staff = get_user_model().objects.create_user("sem-permissao", is_staff=True)
         staff.user_permissions.add(Permission.objects.get(codename="change_questao"))
-        self.assertEqual(self.client.get(self.url()).status_code, 200)
-        csrf_client = Client(enforce_csrf_checks=True)
-        csrf_client.force_login(self.user)
-        self.assertEqual(csrf_client.post(self.url(), data).status_code, 403)
+        self.client.force_login(staff)
+        self.assertIn("professor_email", self.client.get(self.url()).context["form"].fields)
 
     def test_edit_and_resubmit_from_every_status_preserves_history_date_and_question_identity(self):
         for status in dict(Questao.STATUS_CHOICES):
@@ -465,7 +517,7 @@ class RevisaoEnviadasTests(TestCase):
         data = self.payload()
         data["alternativas-0-texto"] = "Texto a reverter"
         data["imagem"] = self.image()
-        with patch("questoes.revisao.registrar_decisao", side_effect=OperationalError("private detail")):
+        with patch("questoes.revisao.registrar_reenvio", side_effect=OperationalError("private detail")):
             response = self.client.post(self.url(), data)
         self.assertEqual(response.status_code, 503)
         self.assertContains(response, "Enunciado reformulado", status_code=503)
@@ -485,7 +537,7 @@ class RevisaoEnviadasTests(TestCase):
         data = self.payload()
         data["imagem"] = self.image()
         with self.captureOnCommitCallbacks(execute=True):
-            with patch("questoes.revisao.registrar_decisao", side_effect=OperationalError("falha simulada")):
+            with patch("questoes.revisao.registrar_reenvio", side_effect=OperationalError("falha simulada")):
                 self.assertEqual(self.client.post(self.url(), data).status_code, 503)
         self.question.refresh_from_db()
         self.assertEqual(snapshot_questao(self.question), before)

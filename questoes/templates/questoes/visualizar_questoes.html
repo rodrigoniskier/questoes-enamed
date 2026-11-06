@@ -26,8 +26,7 @@
             <div>
                 <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Banco de Questões</h1>
                 <p class="text-primary font-medium">{{ componente.nome }}</p>
-                {% if user.is_staff and perms.questoes.change_questao %}<p>Abra uma questão para editar seu conteúdo completo e reenviar para análise ou reanálise.</p>{% endif %}
-                {% if not user.is_staff %}<p>Para editar e reenviar, <a href="{% url 'admin:login' %}?next={{ request.get_full_path|urlencode }}">entre com acesso administrativo</a>.</p>{% endif %}
+                <p>Abra uma questão para editar seu conteúdo e reenviar para análise ou reanálise.</p>
             </div>
             <a href="{% url 'submeter_selecao' %}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 transition">
                 Voltar
@@ -54,7 +53,7 @@
                             {% endif %}
                         </div>
 
-                        {% if user.is_staff and perms.questoes.change_questao %}<a href="{% url 'submeter_editar_questao' questao.pk %}?componente={{ componente.pk }}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">EDITAR E REENVIAR</a>{% endif %}
+                        <a href="{% url 'submeter_editar_questao' questao.pk %}?componente={{ componente.pk }}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">EDITAR E REENVIAR</a>
 
                         <div class="w-full md:w-auto flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg border border-blue-100 dark:border-blue-800">
                             <label class="text-sm font-bold text-blue-800 dark:text-blue-300 whitespace-nowrap">Uso da Prova:</label>

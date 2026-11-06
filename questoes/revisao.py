@@ -1,4 +1,4 @@
-"""Edição administrativa e reenvio pelo banco de questões dos componentes."""
+"""Edição e reenvio pelo banco de questões dos componentes."""
 
 import hashlib
 import json
@@ -8,8 +8,6 @@ from urllib.parse import urlencode
 
 from django import forms
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
-from django.contrib.auth.decorators import permission_required
 from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, transaction
@@ -24,7 +22,7 @@ from pre_auditoria.forms import QuestaoRevisaoForm, RevisaoAlternativasFormSet
 from pre_auditoria.models import AlteracaoPreAuditoria, ReciboDecisao
 from pre_auditoria.services import executar_pre_auditoria, snapshot_questao
 
-from .avaliacao import registrar_decisao
+from .avaliacao import AUTOR_REENVIO_SEM_LOGIN, registrar_reenvio
 from .historico import orientacao_anterior
 from .models import Alternativa, ComponenteCurricular, Questao
 from .submission import ASSERTION_ANSWERS, allowed_styles
@@ -38,8 +36,13 @@ class QuestaoEnviadaForm(QuestaoRevisaoForm):
         label="Confirmo o reenvio desta questão para avaliação como Pendente."
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, acesso_gestao, **kwargs):
         super().__init__(*args, **kwargs)
+        if not acesso_gestao:
+            for field in ("professor_nome", "professor_email", "componente", "uso_prova"):
+                del self.fields[field]
+            return
+
         self.fields["componente"].queryset = (
             ComponenteCurricular.objects.filter(
                 periodo__semestre_id=self.instance.componente.periodo.semestre_id,
@@ -53,7 +56,7 @@ class QuestaoEnviadaForm(QuestaoRevisaoForm):
 
     def clean(self):
         data = super().clean()
-        component = data.get("componente")
+        component = data.get("componente", self.instance.componente)
         if component and data.get("tipo_questao") not in allowed_styles(component):
             self.add_error("tipo_questao", "Este componente aceita apenas questões de resposta única.")
         return data
@@ -143,8 +146,6 @@ def _version(question, snapshot):
     return hashlib.sha256(json.dumps(state, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
-@staff_member_required
-@permission_required("questoes.change_questao", raise_exception=True)
 @require_http_methods(["GET", "POST"])
 @never_cache
 def editar_questao_enviada(request, questao_id):
@@ -156,6 +157,9 @@ def editar_questao_enviada(request, questao_id):
     question = get_object_or_404(
         Questao.objects.select_related("componente__periodo__semestre"), pk=questao_id
     )
+    autor = request.user if request.user.is_authenticated else None
+    acesso_gestao = request.user.is_staff and request.user.has_perm("questoes.change_questao")
+    sessao_edicao = None if autor else request.session.get("reenvio_nonce")
     token = request.POST.get("edicao_token", "") if request.method == "POST" else ""
     payload = None
     error = ""
@@ -166,6 +170,7 @@ def editar_questao_enviada(request, questao_id):
             if (
                 not isinstance(payload, dict)
                 or payload.get("user") != request.user.pk
+                or (autor is None and (not sessao_edicao or payload.get("sessao") != sessao_edicao))
                 or payload.get("questao") != question.pk
                 or payload.get("componente") != component.pk
             ):
@@ -193,6 +198,7 @@ def editar_questao_enviada(request, questao_id):
     form = QuestaoEnviadaForm(
         request.POST if request.method == "POST" else None,
         request.FILES if request.method == "POST" else None,
+        acesso_gestao=acesso_gestao,
         instance=question,
     )
     formset = AlternativasEnviadas(
@@ -216,9 +222,12 @@ def editar_questao_enviada(request, questao_id):
             before = _snapshot(question)
             version = _version(question, before)
             if request.method == "GET":
+                if autor is None:
+                    sessao_edicao = request.session.setdefault("reenvio_nonce", uuid.uuid4().hex)
                 token = signing.dumps(
                     {
                         "user": request.user.pk,
+                        "sessao": sessao_edicao,
                         "questao": question.pk,
                         "componente": component.pk,
                         "version": version,
@@ -236,6 +245,7 @@ def editar_questao_enviada(request, questao_id):
             form = QuestaoEnviadaForm(
                 request.POST if request.method == "POST" else None,
                 request.FILES if request.method == "POST" else None,
+                acesso_gestao=acesso_gestao,
                 instance=question,
             )
             formset = AlternativasEnviadas(
@@ -253,23 +263,20 @@ def editar_questao_enviada(request, questao_id):
                     form.save()
                     formset.save()
                     question.refresh_from_db()
-                    executar_pre_auditoria(
-                        question, revisor=request.user, semantica=False, request_id=payload["request_id"]
-                    )
-                    registrar_decisao(
-                        question.pk,
-                        request.user,
-                        "PENDENTE",
-                        "Questão reenviada pelo banco de questões para análise ou reanálise.",
-                        request_id=payload["request_id"],
-                    )
+                    executar_pre_auditoria(question, revisor=autor, request_id=payload["request_id"])
+                    registrar_reenvio(question.pk, autor, request_id=payload["request_id"])
                     question.refresh_from_db()
                     after = _snapshot(question)
                     # O reenvio sem mudança também precisa ficar visível para a gestão.
                     AlteracaoPreAuditoria.objects.create(
                         questao=question,
-                        revisor=request.user,
-                        revisor_nome=request.user.get_username(),
+                        revisor=autor,
+                        revisor_nome=autor.get_username() if autor else AUTOR_REENVIO_SEM_LOGIN,
+                        origem=(
+                            AlteracaoPreAuditoria.Origem.REVISOR
+                            if acesso_gestao
+                            else AlteracaoPreAuditoria.Origem.PROFESSOR
+                        ),
                         antes={**before, "_orientacao_reenvio": guidance},
                         depois=after,
                     )
@@ -316,7 +323,10 @@ def editar_questao_enviada(request, questao_id):
             "return_url": return_url,
             "bloqueada": bool(error),
             "erro_edicao": error,
-            "pareceres": question.decisoes_pre_auditoria.exclude(justificativa="")[:5],
+            "acesso_gestao": acesso_gestao,
+            "pareceres": question.decisoes_pre_auditoria.exclude(justificativa="")[:5]
+            if acesso_gestao
+            else (),
             "assertion_answers": [f"{letter}) {text}" for letter, text in ASSERTION_ANSWERS.items()],
         },
         status=status,

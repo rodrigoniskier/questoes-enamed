@@ -51,6 +51,7 @@ logger = logging.getLogger(__name__)
 
 
 # --- VIEW DE GESTÃO DO PROFESSOR (VISUALIZAR/EDITAR USO) ---
+@never_cache
 def visualizar_questoes_view(request):
     componente_id = request.GET.get("componente")
     if not componente_id or not componente_id.isdigit():
