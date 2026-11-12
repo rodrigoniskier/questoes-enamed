@@ -78,9 +78,30 @@ class SharedCatalogTests(TestCase):
     def test_dry_run_keeps_original_groups_and_question_links(self):
         self.consolidate(dry_run=True)
         self.assertEqual(Periodo.objects.filter(ativo=True).count(), 9)
-        self.assertEqual(ComponenteCurricular.objects.filter(consolidado_em__isnull=True).count(), 62)
+        self.assertEqual(ComponenteCurricular.objects.filter(consolidado_em__isnull=True).count(), 63)
         self.cd_question.refresh_from_db()
         self.assertEqual(self.cd_question.componente_id, self.cd.pk)
+
+    def test_contribution_panel_counts_each_exam_destination(self):
+        self.consolidate()
+        for uso in ("REPOSICAO", "AMBAS", "SIMULADO", "RESIDENCIA"):
+            question = self.make_question(self.ab, uso)
+            Questao.objects.filter(pk=question.pk).update(uso_prova=uso)
+        excluded = self.make_question(self.ab, "Excluída")
+        excluded.delete()
+
+        response = self.client.get(reverse("api_get_historico"), {"componente_id": self.cd.pk})
+        self.assertEqual(
+            response.json()["por_prova"],
+            {
+                "INTEGRADA": {"necessario": 6, "enviado": 3, "restantes": 3},
+                "REPOSICAO": {"necessario": 6, "enviado": 2, "restantes": 4},
+            },
+        )
+        form = self.client.get(reverse("submeter_resposta_unica"), {"componente": self.cd.pk})
+        self.assertContains(form, 'data-prova="INTEGRADA"')
+        self.assertContains(form, 'data-prova="REPOSICAO"')
+        self.assertContains(form, '<td class="font-bold">6</td>', count=2, html=True)
 
     def test_failure_during_question_move_rolls_back_catalog_and_links(self):
         from django.db.models.query import QuerySet

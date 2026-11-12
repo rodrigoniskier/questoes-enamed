@@ -30,6 +30,8 @@ Testes usam banco em memória, e-mail simulado e IA simulada. Nenhuma geração 
 
 ## Implantação no PythonAnywhere
 
+Atualização de 12/11/2026 — **Grade do 8º período e metas por tipo de prova.** Com o ambiente virtual ativo, execute `git pull --ff-only origin main && bash ops/deploy_pre_auditoria.sh`. O script faz o backup e aplica a migração da grade. Em seguida, clique em **Reload** na aba Web.
+
 Atualização de 06/11/2026 — **Editar e reenviar pelo app Submeter.** No banco do componente, qualquer visitante pode editar o conteúdo de uma questão do semestre ativo e reenviá-la para avaliação. O reenvio devolve a questão a **Pendente** e registra a alteração no histórico. A edição da identificação do professor, do componente e do destino da prova pelo editor de reenvio exige acesso de gestão. A listagem e o editor solicitam que o navegador não armazene a página em cache.
 
 Atualização de 04/11/2026 — **Confirmar exclusão no Admin, preservando o histórico:** a exclusão individual ou em lote passa a retirar a questão do banco ativo por arquivamento, com data e responsável. O botão **Confirmar exclusão** volta a aparecer mesmo quando há pareceres e decisões protegidos. O conteúdo, a imagem, as alternativas, os pareceres, as decisões, as evidências e as alterações permanecem preservados. A seção **Questões excluídas (histórico)** permite consulta somente leitura, com as permissões de consulta da questão; não oferece edição, reativação ou exclusão definitiva. A confirmação exige a permissão `delete_questao` e CSRF. Questões excluídas deixam de aparecer no banco, nas novas provas, nas seleções assinadas e nas contagens administrativas. Links antigos de correção deixam de aceitar alterações, e notificações pendentes não são iniciadas para questões excluídas.
@@ -86,7 +88,9 @@ O módulo está disponível em `/app/pre-auditoria/` para usuários com permiss�
 
 ### Grade de Medicina 2026.2 e arquivo histórico
 
-A grade em `questoes/data/grade_2026_2.json` preserva os nove blocos originais do Quadro 1 (páginas 2–4), com 62 entradas e 50 questões por bloco. `questoes/catalog.py` reúne os blocos em cinco períodos (2º, 4º, 5º, 6º e 8º), com 50 componentes compartilhados. Nomes repetidos dentro do mesmo período utilizam um único banco de questões, indicam todas as turmas atendidas e adotam a maior meta solicitada. O 5º período inclui somente A e C, conforme o edital; componentes de períodos diferentes continuam separados, como em 2026.1.
+A grade em `questoes/data/grade_2026_2.json` reúne os nove blocos do Quadro 1, com 63 entradas e 50 questões por bloco após a atualização do 8º período. `questoes/catalog.py` reúne os blocos em cinco períodos (2º, 4º, 5º, 6º e 8º), com 50 componentes compartilhados. Nomes repetidos dentro do mesmo período utilizam um único banco de questões, indicam todas as turmas atendidas e adotam a maior meta solicitada. O 5º período inclui somente A e C, conforme o edital; componentes de períodos diferentes continuam separados, como em 2026.1.
+
+A migração `0021_atualizar_grade_oitavo_2026_2` atualiza os cadastros existentes do 8º período. Medicina Legal e Deontologia atende A/B e C/D no mesmo banco, com meta de contribuição de seis questões para cada tipo de prova. Ao montar a Integrada ou a Reposição de C/D, selecione cinco questões desse componente. O painel **Meta de Contribuição** mostra as metas da Integrada e da Reposição e acompanha os envios por destino. Questões marcadas como **Integrada e Reposição** contam para as duas metas.
 
 Após backup consistente e aplicação das migrações até 0014, execute:
 

@@ -47,7 +47,7 @@ Compare o banco e as mídias sem restaurar dados antigos:
 python ops/verify_integrity.py --baseline /caminho/privado/production.sqlite3 --current /caminho/real/db.sqlite3 --media-archive /caminho/privado/media.tar.gz --media-root /caminho/real/media
 ```
 
-A comparação permite novos registros e exige igualdade de todos os campos de cada registro preexistente das tabelas acadêmicas, usuários e histórico administrativo. Não imprime dados pessoais. Se houver alteração pedagógica legítima concorrente, investigue a divergência; não reverta o banco automaticamente.
+A comparação permite novos registros e exige igualdade dos registros preexistentes das tabelas acadêmicas, usuários e histórico administrativo. Quando a migração `0021_atualizar_grade_oitavo_2026_2` é aplicada entre as duas cópias, a comparação admite alterações de nome e meta nos componentes que a migração abrange. Não imprime dados pessoais. Se houver alteração pedagógica legítima concorrente, investigue a divergência antes de qualquer reversão.
 
 ## IA
 

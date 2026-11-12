@@ -9,6 +9,26 @@ from contextlib import closing
 from pathlib import Path
 
 
+def componentes_da_grade_atualizada(before, after):
+    migration = "0021_atualizar_grade_oitavo_2026_2"
+    query = "SELECT 1 FROM django_migrations WHERE app = 'questoes' AND name = ?"
+    if before.execute(query, (migration,)).fetchone() or not after.execute(query, (migration,)).fetchone():
+        return set()
+    return {
+        pk
+        for (pk,) in before.execute(
+            """
+            SELECT c.id
+            FROM questoes_componentecurricular c
+            JOIN questoes_periodo p ON p.id = c.periodo_id
+            JOIN questoes_semestre s ON s.id = p.semestre_id
+            WHERE s.nome = '2026.2' AND c.consolidado_em_id IS NULL
+            AND (p.nome = '8º Período' OR (p.nome = '8º Período (turmas C e D)' AND p.ativo))
+            """
+        )
+    }
+
+
 def compare(baseline, current, media_archive=None, media_root=None):
     evidence = {}
     with (
@@ -31,14 +51,29 @@ def compare(baseline, current, media_archive=None, media_root=None):
             current_rows = after.execute(f'SELECT {projection} FROM "{table}"').fetchall()
             index = columns.index(primary)
             current_index = {row[index]: row for row in current_rows}
-            assert all(current_index.get(row[index]) == row for row in existing), (
-                f"Changed/missing rows: {table}"
+            updated_grade = (
+                componentes_da_grade_atualizada(before, after)
+                if table == "questoes_componentecurricular" and "consolidado_em_id" in columns
+                else set()
             )
+            grade_changes = 0
+            for row in existing:
+                current_row = current_index.get(row[index])
+                if current_row == row:
+                    continue
+                assert current_row is not None and row[index] in updated_grade, (
+                    f"Changed/missing rows: {table}"
+                )
+                changed_fields = {col for col, old, new in zip(columns, row, current_row) if old != new}
+                assert changed_fields <= {"nome", "numero_questoes_prova"}, f"Unexpected changes: {table}"
+                grade_changes += 1
             evidence[table] = {
                 "before": len(existing),
                 "after": len(current_rows),
-                "existing_preserved": True,
+                "existing_preserved": grade_changes == 0,
             }
+            if grade_changes:
+                evidence[table]["grade_components_updated"] = grade_changes
     if media_archive:
         checked = 0
         with tarfile.open(media_archive, "r:gz") as archive:
