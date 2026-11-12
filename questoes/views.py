@@ -7,6 +7,7 @@ import math
 import random
 import re
 import uuid
+from collections import Counter
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -298,10 +299,21 @@ def get_historico_questoes(request):
         return JsonResponse({"error": "Componente inválido"}, status=400)
     try:
         componente = ComponenteCurricular.objects.get(id=componente_id).canonico
-        questoes = Questao.objects.filter(componente=componente).order_by("-id")
+        questoes = list(
+            Questao.objects.filter(componente_id__in=componente.ids_compartilhados()).order_by("-id")
+        )
         total_necessario = componente.numero_questoes_prova
-        total_enviado = questoes.count()
+        total_enviado = len(questoes)
         restantes = total_necessario - total_enviado
+        destinos = Counter(q.uso_prova for q in questoes)
+        por_prova = {}
+        for prova in ("INTEGRADA", "REPOSICAO"):
+            enviadas = destinos[prova] + destinos["AMBAS"]
+            por_prova[prova] = {
+                "necessario": total_necessario,
+                "enviado": enviadas,
+                "restantes": max(0, total_necessario - enviadas),
+            }
         dados_questoes = [
             {
                 "id": q.pk,
@@ -313,6 +325,7 @@ def get_historico_questoes(request):
         ]
         resposta = {
             "questoes": dados_questoes,
+            "por_prova": por_prova,
             "contagem": {
                 "necessario": total_necessario,
                 "enviado": total_enviado,

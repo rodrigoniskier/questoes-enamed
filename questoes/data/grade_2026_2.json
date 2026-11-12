@@ -275,23 +275,27 @@
         },
         {
           "nome": "Clínica Integrada: Otorrinolaringologia",
-          "numero_questoes_prova": 6
+          "numero_questoes_prova": 5
         },
         {
           "nome": "Clínica Integrada: Neurologia",
-          "numero_questoes_prova": 8
+          "numero_questoes_prova": 7
         },
         {
           "nome": "Clínica Integrada: Ortopedia e Traumatologia",
-          "numero_questoes_prova": 8
+          "numero_questoes_prova": 7
         },
         {
           "nome": "Clínica Integrada: Reumatologia",
-          "numero_questoes_prova": 6
+          "numero_questoes_prova": 5
         },
         {
           "nome": "Clínica Integrada: Oftalmologia",
-          "numero_questoes_prova": 6
+          "numero_questoes_prova": 5
+        },
+        {
+          "nome": "Medicina Legal e Deontologia",
+          "numero_questoes_prova": 5
         }
       ]
     }

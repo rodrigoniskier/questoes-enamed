@@ -605,6 +605,7 @@ class PeriodoAdmin(admin.ModelAdmin):
         "semestre",
         "ativo",
         "meta_questoes",
+        "meta_reposicao",
         "total_enviadas",
         "total_aprovadas",
         "total_pendentes",
@@ -613,7 +614,7 @@ class PeriodoAdmin(admin.ModelAdmin):
     search_fields = ("nome",)
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
+        qs = super().get_queryset(request).prefetch_related("componentes")
         return qs.annotate(
             _total=Count(
                 "componentes__questoes",
@@ -637,9 +638,13 @@ class PeriodoAdmin(admin.ModelAdmin):
             ),
         )
 
-    @admin.display(description="Meta")
+    @admin.display(description="Meta Integrada")
     def meta_questoes(self, obj):
         return sum(c.numero_questoes_prova for c in obj.componentes.all())
+
+    @admin.display(description="Meta Reposição")
+    def meta_reposicao(self, obj):
+        return self.meta_questoes(obj)
 
     @admin.display(description="Enviadas", ordering="_total")
     def total_enviadas(self, obj):
@@ -661,6 +666,7 @@ class ComponenteCurricularAdmin(admin.ModelAdmin):
         "consolidado_em",
         "get_semestre",
         "meta_questoes",
+        "meta_reposicao",
         "total_enviadas",
         "total_aprovadas",
         "total_pendentes",
@@ -688,8 +694,12 @@ class ComponenteCurricularAdmin(admin.ModelAdmin):
     def get_semestre(self, obj):
         return obj.periodo.semestre.nome if obj.periodo.semestre else "-"
 
-    @admin.display(description="Meta")
+    @admin.display(description="Meta Integrada")
     def meta_questoes(self, obj):
+        return obj.numero_questoes_prova
+
+    @admin.display(description="Meta Reposição")
+    def meta_reposicao(self, obj):
         return obj.numero_questoes_prova
 
     @admin.display(description="Enviadas", ordering="_total")

@@ -124,7 +124,7 @@ class RevisaoEnviadasBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(Questao.objects.count(), 1)
 
     def test_popup_new_question_routes_cancel_keyboard_and_public_component_scope(self):
-        from playwright.sync_api import sync_playwright
+        from playwright.sync_api import expect, sync_playwright
 
         semester = Semestre.objects.create(nome="2026.2")
         period = Periodo.objects.create(nome="2º Período", semestre=semester)
@@ -175,6 +175,10 @@ class RevisaoEnviadasBrowserTests(StaticLiveServerTestCase):
                     page.get_by_role("link", name="Nova questão", exact=True).click()
                     page.wait_for_url(self.live_server_url + reverse(route) + f"?componente={component.pk}")
                     self.assertEqual(page.locator("#id_texto_base").input_value(), "")
+                    metas = page.get_by_role("table", name="Meta de Contribuição")
+                    expect(metas.get_by_role("row", name="Integrada 5 1 4", exact=True)).to_be_visible()
+                    expect(metas.get_by_role("row", name="Reposição 5 0 5", exact=True)).to_be_visible()
+                    self.assertLessEqual(metas.bounding_box()["x"] + metas.bounding_box()["width"], width)
             page.goto(self.live_server_url + reverse("submeter_selecao"))
             page.get_by_label("Período", exact=True).select_option(str(period.pk))
             page.get_by_label("Componente curricular", exact=True).select_option(str(component.pk))
