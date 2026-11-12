@@ -668,6 +668,9 @@ class ComponenteCurricularAdmin(admin.ModelAdmin):
         "meta_questoes",
         "meta_reposicao",
         "total_enviadas",
+        "total_integrada",
+        "total_reposicao",
+        "total_integrada_reposicao",
         "total_aprovadas",
         "total_pendentes",
     )
@@ -678,6 +681,21 @@ class ComponenteCurricularAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         return qs.annotate(
             _total=Count("questoes", filter=Q(questoes__excluida_em__isnull=True), distinct=True),
+            _integrada=Count(
+                "questoes",
+                filter=Q(questoes__uso_prova="INTEGRADA", questoes__excluida_em__isnull=True),
+                distinct=True,
+            ),
+            _reposicao=Count(
+                "questoes",
+                filter=Q(questoes__uso_prova="REPOSICAO", questoes__excluida_em__isnull=True),
+                distinct=True,
+            ),
+            _integrada_reposicao=Count(
+                "questoes",
+                filter=Q(questoes__uso_prova="AMBAS", questoes__excluida_em__isnull=True),
+                distinct=True,
+            ),
             _aprovadas=Count(
                 "questoes",
                 filter=Q(questoes__status__in=Questao.STATUS_APROVADOS, questoes__excluida_em__isnull=True),
@@ -693,6 +711,18 @@ class ComponenteCurricularAdmin(admin.ModelAdmin):
     @admin.display(description="Semestre")
     def get_semestre(self, obj):
         return obj.periodo.semestre.nome if obj.periodo.semestre else "-"
+
+    @admin.display(description="Integrada", ordering="_integrada")
+    def total_integrada(self, obj):
+        return obj._integrada
+
+    @admin.display(description="Reposição", ordering="_reposicao")
+    def total_reposicao(self, obj):
+        return obj._reposicao
+
+    @admin.display(description="Integrada e reposição", ordering="_integrada_reposicao")
+    def total_integrada_reposicao(self, obj):
+        return obj._integrada_reposicao
 
     @admin.display(description="Meta Integrada")
     def meta_questoes(self, obj):
