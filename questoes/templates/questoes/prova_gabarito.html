@@ -84,7 +84,10 @@
 <body>
     <div class="container">
         <div class="cabecalho">
-            <h2>GABARITO DA PROVA</h2>
+            <h2>GABARITO COMENTADO DA PROVA</h2>
+            {% if periodo_prova %}
+                <p><strong>PERÍODO:</strong> {{ periodo_prova }} · <strong>TURMA:</strong> {{ turma_prova }}</p>
+            {% endif %}
             <p><strong>CÓDIGO DA PROVA: {{ codigo_prova }}</strong></p>
             <p>Confira este código com o cartão do estudante antes da correção.</p>
             <h3>
@@ -96,7 +99,7 @@
         </div>
 
         <div class="no-print" style="text-align: center; margin: 1em 0;">
-            <a href="{% url 'prova_gabarito_csv' %}?ids={% for questao in questoes_ordenadas %}{{ questao.pk }}{% if not forloop.last %},{% endif %}{% endfor %}"
+            <a href="{% url 'prova_gabarito_csv' %}?{{ parametros_gabarito }}"
                class="button-link" style="background: #266a43; color: white;">
                 Baixar Gabarito CSV para correção por IA
             </a>

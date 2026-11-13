@@ -98,14 +98,17 @@
                         {% endfor %}
                     </div>
 
-                    <div class="flex justify-center items-center gap-8 pt-8 mt-8 border-t border-gray-200 dark:border-gray-700">
-                        <button type="button" id="gerar-gabarito-btn"
-                                data-url-base="{% url 'prova_gabarito' %}"
-                                class="px-8 py-4 bg-gradient-to-r from-primary to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 flex items-center space-x-2 disabled:opacity-50"
-                                disabled>
-                            <span>Gerar Gabarito Comentado</span>
-                        </button>
-                    </div>
+                    <form id="identificacao-gabarito" action="{% url 'prova_gabarito' %}" method="get" target="_blank" class="space-y-4 pt-8 mt-8 border-t border-gray-200 dark:border-gray-700">
+                        {% include "questoes/partials/identificacao_prova.html" %}
+                        <input type="hidden" name="ids" id="questoes-selecionadas">
+                        <div class="flex justify-center">
+                            <button type="submit" id="gerar-gabarito-btn"
+                                    class="px-8 py-4 bg-gradient-to-r from-primary to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 flex items-center space-x-2 disabled:opacity-50"
+                                    disabled>
+                                <span>Gerar Gabarito Comentado</span>
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
             {% endif %}
@@ -118,6 +121,7 @@
             const ordemSelecionada = [];
             const checkboxes = document.querySelectorAll('.seletor-questao');
             const gerarBtn = document.getElementById('gerar-gabarito-btn');
+            const ids = document.getElementById('questoes-selecionadas');
 
             // 1. Lógica para rastrear a ordem dos cliques
             checkboxes.forEach(checkbox => {
@@ -138,26 +142,11 @@
                     // Ativa/Desativa o botão de gerar
                     if (gerarBtn) {
                         gerarBtn.disabled = ordemSelecionada.length === 0;
+                        ids.value = ordemSelecionada.join(',');
                     }
                 });
             });
 
-            // 2. Lógica para o botão de Gerar Gabarito
-            if (gerarBtn) {
-                gerarBtn.addEventListener('click', function() {
-                    if (ordemSelecionada.length === 0) {
-                        alert('Por favor, selecione pelo menos uma questão.');
-                        return;
-                    }
-
-                    const idsString = ordemSelecionada.join(',');
-                    const urlBase = this.dataset.urlBase;
-                    const urlFinal = `${urlBase}?ids=${idsString}`;
-
-                    // Abre a tua view de gabarito existente numa nova aba
-                    window.open(urlFinal, '_blank');
-                });
-            }
         });
     </script>
 {% include "questoes/partials/footer.html" %}

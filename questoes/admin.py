@@ -116,7 +116,7 @@ class QuestaoAdminForm(forms.ModelForm):
         max_length=200,
         label="Combinações finais A–D",
         widget=CombinacoesWidget(attrs={"rows": 5, "style": "width: 100%;"}),
-        help_text="Uma combinação por linha, usando I, II, III, IV ou V separados por vírgulas. Deixe vazio para geração automática. As letras podem mudar na prova para equilibrar o gabarito; as combinações serão preservadas.",
+        help_text="Uma combinação por linha, usando I, II, III, IV ou V separados por vírgulas. A ordem A–D será preservada na prova. Deixe vazio para geração automática.",
     )
 
     def __init__(self, *args, **kwargs):

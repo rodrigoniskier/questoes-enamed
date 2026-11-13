@@ -668,7 +668,9 @@ class PreAuditoriaTests(TestCase):
             {"texto": "Distrator 2", "eh_correta": False},
         ]
 
-        with patch("questoes.views.gerar_alternativas_multipla_escolha", return_value=generated_options):
+        with patch(
+            "questoes.multiple_choice.gerar_alternativas_multipla_escolha", return_value=generated_options
+        ):
             response = self.client.post(
                 reverse("pre_auditoria:aprovar", args=[self.question.pk]),
                 {

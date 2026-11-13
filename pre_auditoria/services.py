@@ -453,7 +453,7 @@ def validar_aprovacao(questao, parecer, justificativa=""):
                 "A asserção-razão precisa preservar a chave canônica de cinco alternativas."
             )
     if questao.tipo_questao == "MULTIPLA_ESCOLHA":
-        from questoes.views import gerar_alternativas_multipla_escolha
+        from questoes.multiple_choice import gerar_alternativas_multipla_escolha
 
         generated = gerar_alternativas_multipla_escolha(questao)
         if (

@@ -14,6 +14,27 @@ select_classes = text_input_classes  # <-- O nosso novo campo vai usar este esti
 checkbox_classes = "rounded border-gray-300 text-primary focus:ring-primary"
 file_input_classes = "w-full text-base px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-all duration-200"
 
+
+class IdentificacaoProvaForm(forms.Form):
+    periodo_prova = forms.CharField(
+        label="Período da prova",
+        max_length=60,
+        widget=forms.TextInput(attrs={"class": text_input_classes, "placeholder": "Ex.: 8º Período"}),
+    )
+    turma_prova = forms.CharField(
+        label="Turma",
+        max_length=40,
+        widget=forms.TextInput(attrs={"class": text_input_classes, "placeholder": "Ex.: B"}),
+    )
+
+    def clean(self):
+        dados = super().clean()
+        for nome, valor in list(dados.items()):
+            if any(ord(caractere) < 32 or ord(caractere) == 127 for caractere in valor):
+                self.add_error(nome, "Informe o período ou a turma em uma única linha.")
+        return dados
+
+
 # ============================================================================
 # FORMULÁRIOS FINAIS E CORRIGIDOS
 # ============================================================================

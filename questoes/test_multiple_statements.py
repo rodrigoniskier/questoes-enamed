@@ -9,9 +9,9 @@ from django.urls import reverse
 
 from bulk_submit.utils import validate_import
 from questoes.models import ComponenteCurricular, Periodo, Questao, Semestre
+from questoes.multiple_choice import gerar_alternativas_multipla_escolha
 from questoes.submission import MULTIPLE_STATEMENT_PROMPT, new_submission_token
 from questoes.utils import gerar_questao_com_ia
-from questoes.views import gerar_alternativas_multipla_escolha
 
 
 class MultipleStatementTests(TestCase):

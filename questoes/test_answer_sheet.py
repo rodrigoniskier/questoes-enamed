@@ -184,6 +184,18 @@ class GeradorCartaoTests(TestCase):
                 self.assertEqual(resposta.status_code, 200)
                 self.assertEqual(resposta.context["titulo_topo"], titulo)
                 self.assertContains(resposta, titulo)
+                identificada = self.client.get(
+                    reverse("prova_gerada"),
+                    {
+                        "tipo_prova": tipo,
+                        "componentes": self.componente.pk,
+                        "periodo_prova": "9º Período",
+                        "turma_prova": "B",
+                    },
+                )
+                self.assertContains(identificada, titulo)
+                self.assertContains(identificada, "<strong>PERÍODO:</strong> 9º Período")
+                self.assertContains(identificada, "<strong>TURMA:</strong> B")
 
         Questao.objects.filter(componente=self.componente).update(uso_prova="INTEGRADA")
         outro_periodo = Periodo.objects.create(nome="6º Período", semestre=self.componente.periodo.semestre)

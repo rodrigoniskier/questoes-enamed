@@ -22,7 +22,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from questoes.avaliacao import registrar_decisao
 from questoes.feedback import texto_pedagogico
 from questoes.models import ComponenteCurricular, Periodo, Questao, Semestre
-from questoes.views import gerar_alternativas_multipla_escolha
+from questoes.multiple_choice import gerar_alternativas_multipla_escolha
 
 from .forms import (
     AlternativasRevisaoFormSet,
