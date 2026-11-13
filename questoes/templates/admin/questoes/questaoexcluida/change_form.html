@@ -1,0 +1,9 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    {% if pode_restaurar %}
+        <a class="btn btn-block btn-primary btn-sm"
+           href="{% url 'admin:questoes_questaoexcluida_restaurar' original.pk %}">Restaurar questão</a>
+    {% endif %}
+{% endblock %}
