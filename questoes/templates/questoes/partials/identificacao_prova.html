@@ -1,0 +1,11 @@
+<fieldset class="space-y-3">
+    <legend>Identificação da prova</legend>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% for campo in identificacao_form %}
+            <div class="space-y-2">
+                <label class="block text-sm font-medium" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+                {{ campo }}
+            </div>
+        {% endfor %}
+    </div>
+</fieldset>

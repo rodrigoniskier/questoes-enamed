@@ -27,11 +27,10 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET
 
 from .ai_control import AIControlError, subject_key
-from .answer_layout import LayoutBalanceError, montar_layout_balanceado, resumo_gabarito
-from .answer_sheet import codigo_prova, linhas_do_gabarito, paginas_do_cartao
-from .forms import AlternativaForm, QuestaoForm
+from .answer_layout import alternativas_para_prova, montar_alternativas, resumo_gabarito
+from .answer_sheet import LETRAS, codigo_prova, linhas_do_gabarito, paginas_do_cartao
+from .forms import AlternativaForm, IdentificacaoProvaForm, QuestaoForm
 from .models import ComponenteCurricular, Periodo, Questao, Semestre
-from .multiple_choice import gerar_alternativas_multipla_escolha
 from .submission import (
     ASSERTION_ANSWERS,
     FORM_ROUTES,
@@ -494,36 +493,28 @@ def montador_manual_view(request):
         try:
             periodo_selecionado = Periodo.objects.get(id=periodo_id)
             context["periodo_selecionado"] = periodo_selecionado
+            context["identificacao_form"] = IdentificacaoProvaForm(
+                initial={"periodo_prova": periodo_selecionado.nome}
+            )
 
             questoes_do_periodo = Questao.objects.filter(
                 componente__periodo=periodo_selecionado, status__in=Questao.STATUS_APROVADOS
             ).order_by("componente__nome", "id")
 
             questoes_processadas = []
-            letra_map = {0: "A", 1: "B", 2: "C", 3: "D", 4: "E"}
-
             for questao in questoes_do_periodo:
                 if questao.tipo_questao == "ASSERCAO_RAZAO":
                     continue
 
-                # Lógica Determinística para o Montador
-                if questao.tipo_questao == "MULTIPLA_ESCOLHA":
-                    alts = gerar_alternativas_multipla_escolha(questao)
-                    letra_correta = "?"
-                    for i, alt in enumerate(alts):
-                        if alt["eh_correta"]:
-                            letra_correta = letra_map.get(i, "?")
-                            break
-                    questao.letra_correta_calculada = letra_correta
-                else:
-                    letra_correta = "?"
-                    alternativas = list(questao.alternativas.all().order_by("id"))
-                    for i, alt in enumerate(alternativas):
-                        if alt.eh_correta:
-                            letra_correta = letra_map.get(i, "E+")
-                            break
-                    questao.letra_correta_calculada = letra_correta
-
+                alternativas = alternativas_para_prova(questao)
+                questao.letra_correta_calculada = next(
+                    (
+                        letra
+                        for letra, alt in zip(LETRAS, alternativas)
+                        if (alt["eh_correta"] if isinstance(alt, dict) else alt.eh_correta)
+                    ),
+                    "?",
+                )
                 questoes_processadas.append(questao)
 
             context["questoes"] = questoes_processadas
@@ -540,11 +531,18 @@ def montador_manual_view(request):
 def pagina_gerar_prova(request):
     # AJUSTE AQUI: Página de gerar prova foca apenas no que está ativo agora
     periodos = Periodo.objects.filter(ativo=True, semestre__ativo=True).order_by("nome")
-    context = {"periodos": periodos}
+    context = {"periodos": periodos, "identificacao_form": IdentificacaoProvaForm()}
     return render(request, "questoes/gerar_prova.html", context)
 
 
-# Em questoes/views.py
+def _identificacao_prova(dados):
+    form = IdentificacaoProvaForm(dados)
+    # URLs antigas e integrações podem omitir os dois campos.
+    if not any(nome in dados for nome in form.fields):
+        return {}
+    if not form.is_valid():
+        raise ValueError("Informe o período da prova e a turma, em até 60 e 40 caracteres, respectivamente.")
+    return form.cleaned_data
 
 
 @staff_member_required
@@ -595,15 +593,18 @@ def prova_gerada_view(request):
         tipo_prova = dados["tipo_prova"]
         exportar_txt = dados["exportar_txt"]
         try:
-            alternativas_por_questao = montar_layout_balanceado(
-                questoes_selecionadas, gerar_alternativas_multipla_escolha
-            )
+            identificacao = _identificacao_prova(dados)
+            alternativas_por_questao = montar_alternativas(questoes_selecionadas)
             codigo_atual = codigo_prova(questoes_selecionadas, alternativas_por_questao)
-        except (LayoutBalanceError, ValueError) as erro:
+        except ValueError as erro:
             return falha(str(erro))
         if codigo_atual != dados["codigo"]:
             return falha("O conteúdo ou a disposição da prova mudou. Gere uma nova versão.")
     else:
+        try:
+            identificacao = _identificacao_prova(request.GET)
+        except ValueError as erro:
+            return falha(str(erro))
         componentes_ids = request.GET.getlist("componentes")
         if not componentes_ids:
             return falha("Selecione pelo menos um componente.")
@@ -632,7 +633,7 @@ def prova_gerada_view(request):
                 )
             quantidades[componente.pk] = int(valor)
 
-        bancos = []
+        questoes_selecionadas = []
         for componente in componentes_da_prova:
             query_base = Q(componente=componente, status__in=Questao.STATUS_APROVADOS)
             if tipo_prova == "reposicao":
@@ -644,42 +645,18 @@ def prova_gerada_view(request):
             else:
                 query_tipo = Q(uso_prova="INTEGRADA") | Q(uso_prova="AMBAS")
             aprovadas = list(Questao.objects.filter(query_base & query_tipo))
-            bancos.append((aprovadas, quantidades[componente.pk]))
-
-        # Procura uma seleção balanceada. Se nenhuma das tentativas atingir a
-        # meta, escolhe a melhor encontrada, sem jamais romper a ordem textual.
-        melhor = None
-        ultimo_erro = None
-        for _ in range(20):
-            sorteadas_total = []
-            for aprovadas, quantidade in bancos:
-                sorteadas = (
-                    random.sample(aprovadas, quantidade) if len(aprovadas) >= quantidade else aprovadas
-                )
-                sorteadas_total.extend(sorteadas)
-            if not sorteadas_total:
-                return falha("Não há questões aprovadas para compor esta prova.")
-            try:
-                layout = montar_layout_balanceado(sorteadas_total, gerar_alternativas_multipla_escolha)
-                resumo = resumo_gabarito(sorteadas_total, layout)
-            except LayoutBalanceError as erro:
-                ultimo_erro = erro
-                continue
-
-            contagens = list(resumo["contagens_quatro"].values())
-            total_quatro = resumo["quatro_alternativas"]
-            score = (
-                max(contagens) - min(contagens),
-                sum((4 * quantidade - total_quatro) ** 2 for quantidade in contagens),
+            quantidade = quantidades[componente.pk]
+            questoes_selecionadas.extend(
+                random.sample(aprovadas, quantidade) if len(aprovadas) >= quantidade else aprovadas
             )
-            if melhor is None or score < melhor[0]:
-                melhor = (score, sorteadas_total, layout)
-            if resumo["equilibrado"] or all(len(aprovadas) <= quantidade for aprovadas, quantidade in bancos):
-                break
-
-        if melhor is None:
-            return falha(str(ultimo_erro or "Não foi possível montar uma prova válida."))
-        _, questoes_selecionadas, alternativas_por_questao = melhor
+        if not questoes_selecionadas:
+            return falha("Não há questões aprovadas para compor esta prova.")
+        if len(questoes_selecionadas) > 300:
+            return falha("Selecione até 300 questões por prova.")
+        try:
+            alternativas_por_questao = montar_alternativas(questoes_selecionadas)
+        except ValueError as erro:
+            return falha(str(erro))
 
     # Prévia da própria prova, com seleção e ordenação imutáveis no link
     # assinado. A abertura da nova aba acontece SOMENTE após confirmação.
@@ -693,6 +670,7 @@ def prova_gerada_view(request):
                 "tipo_prova": tipo_prova,
                 "exportar_txt": exportar_txt,
                 "codigo": codigo,
+                **identificacao,
             },
             salt="questoes.prova.preflight.v1",
         )
@@ -703,6 +681,7 @@ def prova_gerada_view(request):
                 "codigo_prova": codigo,
                 "url_abertura": url,
                 "exportar_txt": exportar_txt,
+                **identificacao,
             }
         )
         resposta["Cache-Control"] = "no-store"
@@ -731,7 +710,7 @@ def prova_gerada_view(request):
             else:
                 cabecalho = f"MC\tComando: {enunciado}\t"
 
-            # Usa exatamente o mesmo layout balanceado da prova impressa.
+            # Usa a mesma ordem de alternativas da prova impressa.
             alts = alternativas_por_questao[questao.pk]
 
             alts_str_parts = []
@@ -771,6 +750,8 @@ def prova_gerada_view(request):
         titulo_topo = "PROVA DE RESIDÊNCIA MÉDICA - UNIPÊ"
     elif tipo_prova == "simulado":
         titulo_topo = "SIMULADO"
+    elif identificacao:
+        titulo_topo = identificacao["periodo_prova"]
     else:
         periodos_da_prova = set(c.periodo.nome for c in componentes_da_prova)
         if len(periodos_da_prova) == 1:
@@ -809,7 +790,12 @@ def prova_gerada_view(request):
         messages.error(request, str(erro))
         return redirect("pagina_gerar_prova")
 
+    parametros_gabarito = {"ids": ",".join(map(str, questao_ids)), "codigo": codigo_cartao}
     context = {
+        **identificacao,
+        "periodo_no_titulo": tipo_prova not in ("reposicao", "residencia", "simulado"),
+        "parametros_gabarito": urlencode(parametros_gabarito),
+        "parametros_gabarito_comentado": urlencode({**parametros_gabarito, **identificacao}),
         "codigo_prova": codigo_cartao,
         "paginas_cartao": folhas_cartao,
         "componentes": componentes_da_prova,
@@ -837,42 +823,38 @@ def prova_gabarito_view(request):
     if not ids_str:
         return redirect("pagina_gerar_prova")
 
-    ids_list = [int(id) for id in ids_str.split(",")]
-
-    questoes = Questao.objects.filter(id__in=ids_list, status__in=Questao.STATUS_APROVADOS)
-    questoes_mapeadas = {q.id: q for q in questoes}
-    questoes_ordenadas = [questoes_mapeadas[pk] for pk in ids_list if pk in questoes_mapeadas]
     try:
-        alternativas_por_questao = montar_layout_balanceado(
-            questoes_ordenadas, gerar_alternativas_multipla_escolha
-        )
-    except LayoutBalanceError as erro:
-        messages.error(request, str(erro))
-        return redirect("pagina_gerar_prova")
-
-    letras = "ABCDE"
-    for questao in questoes_ordenadas:
-        alternativas = alternativas_por_questao[questao.pk]
-        questao.alternativas_finais_exibicao = alternativas
-        questao.letra_gabarito = next(
-            (
-                letras[i]
-                for i, alt in enumerate(alternativas)
-                if (alt["eh_correta"] if isinstance(alt, dict) else alt.eh_correta)
-            ),
-            "?",
-        )
-
-    componentes_ids = {q.componente.id for q in questoes_ordenadas}
-    componentes = ComponenteCurricular.objects.filter(id__in=componentes_ids)
-
-    try:
-        codigo_cartao = codigo_prova(questoes_ordenadas, alternativas_por_questao)
+        identificacao = _identificacao_prova(request.GET)
+        ids_list = _ids_do_gabarito(ids_str)
     except ValueError as erro:
         messages.error(request, str(erro))
         return redirect("pagina_gerar_prova")
 
+    questoes = Questao.objects.filter(id__in=ids_list, status__in=Questao.STATUS_APROVADOS)
+    questoes_mapeadas = {q.id: q for q in questoes}
+    questoes_ordenadas = [questoes_mapeadas[pk] for pk in ids_list if pk in questoes_mapeadas]
+    if len(questoes_ordenadas) != len(ids_list):
+        messages.error(request, "A seleção da prova foi modificada. Gere uma nova prova.")
+        return redirect("pagina_gerar_prova")
+    try:
+        alternativas_por_questao = montar_alternativas(questoes_ordenadas)
+        codigo_cartao = codigo_prova(questoes_ordenadas, alternativas_por_questao)
+        _validar_codigo_gabarito(request, codigo_cartao)
+        linhas = linhas_do_gabarito(questoes_ordenadas, alternativas_por_questao)
+    except ValueError as erro:
+        messages.error(request, str(erro))
+        return redirect("pagina_gerar_prova")
+
+    for questao, linha in zip(questoes_ordenadas, linhas):
+        questao.alternativas_finais_exibicao = alternativas_por_questao[questao.pk]
+        questao.letra_gabarito = linha["correta"]
+
+    componentes_ids = {q.componente_id for q in questoes_ordenadas}
+    componentes = ComponenteCurricular.objects.filter(id__in=componentes_ids)
+
     context = {
+        **identificacao,
+        "parametros_gabarito": urlencode({"ids": ",".join(map(str, ids_list)), "codigo": codigo_cartao}),
         "componentes": componentes,
         "questoes_ordenadas": questoes_ordenadas,
         "codigo_prova": codigo_cartao,
@@ -880,23 +862,33 @@ def prova_gabarito_view(request):
     return render(request, "questoes/prova_gabarito.html", context)
 
 
+def _ids_do_gabarito(ids_str):
+    if not ids_str or len(ids_str) > 4000:
+        raise ValueError("Informe os IDs da prova.")
+
+    partes = ids_str.split(",")
+    if len(partes) > 300 or not all(parte.isascii() and parte.isdecimal() for parte in partes):
+        raise ValueError("Lista de questões inválida.")
+    ids = [int(parte) for parte in partes]
+    if any(pk <= 0 for pk in ids) or len(set(ids)) != len(ids):
+        raise ValueError("Lista de questões inválida.")
+    return ids
+
+
+def _validar_codigo_gabarito(request, codigo):
+    codigo_esperado = request.GET.get("codigo")
+    if codigo_esperado is not None and codigo_esperado != codigo:
+        raise ValueError("O conteúdo da prova mudou. Gere uma nova versão antes de baixar o gabarito.")
+
+
 @staff_member_required
 @never_cache
 def prova_gabarito_csv_view(request):
     """Exporta gabarito autoritativo para conferência externa das folhas."""
-    ids_str = request.GET.get("ids", "")
-    if not ids_str or len(ids_str) > 4000:
-        return HttpResponse("Informe os IDs da prova.", status=400)
-
-    partes = ids_str.split(",")
-    if (
-        len(partes) > 300
-        or not all(parte.isdecimal() and 0 < int(parte) for parte in partes)
-        or len(set(partes)) != len(partes)
-    ):
-        return HttpResponse("Lista de questões inválida.", status=400)
-
-    ids = [int(parte) for parte in partes]
+    try:
+        ids = _ids_do_gabarito(request.GET.get("ids", ""))
+    except ValueError as erro:
+        return HttpResponse(str(erro), status=400)
     questoes = Questao.objects.filter(pk__in=ids, status__in=Questao.STATUS_APROVADOS)
     mapa = {questao.pk: questao for questao in questoes}
     if len(mapa) != len(ids):
@@ -904,10 +896,11 @@ def prova_gabarito_csv_view(request):
 
     ordenadas = [mapa[pk] for pk in ids]
     try:
-        alternativas = montar_layout_balanceado(ordenadas, gerar_alternativas_multipla_escolha)
+        alternativas = montar_alternativas(ordenadas)
         codigo = codigo_prova(ordenadas, alternativas)
+        _validar_codigo_gabarito(request, codigo)
         linhas = linhas_do_gabarito(ordenadas, alternativas)
-    except (LayoutBalanceError, ValueError) as erro:
+    except ValueError as erro:
         return HttpResponse(str(erro), status=422)
 
     resposta = HttpResponse(content_type="text/csv; charset=utf-8")

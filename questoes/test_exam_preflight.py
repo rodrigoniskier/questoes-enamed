@@ -46,6 +46,8 @@ class ExamPreflightTests(TestCase):
             "componentes": [self.componente.pk],
             f"quantidade_{self.componente.pk}": quantidade,
             "tipo_prova": "integrada",
+            "periodo_prova": "8º Período",
+            "turma_prova": "B & C",
         }
 
     def test_previa_antecede_prova_sem_ressorteio(self):
@@ -64,12 +66,22 @@ class ExamPreflightTests(TestCase):
         self.assertEqual(payload["codigo"], dados["codigo_prova"])
         self.assertEqual(len(payload["ids"]), 4)
         self.assertEqual(len(set(payload["ids"])), 4)
+        self.assertEqual(payload["periodo_prova"], "8º Período")
+        self.assertEqual(payload["turma_prova"], "B & C")
 
-        prova = self.client.get(destino)
+        prova = self.client.get(destino + "&periodo_prova=adulterado&turma_prova=adulterada")
         self.assertEqual(prova.status_code, 200)
         self.assertEqual(prova.context["codigo_prova"], dados["codigo_prova"])
+        self.assertEqual(prova.context["titulo_topo"], "8º Período")
+        self.assertContains(prova, "B &amp; C")
         ids_impressos = [questao.pk for questao in prova.context["questoes_selecionadas"]]
         self.assertEqual(ids_impressos, payload["ids"])
+        comentado = self.client.get(
+            reverse("prova_gabarito") + "?" + prova.context["parametros_gabarito_comentado"]
+        )
+        self.assertContains(comentado, "8º Período")
+        self.assertContains(comentado, "B &amp; C")
+        self.assertContains(comentado, dados["codigo_prova"])
 
         gabarito = self.client.get(
             reverse("prova_gabarito_csv"),
@@ -112,10 +124,35 @@ class ExamPreflightTests(TestCase):
         resposta = self.client.get(reverse("prova_gerada"), {"preflight": "1"})
         self.assertEqual(resposta.status_code, 400)
         self.assertIn("erro", resposta.json())
+        for campos in (
+            {"turma_prova": " "},
+            {"periodo_prova": "x" * 61},
+            {"turma_prova": "B\nC"},
+        ):
+            with self.subTest(campos=campos):
+                params = {**self.parametros(), **campos, "preflight": "1"}
+                resposta = self.client.get(reverse("prova_gerada"), params)
+                self.assertEqual(resposta.status_code, 400)
+                self.assertIn("período da prova e a turma", resposta.json()["erro"])
+
+    def test_gabaritos_da_prova_aberta_detectam_alteracao_da_letra(self):
+        previa = self.client.get(reverse("prova_gerada"), {**self.parametros(), "preflight": "1"}).json()
+        prova = self.client.get(previa["url_abertura"])
+        questao = prova.context["questoes_selecionadas"][0]
+        alternativas = questao.alternativas.order_by("pk")
+        incorreta = alternativas.filter(eh_correta=False).first()
+        alternativas.update(eh_correta=False)
+        Alternativa.objects.filter(pk=incorreta.pk).update(eh_correta=True)
+        comentado = reverse("prova_gabarito") + "?" + prova.context["parametros_gabarito_comentado"]
+        csv_url = reverse("prova_gabarito_csv") + "?" + prova.context["parametros_gabarito"]
+        self.assertRedirects(self.client.get(comentado), reverse("pagina_gerar_prova"))
+        self.assertEqual(self.client.get(csv_url).status_code, 422)
 
     def test_modal_e_codigo_visiveis_no_gerador(self):
         resposta = self.client.get(reverse("pagina_gerar_prova"))
         self.assertContains(resposta, 'id="modal-gabarito"')
         self.assertContains(resposta, "modalGabarito.showModal()")
         self.assertContains(resposta, "Confirmar e abrir prova")
-        self.assertContains(resposta, "ordem crescente ou decrescente")
+        self.assertContains(resposta, "preserva a ordem das alternativas")
+        self.assertContains(resposta, 'name="periodo_prova"')
+        self.assertContains(resposta, 'name="turma_prova"')

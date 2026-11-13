@@ -112,4 +112,46 @@ class CapaProvaBrowserTests(StaticLiveServerTestCase):
                 self.assertEqual(len(re.findall(rb"/Type /Page\b", pdf)), 1)
                 if destino:
                     (destino / f"capa-original-{total}.pdf").write_bytes(pdf)
+            page.emulate_media(media="screen")
+            page.set_viewport_size({"width": 390, "height": 850})
+            page.goto(self.live_server_url + reverse("pagina_gerar_prova"))
+            page.locator("#periodos").select_option(str(self.componentes[0].periodo_id))
+            page.locator("#componentes").select_option(str(self.componentes[0].pk))
+            periodo = page.get_by_label("Período da prova", exact=True)
+            self.assertEqual(periodo.input_value(), "4º Período")
+            periodo.fill("8º Período")
+            page.get_by_label("Turma", exact=True).fill("B & C")
+            page.get_by_role("button", name="Gerar Prova Integrada").click()
+            self.assertIn("8º Período · Turma B & C", page.get_by_role("dialog").inner_text())
+            with page.expect_popup() as abertura:
+                page.get_by_role("link", name="Confirmar e abrir prova").click()
+            prova = abertura.value
+            self.assertIn("8º PERÍODO", prova.locator(".capa-periodo").inner_text())
+            self.assertIn("TURMA: B & C", prova.locator(".capa-identificacao").inner_text())
+            pdf = prova.pdf(print_background=True, prefer_css_page_size=True)
+            self.assertEqual(len(re.findall(rb"/Type /Page\b", pdf)), 3)
+            with prova.expect_popup() as abertura:
+                prova.get_by_role("link", name="Ver Gabarito").click()
+            gabarito = abertura.value
+            self.assertIn("PERÍODO: 8º Período · TURMA: B & C", gabarito.locator(".cabecalho").inner_text())
+            if destino:
+                prova.locator(".capa-container").screenshot(path=str(destino / "capa-periodo-turma.png"))
+                gabarito.locator(".cabecalho").screenshot(path=str(destino / "gabarito-periodo-turma.png"))
+
+            manual = reverse("montador_manual") + f"?periodo_id={self.componentes[0].periodo_id}"
+            page.goto(self.live_server_url + manual)
+            self.assertEqual(page.get_by_label("Período da prova", exact=True).input_value(), "4º Período")
+            page.get_by_label("Turma", exact=True).fill("D")
+            page.locator(".seletor-questao").nth(1).check()
+            page.locator(".seletor-questao").nth(0).check()
+            with page.expect_popup() as abertura:
+                page.get_by_role("button", name="Gerar Gabarito Comentado").click()
+            gabarito_manual = abertura.value
+            self.assertIn(
+                "PERÍODO: 4º Período · TURMA: D", gabarito_manual.locator(".cabecalho").inner_text()
+            )
+            self.assertEqual(
+                [item.split() for item in gabarito_manual.locator(".gabarito-item").all_inner_texts()],
+                [["1.", "B"], ["2.", "A"]],
+            )
             browser.close()

@@ -19,13 +19,11 @@
         }
         #modal-gabarito::backdrop { background: rgba(10, 20, 40, .72); }
         #modal-gabarito h2 { font-size: 1.35rem; font-weight: 800; margin: 0 0 12px; }
-        #modal-gabarito-status { font-weight: 650; margin: 8px 0; }
         #modal-gabarito-codigo { font-size: .95rem; margin: 8px 0 16px; }
         #modal-gabarito-letras { display: grid; gap: 9px; }
         .modal-letra-linha { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center; }
         .modal-letra-barra { width: 100%; height: 12px; border-radius: 10px; background: #e5e7eb; overflow: hidden; }
         .modal-letra-preenchimento { height: 100%; background: #334a78; }
-        .modal-observacao { margin: 14px 0; font-size: .91rem; line-height: 1.5; }
         .modal-acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 18px; }
         .modal-acoes button, .modal-acoes a {
             border-radius: 8px; padding: 10px 14px; font-weight: 700;
@@ -53,9 +51,7 @@
                     {% endfor %}
                 {% endif %}
                 <p class="bg-white rounded-lg p-4 mb-4 text-sm">
-                    As alternativas de Resposta Única ficam sempre em ordem crescente ou decrescente
-                    de extensão. O sistema busca equilibrar A–D; se não for possível,
-                    mantém a ordenação e apresenta a distribuição efetiva antes de abrir a prova.
+                    A prova preserva a ordem das alternativas e a letra correta registradas no banco.
                 </p>
                 <p id="erro-preflight" role="alert" class="hidden bg-white border border-red-600 rounded-lg p-4 mb-4 text-red-900"></p>
                 <form action="{% url 'prova_gerada' %}" method="GET" target="_blank" class="space-y-8">
@@ -69,7 +65,7 @@
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div class="space-y-2">
-                                <label for="periodos" class="block text-sm font-medium text-gray-700 dark:text-gray-300">1. Selecione o(s) Período(s)</label>
+                                <label for="periodos" class="block text-sm font-medium text-gray-700 dark:text-gray-300">1. Períodos de origem das questões</label>
                                 <p class="text-xs text-gray-500 dark:text-gray-400">Segure Ctrl (ou Cmd no Mac) para selecionar mais de um.</p>
                                 <select id="periodos" name="periodos" multiple class="w-full text-base px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-all duration-200">
                                     {% for p in periodos %}
@@ -92,7 +88,8 @@
                             <p id="componentes-status" role="status" class="text-sm text-gray-600"></p>
                             <div id="quantidades-componentes" class="space-y-3"></div>
                         </section>
-<div class="flex items-center justify-center mt-6">
+                        {% include "questoes/partials/identificacao_prova.html" %}
+                        <div class="flex items-center justify-center mt-6">
                             <label class="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                 <input type="checkbox" name="formato_txt" value="1" class="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary">
                                 <div class="flex flex-col">
@@ -140,10 +137,9 @@
 
     <dialog id="modal-gabarito" aria-labelledby="modal-gabarito-titulo">
         <h2 id="modal-gabarito-titulo">Distribuição do gabarito</h2>
-        <p id="modal-gabarito-status" role="status"></p>
+        <p id="modal-gabarito-identificacao"></p>
         <p id="modal-gabarito-codigo"></p>
         <div id="modal-gabarito-letras" aria-label="Frequências das letras corretas"></div>
-        <p id="modal-gabarito-observacao" class="modal-observacao"></p>
         <div class="modal-acoes">
             <button type="button" id="modal-gabarito-cancelar">Voltar e ajustar</button>
             <a id="modal-gabarito-abrir" href="#" target="_blank" rel="noopener noreferrer">
@@ -156,6 +152,7 @@
         const components = document.getElementById('componentes');
         const quantities = document.getElementById('quantidades-componentes');
         const status = document.getElementById('componentes-status');
+        const periodoProva = document.getElementById('id_periodo_prova');
         const savedCounts = new Map();
         const submitButtons = document.querySelectorAll('button[type="submit"]');
         let controller;
@@ -191,10 +188,15 @@
         components.addEventListener('change', renderCounts);
         periods.addEventListener('change', async function() {
             rememberCounts();
+            const periodosSelecionados = Array.from(this.selectedOptions);
+            if (!periodoProva.value || periodoProva.value === periodoProva.dataset.sugerido) {
+                periodoProva.value = periodosSelecionados.length === 1 ? periodosSelecionados[0].textContent : '';
+                periodoProva.dataset.sugerido = periodoProva.value;
+            }
             if (controller) controller.abort();
             controller = new AbortController();
             const requestController = controller;
-            const ids = Array.from(this.selectedOptions).map(option => option.value);
+            const ids = periodosSelecionados.map(option => option.value);
             components.replaceChildren();
             components.disabled = true;
             quantities.replaceChildren();
@@ -252,10 +254,8 @@
                 });
                 const dados = await response.json();
                 if (!response.ok) throw new Error(dados.erro || 'Não foi possível preparar a prova.');
-                const situacao = document.getElementById('modal-gabarito-status');
-                situacao.textContent = dados.equilibrado
-                    ? 'Gabarito A–D equilibrado nas questões de quatro alternativas.'
-                    : 'Atenção: o gabarito está desequilibrado. A ordenação por extensão foi preservada.';
+                document.getElementById('modal-gabarito-identificacao').textContent =
+                    [dados.periodo_prova, dados.turma_prova && 'Turma ' + dados.turma_prova].filter(Boolean).join(' · ');
                 const codigo = document.getElementById('modal-gabarito-codigo');
                 codigo.textContent = 'Prova: ' + dados.codigo_prova + ' · ' + dados.total + ' questões';
                 const lista = document.getElementById('modal-gabarito-letras');
@@ -278,13 +278,6 @@
                     linha.append(letra, barra, medida);
                     lista.append(linha);
                 });
-                const observacao = document.getElementById('modal-gabarito-observacao');
-                observacao.textContent = dados.cinco_alternativas
-                    ? 'A distribuição acima considera todas as questões. ' +
-                      dados.cinco_alternativas + ' questão(ões) com cinco opções não ' +
-                      'participam da meta de equilíbrio A–D; a letra E aparece quando utilizada.'
-                    : 'Percentuais calculados sobre o total de questões. ' +
-                      'A diferença máxima de uma resposta por letra caracteriza o equilíbrio exato.';
                 modalAbrir.textContent = dados.exportar_txt
                     ? 'Confirmar e baixar TXT'
                     : 'Confirmar e abrir prova';
