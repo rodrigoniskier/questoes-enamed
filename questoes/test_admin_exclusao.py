@@ -302,7 +302,7 @@ class ExclusaoQuestaoAdminTests(TestCase):
 
 @skipUnless(os.environ.get("RUN_BROWSER_TESTS") == "1", "Habilite RUN_BROWSER_TESTS=1 para Chromium")
 class ExclusaoQuestaoBrowserTests(StaticLiveServerTestCase):
-    def test_confirm_and_cancel_on_desktop_and_mobile_with_preserved_history(self):
+    def test_archive_and_restore_on_desktop_and_mobile_with_preserved_history(self):
         from playwright.sync_api import sync_playwright
 
         usuario = get_user_model().objects.create_superuser(
@@ -352,11 +352,36 @@ class ExclusaoQuestaoBrowserTests(StaticLiveServerTestCase):
             page.goto(url)
             page.get_by_role("button", name="Confirmar exclusão", exact=True).click()
             page.wait_for_url(self.live_server_url + reverse("admin:questoes_questao_changelist"))
-            page.goto(
-                self.live_server_url + reverse("admin:questoes_questaoexcluida_change", args=[questao.pk])
+            excluida = self.live_server_url + reverse(
+                "admin:questoes_questaoexcluida_change", args=[questao.pk]
             )
+            lista_excluidas = self.live_server_url + reverse("admin:questoes_questaoexcluida_changelist")
+            page.goto(excluida)
             self.assertIn(questao.enunciado, page.locator("body").inner_text())
             self.assertEqual(page.locator("[name=_save]").count(), 0)
+
+            for largura in (1440, 390):
+                page.set_viewport_size({"width": largura, "height": 1000})
+                page.goto(excluida)
+                page.get_by_role("link", name="Restaurar questão", exact=True).click()
+                botao = page.get_by_role("button", name="Confirmar restauração", exact=True)
+                botao.click(trial=True, timeout=5000)
+                if largura >= 992:
+                    menu = page.locator(".main-sidebar").bounding_box()
+                    self.assertGreaterEqual(botao.bounding_box()["x"], menu["x"] + menu["width"])
+                self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), largura + 1)
+                if os.environ.get("BROWSER_SCREENSHOT"):
+                    page.screenshot(
+                        path=str(destino / f"restauracao-confirmacao-{largura}.png"), animations="disabled"
+                    )
+                page.get_by_role("link", name="Cancelar", exact=True).click()
+                page.wait_for_url(lista_excluidas)
+                self.assertIn(questao.enunciado, page.locator("body").inner_text())
+            page.goto(excluida)
+            page.get_by_role("link", name="Restaurar questão", exact=True).click()
+            page.get_by_role("button", name="Confirmar restauração", exact=True).click()
+            page.wait_for_url(lista_excluidas)
+            self.assertIn("Questões restauradas ao banco ativo: 1.", page.locator("body").inner_text())
             browser.close()
-        self.assertFalse(Questao.objects.filter(pk=questao.pk).exists())
+        self.assertTrue(Questao.objects.filter(pk=questao.pk).exists())
         self.assertTrue(DecisaoPreAuditoria.objects.filter(questao_id=questao.pk).exists())

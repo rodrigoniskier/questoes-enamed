@@ -7,12 +7,13 @@ import uuid
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin.actions import delete_selected
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import DatabaseError, models, transaction
 from django.db.models import Count, Q
 from django.forms import Textarea
 from django.forms.models import BaseInlineFormSet
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
@@ -21,7 +22,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 
 from .avaliacao import registrar_decisao
-from .exclusao import arquivar_questoes
+from .exclusao import arquivar_questoes, pode_restaurar_questoes, restaurar_questoes
 from .feedback import texto_pedagogico
 from .historico import contexto_historico
 
@@ -778,7 +779,8 @@ class AlternativaHistoricaInline(admin.TabularInline):
 
 @admin.register(QuestaoExcluida)
 class QuestaoExcluidaAdmin(QuestaoAdmin):
-    actions = None
+    actions = ["restaurar_selecionadas"]
+    change_form_template = "admin/questoes/questaoexcluida/change_form.html"
     inlines = [AlternativaHistoricaInline]
     list_display = ("id", "enunciado_curto", "excluida_em", "excluida_por", "get_componente")
     list_filter = ("excluida_em", "componente__periodo__semestre", "componente")
@@ -793,7 +795,93 @@ class QuestaoExcluidaAdmin(QuestaoAdmin):
         )
 
     def get_urls(self):
-        return admin.ModelAdmin.get_urls(self)
+        return [
+            path(
+                "<int:pk>/restaurar/",
+                self.admin_site.admin_view(self.restaurar_individual),
+                name="questoes_questaoexcluida_restaurar",
+            ),
+            path(
+                "restaurar/",
+                self.admin_site.admin_view(self.confirmar_restauracao),
+                name="questoes_questaoexcluida_confirmar_restauracao",
+            ),
+        ] + admin.ModelAdmin.get_urls(self)
+
+    def has_restore_permission(self, request):
+        return pode_restaurar_questoes(request.user)
+
+    def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
+        context["pode_restaurar"] = self.has_restore_permission(request)
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+    def restaurar_individual(self, request, pk):
+        if not self.has_restore_permission(request):
+            raise PermissionDenied
+        if request.method != "GET":
+            return HttpResponseNotAllowed(["GET"])
+        questao = get_object_or_404(self.get_queryset(request), pk=pk)
+        return self._previa_restauracao(request, [questao])
+
+    @admin.action(description="Restaurar questões selecionadas", permissions=["restore"])
+    def restaurar_selecionadas(self, request, queryset):
+        questoes = list(queryset.only("enunciado", "excluida_em"))
+        if not questoes:
+            self.message_user(request, "Nenhuma das questões selecionadas está excluída.", messages.WARNING)
+            return None
+        return self._previa_restauracao(request, questoes)
+
+    def _previa_restauracao(self, request, questoes):
+        # A confirmação vale apenas para as exclusões exibidas a este usuário.
+        confirmacao = signing.dumps(
+            {str(questao.pk): questao.excluida_em.isoformat() for questao in questoes},
+            salt=f"questoes.admin.restaurar.{request.user.pk}",
+            compress=True,
+        )
+        return TemplateResponse(
+            request,
+            "admin/questoes/questaoexcluida/confirmar_restauracao.html",
+            {
+                **self.admin_site.each_context(request),
+                "opts": self.opts,
+                "title": "Confirmar restauração de questões",
+                "questoes": questoes,
+                "confirmacao": confirmacao,
+            },
+        )
+
+    def confirmar_restauracao(self, request):
+        if not self.has_restore_permission(request):
+            raise PermissionDenied
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        try:
+            exclusoes = signing.loads(
+                request.POST.get("confirmacao", ""),
+                salt=f"questoes.admin.restaurar.{request.user.pk}",
+            )
+            restauradas = restaurar_questoes(exclusoes, request.user)
+        except signing.BadSignature:
+            self.message_user(
+                request, "Confirmação inválida. Selecione novamente as questões excluídas.", messages.ERROR
+            )
+        except DatabaseError as erro:
+            logger.error("Question restoration failed: %s", type(erro).__name__)
+            self.message_user(
+                request, "Não foi possível restaurar as questões. Tente novamente.", messages.ERROR
+            )
+        else:
+            if restauradas:
+                self.message_user(
+                    request, f"Questões restauradas ao banco ativo: {restauradas}.", messages.SUCCESS
+                )
+            if restauradas < len(exclusoes):
+                self.message_user(
+                    request,
+                    "A situação de uma ou mais questões mudou. Confira a lista antes de tentar novamente.",
+                    messages.WARNING,
+                )
+        return redirect("admin:questoes_questaoexcluida_changelist")
 
     def has_view_permission(self, request, obj=None):
         return request.user.has_perm("questoes.view_questao") or request.user.has_perm(

@@ -1,0 +1,26 @@
+{% extends "admin/base_site.html" %}
+
+{% block content_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="col-12">
+    <div class="card card-primary card-outline">
+        <div class="card-body">
+            <p>As questões abaixo voltarão ao banco ativo com o status que tinham antes da exclusão. O conteúdo e o histórico serão preservados.</p>
+            <ul>
+                {% for questao in questoes %}
+                    <li>Questão {{ questao.pk }} — {{ questao.enunciado }}</li>
+                {% endfor %}
+            </ul>
+            <form action="{% url 'admin:questoes_questaoexcluida_confirmar_restauracao' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="confirmacao" value="{{ confirmacao }}">
+                <div class="d-flex flex-wrap" style="gap: 0.75rem;">
+                    <button type="submit" class="btn btn-primary">Confirmar restauração</button>
+                    <a href="{% url 'admin:questoes_questaoexcluida_changelist' %}" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
