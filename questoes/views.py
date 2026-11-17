@@ -15,7 +15,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core import signing
 from django.core.exceptions import ValidationError
-from django.db import DatabaseError
+from django.db import DatabaseError, transaction
 from django.db.models import OuterRef, Q, Subquery
 from django.forms import formset_factory
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
@@ -30,7 +30,7 @@ from .ai_control import AIControlError, subject_key
 from .answer_layout import alternativas_para_prova, montar_alternativas, resumo_gabarito
 from .answer_sheet import LETRAS, codigo_prova, linhas_do_gabarito, paginas_do_cartao
 from .forms import AlternativaForm, IdentificacaoProvaForm, QuestaoForm
-from .models import ComponenteCurricular, Periodo, Questao, Semestre
+from .models import ComponenteCurricular, Periodo, ProvaGerada, Questao, Semestre
 from .submission import (
     ASSERTION_ANSWERS,
     FORM_ROUTES,
@@ -527,11 +527,99 @@ def montador_manual_view(request):
 
 
 # --- GERADOR DE PROVAS E GABARITOS ---
+RECENTES_MAX = 20
+
+
+def _registrar_prova(usuario, ids, tipo_prova, codigo, titulo_topo, identificacao, semestre_letivo):
+    """Guarda a prova aberta; falha aqui nunca impede a prova de ser exibida."""
+    try:
+        with transaction.atomic():
+            ProvaGerada.objects.update_or_create(
+                usuario=usuario,
+                codigo=codigo,
+                tipo_prova=tipo_prova,
+                periodo_prova=identificacao.get("periodo_prova", ""),
+                turma_prova=identificacao.get("turma_prova", ""),
+                defaults={
+                    "questao_ids": list(ids),
+                    "titulo_topo": titulo_topo[:120],
+                    "semestre_letivo": semestre_letivo[:200],
+                },
+            )
+            antigas = list(
+                ProvaGerada.objects.filter(usuario=usuario).values_list("pk", flat=True)[RECENTES_MAX * 5 :]
+            )
+            ProvaGerada.objects.filter(pk__in=antigas).delete()
+    except Exception:
+        logger.exception("Não foi possível registrar a prova gerada para reimpressão do cartão.")
+
+
+@staff_member_required
+def cartoes_gerados_view(request):
+    """Reimprime somente o cartão de respostas de provas recentes do próprio usuário."""
+    bruto = request.GET.getlist("provas")
+    if not bruto or len(bruto) > RECENTES_MAX or not all(v.isdigit() and len(v) <= 12 for v in bruto):
+        messages.error(request, "Selecione de 1 a %d provas recentes." % RECENTES_MAX)
+        return redirect("pagina_gerar_prova")
+    pks = [int(v) for v in dict.fromkeys(bruto)]
+    registros = {p.pk: p for p in ProvaGerada.objects.filter(usuario=request.user, pk__in=pks)}
+    if len(registros) != len(pks):
+        messages.error(request, "Alguma prova selecionada não está mais disponível. Atualize a lista.")
+        return redirect("pagina_gerar_prova")
+
+    cartoes = []
+    for pk in pks:
+        registro = registros[pk]
+        rotulo = f"{registro.titulo_topo} ({registro.codigo})"
+        ids = registro.questao_ids
+        if not isinstance(ids, list) or not ids or any(type(i) is not int for i in ids):
+            messages.error(request, f"Registro inválido para {rotulo}. Gere a prova novamente.")
+            return redirect("pagina_gerar_prova")
+        mapa = {q.pk: q for q in Questao.objects.filter(pk__in=ids, status__in=Questao.STATUS_APROVADOS)}
+        if len(mapa) != len(set(ids)):
+            messages.error(
+                request,
+                f"As questões de {rotulo} foram alteradas ou removidas; o cartão não seria idêntico. "
+                "Gere a prova novamente.",
+            )
+            return redirect("pagina_gerar_prova")
+        questoes = [mapa[i] for i in ids]
+        try:
+            alternativas = montar_alternativas(questoes)
+            codigo_atual = codigo_prova(questoes, alternativas)
+            paginas = paginas_do_cartao(questoes, alternativas)
+        except ValueError as erro:
+            messages.error(request, f"{rotulo}: {erro}")
+            return redirect("pagina_gerar_prova")
+        if codigo_atual != registro.codigo:
+            messages.error(
+                request,
+                f"O conteúdo de {rotulo} mudou desde que a prova foi gerada. Gere uma nova versão.",
+            )
+            return redirect("pagina_gerar_prova")
+        cartoes.append(
+            {
+                "titulo_topo": registro.titulo_topo,
+                "codigo_prova": registro.codigo,
+                "semestre_letivo": registro.semestre_letivo,
+                "paginas": paginas,
+            }
+        )
+    resposta = render(request, "questoes/prova_template.html", {"somente_cartao": True, "cartoes": cartoes})
+    resposta["Cache-Control"] = "no-store"
+    return resposta
+
+
 @staff_member_required
 def pagina_gerar_prova(request):
     # AJUSTE AQUI: Página de gerar prova foca apenas no que está ativo agora
     periodos = Periodo.objects.filter(ativo=True, semestre__ativo=True).order_by("nome")
-    context = {"periodos": periodos, "identificacao_form": IdentificacaoProvaForm()}
+    recentes = ProvaGerada.objects.filter(usuario=request.user)[:RECENTES_MAX]
+    context = {
+        "periodos": periodos,
+        "identificacao_form": IdentificacaoProvaForm(),
+        "provas_recentes": recentes,
+    }
     return render(request, "questoes/gerar_prova.html", context)
 
 
@@ -791,8 +879,34 @@ def prova_gerada_view(request):
         return redirect("pagina_gerar_prova")
 
     parametros_gabarito = {"ids": ",".join(map(str, questao_ids)), "codigo": codigo_cartao}
+    semestre_letivo = " / ".join(
+        sorted(
+            {
+                componente.periodo.semestre.nome
+                for componente in componentes_da_prova
+                if componente.periodo.semestre_id
+            }
+        )
+    )
+    _registrar_prova(
+        request.user,
+        questao_ids,
+        tipo_prova,
+        codigo_cartao,
+        titulo_topo,
+        identificacao,
+        semestre_letivo,
+    )
     context = {
         **identificacao,
+        "cartoes": [
+            {
+                "titulo_topo": titulo_topo,
+                "codigo_prova": codigo_cartao,
+                "semestre_letivo": semestre_letivo,
+                "paginas": folhas_cartao,
+            }
+        ],
         "periodo_no_titulo": tipo_prova not in ("reposicao", "residencia", "simulado"),
         "parametros_gabarito": urlencode(parametros_gabarito),
         "parametros_gabarito_comentado": urlencode({**parametros_gabarito, **identificacao}),

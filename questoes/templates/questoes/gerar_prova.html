@@ -131,6 +131,29 @@
                         </div>
                         </div>
                 </form>
+                <form action="{% url 'cartoes_gerados' %}" method="GET" target="_blank" class="glass-effect rounded-2xl p-8 shadow-xl border border-white/20 mt-8" id="form-cartoes">
+                    <h3 class="text-xl font-bold mb-2">Gerar somente o cartão de respostas</h3>
+                    <p class="text-sm mb-4">Reimprima o cartão (sem a prova) de provas geradas recentemente. O código da prova e o gabarito são conferidos; se as questões mudaram, a reimpressão é recusada.</p>
+                    {% if provas_recentes %}
+                    <fieldset class="space-y-2">
+                        <legend class="sr-only">Provas recentes</legend>
+                        {% for prova in provas_recentes %}
+                        <label class="flex items-start gap-3 bg-white rounded-lg p-3 border border-gray-200 cursor-pointer">
+                            <input type="checkbox" name="provas" value="{{ prova.pk }}" class="mt-1">
+                            <span class="text-sm">
+                                <strong>{{ prova.titulo_topo }}</strong>
+                                {% if prova.semestre_letivo %} · Semestre {{ prova.semestre_letivo }}{% endif %}
+                                {% if prova.turma_prova %} · Turma {{ prova.turma_prova }}{% endif %}<br>
+                                <span class="text-gray-600">Código {{ prova.codigo }} · {{ prova.questao_ids|length }} questões · {{ prova.atualizada_em|date:"d/m/Y H:i" }}</span>
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </fieldset>
+                    <button type="submit" class="mt-4 px-6 py-3 bg-gradient-to-r from-accent to-green-600 text-white font-semibold rounded-xl shadow-lg">Gerar somente os cartões selecionados</button>
+                    {% else %}
+                    <p class="text-sm">Nenhuma prova recente. Os cartões aparecem aqui depois que você gerar uma prova.</p>
+                    {% endif %}
+                </form>
             </div>
         </div>
     </div>
@@ -225,6 +248,16 @@
         renderCounts();
 
         const geradorForm = document.querySelector('form[action="{% url 'prova_gerada' %}"]');
+        const formCartoes = document.getElementById('form-cartoes');
+        if (formCartoes) formCartoes.addEventListener('submit', function (event) {
+            if (!formCartoes.querySelector('input[name="provas"]:checked')) {
+                event.preventDefault();
+                erroPreflight.textContent = 'Selecione ao menos uma prova recente.';
+                erroPreflight.classList.remove('hidden');
+            } else {
+                erroPreflight.classList.add('hidden');
+            }
+        });
         const modalGabarito = document.getElementById('modal-gabarito');
         const modalAbrir = document.getElementById('modal-gabarito-abrir');
         const modalCancelar = document.getElementById('modal-gabarito-cancelar');

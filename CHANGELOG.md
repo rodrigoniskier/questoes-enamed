@@ -1,5 +1,12 @@
 # Alterações
 
+## 2026-11-17 — Semestre letivo no cartão e reimpressão só do cartão
+
+- O cartão de respostas exibe o semestre letivo da prova (ex.: «SEMESTRE LETIVO: 2026.2»).
+- Cada prova aberta é registrada (por usuário, sem duplicar o mesmo código/período/turma); a página do gerador lista as 20 mais recentes e permite imprimir apenas os cartões escolhidos.
+- A reimpressão recalcula o cartão e recusa a operação se as questões mudaram (código da prova diferente) ou deixaram de ser aprovadas.
+- Migração aditiva `0022_prova_gerada` (nova tabela; nada existente é alterado). Provas geradas antes desta versão não aparecem na lista.
+
 ## 2026-11-02 — PDF e aprovação em lote no painel
 
 - Seleção compartilhada de questões, Selecionar todas da página atual e contador acessível.
