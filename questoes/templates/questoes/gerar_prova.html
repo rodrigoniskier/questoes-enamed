@@ -154,6 +154,18 @@
                     <p class="text-sm">Nenhuma prova recente. Os cartões aparecem aqui depois que você gerar uma prova.</p>
                     {% endif %}
                 </form>
+                <form action="{% url 'cartao_avulso' %}" method="GET" target="_blank" class="glass-effect rounded-2xl p-8 shadow-xl border border-white/20 mt-8">
+                    <h3 class="text-xl font-bold mb-2">Cartão de respostas avulso</h3>
+                    <p class="text-sm mb-4">Para provas que não estão na lista acima. O cartão sai sem código de prova, só com a grade de respostas.</p>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <label class="text-sm font-semibold">Semestre letivo<input name="semestre_letivo" required maxlength="30" placeholder="Ex.: 2026.2" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"></label>
+                        <label class="text-sm font-semibold">Período<input name="periodo_prova" required maxlength="60" placeholder="Ex.: 8º Período" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"></label>
+                        <label class="text-sm font-semibold">Turma<input name="turma_prova" required maxlength="40" placeholder="Ex.: B" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"></label>
+                        <label class="text-sm font-semibold">Quantidade de questões<input name="quantidade" type="number" required min="1" max="300" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"></label>
+                        <label class="text-sm font-semibold">Alternativas por questão<select name="alternativas" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"><option value="4">4 (A–D)</option><option value="5">5 (A–E)</option></select></label>
+                    </div>
+                    <button type="submit" class="mt-4 px-6 py-3 bg-gradient-to-r from-accent to-green-600 text-white font-semibold rounded-xl shadow-lg">Gerar cartão avulso</button>
+                </form>
             </div>
         </div>
     </div>

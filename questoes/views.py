@@ -28,8 +28,8 @@ from django.views.decorators.http import require_GET
 
 from .ai_control import AIControlError, subject_key
 from .answer_layout import alternativas_para_prova, montar_alternativas, resumo_gabarito
-from .answer_sheet import LETRAS, codigo_prova, linhas_do_gabarito, paginas_do_cartao
-from .forms import AlternativaForm, IdentificacaoProvaForm, QuestaoForm
+from .answer_sheet import LETRAS, codigo_prova, linhas_do_gabarito, paginas_avulsas, paginas_do_cartao
+from .forms import AlternativaForm, CartaoAvulsoForm, IdentificacaoProvaForm, QuestaoForm
 from .models import ComponenteCurricular, Periodo, ProvaGerada, Questao, Semestre
 from .submission import (
     ASSERTION_ANSWERS,
@@ -606,6 +606,34 @@ def cartoes_gerados_view(request):
             }
         )
     resposta = render(request, "questoes/prova_template.html", {"somente_cartao": True, "cartoes": cartoes})
+    resposta["Cache-Control"] = "no-store"
+    return resposta
+
+
+@staff_member_required
+def cartao_avulso_view(request):
+    """Cartão individual sem prova registrada (por exemplo, provas anteriores ao registro)."""
+    form = CartaoAvulsoForm(request.GET)
+    if not form.is_valid():
+        erros = "; ".join(f"{form.fields[c].label}: {e[0]}" for c, e in form.errors.items())
+        messages.error(request, f"Dados do cartão avulso inválidos. {erros}")
+        return redirect("pagina_gerar_prova")
+    d = form.cleaned_data
+    resposta = render(
+        request,
+        "questoes/prova_template.html",
+        {
+            "somente_cartao": True,
+            "cartoes": [
+                {
+                    "titulo_topo": f"{d['periodo_prova']} · Turma {d['turma_prova']}",
+                    "codigo_prova": "AVULSO (sem código de prova)",
+                    "semestre_letivo": d["semestre_letivo"],
+                    "paginas": paginas_avulsas(d["quantidade"], d["alternativas"]),
+                }
+            ],
+        },
+    )
     resposta["Cache-Control"] = "no-store"
     return resposta
 

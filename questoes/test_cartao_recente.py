@@ -48,8 +48,21 @@ class CartaoRecenteTests(TestCase):
         self.assertEqual(ProvaGerada.objects.filter(usuario=self.gestor).count(), 1)
         registro = ProvaGerada.objects.get()
         self.assertEqual(registro.semestre_letivo, "2026.2")
-        self.gerar(ordem="x")  # mesma seleção possível ou nova: nunca mais de um por código
-        self.assertLessEqual(ProvaGerada.objects.filter(usuario=self.gestor).count(), 1)
+        # Reabrir a mesma prova (mesmo código) não cria outro registro.
+        reabrir = reverse("prova_gerada") + "?ids=" + ",".join(map(str, registro.questao_ids))
+        self.client.get(reabrir)
+        from .views import _registrar_prova
+
+        _registrar_prova(
+            self.gestor,
+            registro.questao_ids,
+            registro.tipo_prova,
+            registro.codigo,
+            registro.titulo_topo,
+            {},
+            registro.semestre_letivo,
+        )
+        self.assertEqual(ProvaGerada.objects.filter(usuario=self.gestor).count(), 1)
         pagina = self.client.get(reverse("pagina_gerar_prova"))
         self.assertContains(pagina, registro.codigo)
 
@@ -116,3 +129,55 @@ class CartaoRecenteTests(TestCase):
         Questao.objects.filter(pk=registro.questao_ids[0]).update(status="PENDENTE")
         resposta = self.client.get(reverse("cartoes_gerados"), {"provas": [registro.pk]}, follow=True)
         self.assertContains(resposta, "alteradas ou removidas")
+
+
+class CartaoAvulsoTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.gestor = get_user_model().objects.create_user("gestor-avulso", is_staff=True)
+
+    def pedir(self, **extra):
+        dados = {
+            "semestre_letivo": "2026.1",
+            "periodo_prova": "8º Período",
+            "turma_prova": "B",
+            "quantidade": 50,
+            "alternativas": 4,
+            **extra,
+        }
+        return self.client.get(reverse("cartao_avulso"), dados)
+
+    def test_gera_cartao_com_identificacao_e_quantidade(self):
+        self.client.force_login(self.gestor)
+        resposta = self.pedir()
+        self.assertContains(resposta, "SEMESTRE LETIVO: 2026.1")
+        self.assertContains(resposta, "8º Período · Turma B")
+        self.assertContains(resposta, "AVULSO")
+        self.assertContains(resposta, 'class="cartao-numero">050</span>')
+        self.assertNotContains(resposta, 'class="cartao-numero">051</span>')
+        self.assertNotContains(resposta, 'class="cartao-bolha">E</span>')
+        self.assertNotContains(resposta, 'class="pagina page-break-after capa-container"')
+
+    def test_cinco_alternativas_e_varias_folhas(self):
+        self.client.force_login(self.gestor)
+        resposta = self.pedir(quantidade=121, alternativas=5)
+        self.assertContains(resposta, '<section class="pagina cartao-respostas">', count=2)
+        self.assertContains(resposta, 'class="cartao-bolha">E</span>')
+
+    def test_entradas_invalidas_sao_recusadas(self):
+        self.client.force_login(self.gestor)
+        for extra in (
+            {"quantidade": 0},
+            {"quantidade": 301},
+            {"alternativas": 6},
+            {"turma_prova": ""},
+            {"semestre_letivo": "a\nb"},
+            {"quantidade": "x"},
+        ):
+            with self.subTest(extra=extra):
+                self.assertRedirects(self.pedir(**extra), reverse("pagina_gerar_prova"))
+
+    def test_exige_login(self):
+        resposta = self.pedir()
+        self.assertEqual(resposta.status_code, 302)
+        self.assertIn("login", resposta["Location"])

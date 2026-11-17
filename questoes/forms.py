@@ -35,6 +35,26 @@ class IdentificacaoProvaForm(forms.Form):
         return dados
 
 
+class CartaoAvulsoForm(forms.Form):
+    semestre_letivo = forms.CharField(label="Semestre letivo", max_length=30)
+    periodo_prova = forms.CharField(label="Período", max_length=60)
+    turma_prova = forms.CharField(label="Turma", max_length=40)
+    quantidade = forms.IntegerField(label="Quantidade de questões", min_value=1, max_value=300)
+    alternativas = forms.TypedChoiceField(
+        label="Alternativas por questão", choices=[(4, "4 (A–D)"), (5, "5 (A–E)")], coerce=int
+    )
+
+    def clean(self):
+        dados = super().clean()
+        for nome in ("semestre_letivo", "periodo_prova", "turma_prova"):
+            valor = (dados.get(nome) or "").strip()
+            if any(ord(c) < 32 or ord(c) == 127 for c in valor):
+                self.add_error(nome, "Informe em uma única linha.")
+            if nome in dados:
+                dados[nome] = valor
+        return dados
+
+
 # ============================================================================
 # FORMULÁRIOS FINAIS E CORRIGIDOS
 # ============================================================================
