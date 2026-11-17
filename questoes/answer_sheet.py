@@ -46,6 +46,17 @@ def paginas_do_cartao(questoes, alternativas_por_questao):
             raise ValueError(f"Questão {questao.pk}: quantidade de alternativas inválida.")
         itens.append({"numero": numero, "letras": LETRAS[: len(alternativas)]})
 
+    return _paginar(itens)
+
+
+def paginas_avulsas(quantidade, alternativas):
+    """Cartão sem prova associada: apenas a grade de bolhas."""
+    if not (type(quantidade) is int and 1 <= quantidade <= 300 and alternativas in (4, 5)):
+        raise ValueError("Informe de 1 a 300 questões e 4 ou 5 alternativas.")
+    return _paginar([{"numero": n, "letras": LETRAS[:alternativas]} for n in range(1, quantidade + 1)])
+
+
+def _paginar(itens):
     paginas = []
     total_paginas = ceil(len(itens) / MAXIMO_POR_FOLHA)
     for inicio in range(0, len(itens), MAXIMO_POR_FOLHA):

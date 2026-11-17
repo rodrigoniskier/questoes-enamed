@@ -277,3 +277,34 @@ class ImportacaoQuestao(models.Model):
 
     def __str__(self):
         return f"Questão {self.origem_identificador} → {self.receptor}"
+
+
+class ProvaGerada(models.Model):
+    """Registro leve de cada prova aberta, para reimprimir apenas o cartão.
+
+    Guarda apenas a seleção ordenada de questões e a identificação impressa;
+    o cartão é sempre recalculado e conferido pelo código da prova.
+    """
+
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    questao_ids = models.JSONField()
+    tipo_prova = models.CharField(max_length=20)
+    codigo = models.CharField(max_length=13)
+    titulo_topo = models.CharField(max_length=120)
+    periodo_prova = models.CharField(max_length=60, blank=True)
+    turma_prova = models.CharField(max_length=40, blank=True)
+    semestre_letivo = models.CharField(max_length=200, blank=True)
+    criada_em = models.DateTimeField(auto_now_add=True)
+    atualizada_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-atualizada_em", "-pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["usuario", "codigo", "tipo_prova", "periodo_prova", "turma_prova"],
+                name="prova_gerada_unica",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.titulo_topo} · {self.codigo}"
