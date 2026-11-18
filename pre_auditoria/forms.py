@@ -95,7 +95,7 @@ class RevisaoAlternativasFormSet(BaseInlineFormSet):
             if not text and not correct:
                 continue
             alternatives.append({"texto": text, "eh_correta": correct})
-        count = 5 if style == "ASSERCAO_RAZAO" else alternative_count(self.instance.componente, style)
+        count = 5 if style == "ASSERCAO_RAZAO" else alternative_count(self.instance.componente, style, self.instance.uso_prova)
         validation_style = "RESPOSTA_UNICA" if style == "ASSERCAO_RAZAO" else style
         try:
             validate_alternatives(alternatives, validation_style, count)
