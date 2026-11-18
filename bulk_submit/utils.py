@@ -106,7 +106,7 @@ def validate_import(data, componente, backup=False):
         if not isinstance(item, dict):
             raise ValidationError("Item inválido no lote.")
         style = item.get("tipo_questao", "RESPOSTA_UNICA")
-        if style not in allowed_styles(componente):
+        if style not in allowed_styles(componente, item.get("uso_prova", "INTEGRADA")):
             raise ValidationError("Estilo inválido para este componente.")
         if item.get("uso_prova", "INTEGRADA") not in dict(Questao.USO_PROVA_CHOICES):
             raise ValidationError("Destino inválido no lote.")
@@ -144,5 +144,5 @@ def validate_import(data, componente, backup=False):
                 item["assercao_gabarito"] = "ABCDE"[
                     next(i for i, a in enumerate(alternatives) if a["eh_correta"])
                 ]
-            validate_ai_draft(item, style, alternative_count(componente, style))
+            validate_ai_draft(item, style, alternative_count(componente, style, item.get("uso_prova", "INTEGRADA")))
     return data
