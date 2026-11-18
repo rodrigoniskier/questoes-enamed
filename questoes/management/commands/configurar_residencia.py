@@ -50,7 +50,7 @@ class Command(BaseCommand):
                     periodo.save(update_fields=["ativo"])
             else:
                 periodo = Periodo.objects.create(
-                    nome="Residência Médica", semestre=semestre, ativo=True
+                    nome="RESIDÊNCIA MÉDICA", semestre=semestre, ativo=True
                 )
 
             # Não altera bancos de questões nem substitui componentes existentes.
