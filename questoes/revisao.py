@@ -57,7 +57,9 @@ class QuestaoEnviadaForm(QuestaoRevisaoForm):
     def clean(self):
         data = super().clean()
         component = data.get("componente", self.instance.componente)
-        if component and data.get("tipo_questao") not in allowed_styles(component, data.get("uso_prova", self.instance.uso_prova)):
+        if component and data.get("tipo_questao") not in allowed_styles(
+            component, data.get("uso_prova", self.instance.uso_prova)
+        ):
             self.add_error("tipo_questao", "Este componente aceita apenas questões de resposta única.")
         return data
 
