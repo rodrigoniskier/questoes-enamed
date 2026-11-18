@@ -5,7 +5,6 @@ from django.db import transaction
 
 from questoes.models import ComponenteCurricular, Periodo, Semestre
 
-
 AREAS_RESIDENCIA = (
     ("Medicina Social e Preventiva - RM", 10),
     ("Obstetrícia e Ginecologia - RM", 10),
