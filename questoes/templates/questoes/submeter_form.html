@@ -88,6 +88,7 @@
                             <div>
                                 <label for="{{ questao_form.uso_prova.id_for_label }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Destino da Questão</label>
                                 {{ questao_form.uso_prova }}
+                                <p class="mt-2 text-xs text-gray-600 dark:text-gray-300">Para alterar a quantidade de alternativas entre modalidades, volte à seleção inicial de questões.</p>
                             </div>
                         </div>
                     </div>
@@ -113,6 +114,12 @@
                                     </tr>
                                     <tr data-prova="REPOSICAO" class="border-t border-gray-200 dark:border-gray-700">
                                         <th scope="row">Reposição</th>
+                                        <td class="font-bold">{{ componente.numero_questoes_prova }}</td>
+                                        <td data-contagem="enviado">—</td>
+                                        <td data-contagem="restantes">—</td>
+                                    </tr>
+                                    <tr data-prova="RESIDENCIA" class="border-t border-gray-200 dark:border-gray-700">
+                                        <th scope="row">Residência Médica</th>
                                         <td class="font-bold">{{ componente.numero_questoes_prova }}</td>
                                         <td data-contagem="enviado">—</td>
                                         <td data-contagem="restantes">—</td>
@@ -556,6 +563,7 @@
                     'prompt_professor': promptDoProfessor,
                     'componente_id': componenteId,
                     'tipo_questao': tipoSelecionado,
+                    'uso_prova': form.elements['uso_prova'].value,
                     'num_alternativas': numAlternativas,
                     // Novos Parâmetros ENAMED:
                     'area_primaria': document.getElementById('ia-area-primaria').value,
