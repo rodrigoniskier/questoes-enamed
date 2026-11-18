@@ -4,7 +4,6 @@ import csv
 import json
 import logging
 import math
-import random
 import re
 import uuid
 from collections import Counter
@@ -29,6 +28,7 @@ from django.views.decorators.http import require_GET
 from .ai_control import AIControlError, subject_key
 from .answer_layout import alternativas_para_prova, montar_alternativas, resumo_gabarito
 from .answer_sheet import LETRAS, codigo_prova, linhas_do_gabarito, paginas_avulsas, paginas_do_cartao
+from .exam_selection import questoes_sao_unicas, selecionar_questoes_unicas
 from .forms import AlternativaForm, CartaoAvulsoForm, IdentificacaoProvaForm, QuestaoForm
 from .models import ComponenteCurricular, Periodo, ProvaGerada, Questao, Semestre
 from .submission import (
@@ -700,6 +700,8 @@ def prova_gerada_view(request):
         if len(mapa) != len(ids):
             return falha("A seleção da prova foi modificada. Gere uma nova prova.")
         questoes_selecionadas = [mapa[pk] for pk in ids]
+        if not questoes_sao_unicas(questoes_selecionadas):
+            return falha("A seleção contém questões repetidas. Gere uma nova prova.")
         componentes_ids = {questao.componente_id for questao in questoes_selecionadas}
         componentes_da_prova = (
             ComponenteCurricular.objects.filter(pk__in=componentes_ids)
@@ -749,7 +751,7 @@ def prova_gerada_view(request):
                 )
             quantidades[componente.pk] = int(valor)
 
-        questoes_selecionadas = []
+        bancos = []
         for componente in componentes_da_prova:
             query_base = Q(componente=componente, status__in=Questao.STATUS_APROVADOS)
             if tipo_prova == "reposicao":
@@ -761,10 +763,8 @@ def prova_gerada_view(request):
             else:
                 query_tipo = Q(uso_prova="INTEGRADA") | Q(uso_prova="AMBAS")
             aprovadas = list(Questao.objects.filter(query_base & query_tipo))
-            quantidade = quantidades[componente.pk]
-            questoes_selecionadas.extend(
-                random.sample(aprovadas, quantidade) if len(aprovadas) >= quantidade else aprovadas
-            )
+            bancos.append((componente.pk, aprovadas))
+        questoes_selecionadas = selecionar_questoes_unicas(bancos, quantidades)
         if not questoes_selecionadas:
             return falha("Não há questões aprovadas para compor esta prova.")
         if len(questoes_selecionadas) > 300:
