@@ -48,7 +48,7 @@ class ResidenciaPeriodoTests(TestCase):
         self.assertEqual(len(componentes), 5)
         self.assertEqual(sum(c["numero_questoes_prova"] for c in componentes), 50)
 
-    def test_submission_uses_residency_only_and_four_alternatives(self):
+    def test_submission_accepts_residency_and_replacement_only_with_four_alternatives(self):
         componente = self.componentes[0]
         url = reverse("submeter_resposta_unica") + f"?componente={componente.pk}"
         resposta = self.client.get(url)
@@ -76,12 +76,27 @@ class ResidenciaPeriodoTests(TestCase):
         questao = Questao.objects.get(enunciado="Qual a melhor conduta?")
         self.assertEqual(questao.uso_prova, "RESIDENCIA")
         self.assertEqual(questao.alternativas.count(), 4)
+        dados["uso_prova"] = "REPOSICAO"
+        dados["submission_token"] = self.client.get(url).context["submission_token"]
+        dados["enunciado"] = "Questão da reposição da Residência"
+        self.assertRedirects(self.client.post(url, dados), reverse("submeter_selecao"))
+        reposicao = Questao.objects.get(enunciado="Questão da reposição da Residência")
+        self.assertEqual(reposicao.uso_prova, "REPOSICAO")
+        self.assertEqual(reposicao.alternativas.count(), 4)
+        historico = self.client.get(
+            reverse("api_get_historico"), {"componente_id": componente.pk}
+        ).json()
+        self.assertEqual(historico["por_prova"]["RESIDENCIA"]["necessario"], 10)
+        self.assertEqual(historico["por_prova"]["RESIDENCIA"]["enviado"], 1)
+        self.assertEqual(historico["por_prova"]["REPOSICAO"]["necessario"], 10)
+        self.assertEqual(historico["por_prova"]["REPOSICAO"]["enviado"], 1)
+
         dados["uso_prova"] = "INTEGRADA"
         dados["submission_token"] = self.client.get(url).context["submission_token"]
         dados["enunciado"] = "Tentativa com destino incorreto"
         recusado = self.client.post(url, dados)
         self.assertEqual(recusado.status_code, 200)
-        self.assertContains(recusado, "Este período aceita somente questões de Residência Médica.")
+        self.assertContains(recusado, "Este período aceita apenas questões de Residência Médica ou de sua reposição.")
         self.assertFalse(Questao.objects.filter(enunciado="Tentativa com destino incorreto").exists())
 
     def test_generator_selects_residency_questions_in_its_own_period(self):
