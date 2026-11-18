@@ -41,7 +41,7 @@ def cadastrar_residencia(apps, schema_editor):
             periodo.save(update_fields=["ativo"], using=alias)
     else:
         periodo = Periodo.objects.using(alias).create(
-            semestre_id=semestre.pk, nome="Residência Médica", ativo=True
+            semestre_id=semestre.pk, nome="RESIDÊNCIA MÉDICA", ativo=True
         )
 
     # Se a coordenação já definiu componentes próprios, mantém exatamente esses.
