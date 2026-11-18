@@ -65,7 +65,12 @@ class AnswerLayoutTests(TestCase):
         self.assertEqual(layout[automaticas.pk], gerar_alternativas_multipla_escolha(automaticas))
 
     def test_prova_previa_gabaritos_e_txt_conservam_letras_repetidas(self):
-        questoes = [self.criar_questao([False, True, False, False]) for _ in range(4)]
+        questoes = []
+        for indice in range(4):
+            questao = self.criar_questao([False, True, False, False])
+            questao.enunciado = f"Selecione a opção correta no caso {indice + 1}."
+            questao.save(update_fields=["enunciado"])
+            questoes.append(questao)
         self.client.force_login(self.gestor)
         parametros = {"componentes": self.componente.pk, f"quantidade_{self.componente.pk}": 4}
         previa = self.client.get(reverse("prova_gerada"), {**parametros, "preflight": "1"}).json()

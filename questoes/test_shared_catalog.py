@@ -96,12 +96,14 @@ class SharedCatalogTests(TestCase):
             {
                 "INTEGRADA": {"necessario": 6, "enviado": 3, "restantes": 3},
                 "REPOSICAO": {"necessario": 6, "enviado": 2, "restantes": 4},
+                "RESIDENCIA": {"necessario": 6, "enviado": 1, "restantes": 5},
             },
         )
         form = self.client.get(reverse("submeter_resposta_unica"), {"componente": self.cd.pk})
         self.assertContains(form, 'data-prova="INTEGRADA"')
         self.assertContains(form, 'data-prova="REPOSICAO"')
-        self.assertContains(form, '<td class="font-bold">6</td>', count=2, html=True)
+        self.assertContains(form, 'data-prova="RESIDENCIA"')
+        self.assertContains(form, '<td class="font-bold">6</td>', count=3, html=True)
 
     def test_failure_during_question_move_rolls_back_catalog_and_links(self):
         from django.db.models.query import QuerySet
