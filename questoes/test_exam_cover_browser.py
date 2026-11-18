@@ -120,7 +120,7 @@ class CapaProvaBrowserTests(StaticLiveServerTestCase):
             periodo = page.get_by_label("Período da prova", exact=True)
             self.assertEqual(periodo.input_value(), "4º Período")
             periodo.fill("8º Período")
-            page.get_by_label("Turma", exact=True).fill("B & C")
+            page.locator("#id_turma_prova").fill("B & C")
             page.get_by_role("button", name="Gerar Prova Integrada").click()
             self.assertIn("8º Período · Turma B & C", page.get_by_role("dialog").inner_text())
             with page.expect_popup() as abertura:
