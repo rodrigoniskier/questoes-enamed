@@ -184,7 +184,7 @@ def validar_estrutura(questao):
 
     correct_count = sum(alternative.eh_correta for alternative in alternatives)
     if questao.tipo_questao == "RESPOSTA_UNICA":
-        expected_count = alternative_count(questao.componente)
+        expected_count = alternative_count(questao.componente, uso_prova=questao.uso_prova)
         if len(alternatives) != expected_count:
             findings.append(
                 _achado(
