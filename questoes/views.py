@@ -132,10 +132,17 @@ def submeter_form_view(request, tipo_questao):
     ):
         messages.info(request, "Este semestre está arquivado. Selecione um componente do semestre atual.")
         return redirect("submeter_selecao")
-    if tipo_questao not in allowed_styles(componente):
-        messages.error(request, "Este componente permite apenas questões de resposta única.")
+    initial = {**get_header(request, componente), "componente": componente, "tipo_questao": tipo_questao}
+    destino_solicitado = request.GET.get("uso_prova")
+    if destino_solicitado in dict(Questao.USO_PROVA_CHOICES):
+        initial["uso_prova"] = destino_solicitado
+    elif "residência médica" in componente.periodo.nome.casefold():
+        initial.setdefault("uso_prova", "RESIDENCIA")
+    destino = request.POST.get("uso_prova") if request.method == "POST" else initial.get("uso_prova")
+    if tipo_questao not in allowed_styles(componente, destino):
+        messages.error(request, "Questões de Residência Médica permitem apenas resposta única.")
         return redirect("submeter_selecao")
-    num_alternativas = alternative_count(componente, tipo_questao)
+    num_alternativas = alternative_count(componente, tipo_questao, destino)
     FormSet = formset_factory(
         AlternativaForm,
         extra=num_alternativas,
@@ -143,7 +150,6 @@ def submeter_form_view(request, tipo_questao):
         validate_max=True,
         absolute_max=num_alternativas,
     )
-    initial = {**get_header(request, componente), "componente": componente, "tipo_questao": tipo_questao}
     if tipo_questao == "MULTIPLA_ESCOLHA":
         initial["enunciado"] = MULTIPLE_STATEMENT_PROMPT
     submission_token = new_submission_token(componente, tipo_questao)
@@ -306,8 +312,8 @@ def get_historico_questoes(request):
         restantes = total_necessario - total_enviado
         destinos = Counter(q.uso_prova for q in questoes)
         por_prova = {}
-        for prova in ("INTEGRADA", "REPOSICAO"):
-            enviadas = destinos[prova] + destinos["AMBAS"]
+        for prova in ("INTEGRADA", "REPOSICAO", "RESIDENCIA"):
+            enviadas = destinos[prova] + (destinos["AMBAS"] if prova != "RESIDENCIA" else 0)
             por_prova[prova] = {
                 "necessario": total_necessario,
                 "enviado": enviadas,
@@ -367,6 +373,7 @@ def api_gerar_questao_view(request):
         componente_id = data.get("componente_id")
         tipo_questao = data.get("tipo_questao")
         num_alternativas = data.get("num_alternativas")
+        uso_prova = data.get("uso_prova")
 
         # --- NOVOS DADOS EXTRAÍDOS DO FRONTEND ---
         parametros_ia = {
@@ -400,12 +407,13 @@ def api_gerar_questao_view(request):
         ):
             return JsonResponse({"erro": "O semestre deste componente está arquivado."}, status=400)
         if (
-            tipo_questao not in allowed_styles(componente)
+            (uso_prova is not None and uso_prova not in dict(Questao.USO_PROVA_CHOICES))
+            or tipo_questao not in allowed_styles(componente, uso_prova)
             or type(num_alternativas) is not int
             or (
                 not 3 <= num_alternativas <= 5
                 if tipo_questao == "MULTIPLA_ESCOLHA"
-                else num_alternativas != alternative_count(componente, tipo_questao)
+                else num_alternativas != alternative_count(componente, tipo_questao, uso_prova)
             )
         ):
             return JsonResponse({"erro": "Estilo ou número de alternativas inválido."}, status=400)
