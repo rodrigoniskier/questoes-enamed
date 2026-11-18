@@ -31,7 +31,7 @@ class CapaProvaBrowserTests(StaticLiveServerTestCase):
                 componente=componente,
                 professor_nome="Docente",
                 professor_email="docente@example.com",
-                enunciado="Selecione a alternativa correta.",
+                enunciado=f"Selecione a alternativa correta no caso {indice + 1}.",
                 justificativa="Justificativa.",
                 tipo_questao="RESPOSTA_UNICA",
                 status="APROVADA",
