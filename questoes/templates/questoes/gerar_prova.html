@@ -189,7 +189,7 @@
         const status = document.getElementById('componentes-status');
         const periodoProva = document.getElementById('id_periodo_prova');
         const savedCounts = new Map();
-        const submitButtons = document.querySelectorAll('button[type="submit"]');
+        const submitButtons = document.querySelectorAll('form[action="{% url \'prova_gerada\' %}"] button[type="submit"]');
         let controller;
 
         function rememberCounts() {
