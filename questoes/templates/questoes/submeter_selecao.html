@@ -187,6 +187,11 @@
                 labelRespostaUnica.style.display = 'inline-flex';
                 labelRespostaMultipla.style.display = apenasRespostaUnica ? 'none' : 'inline-flex';
                 labelAssercaoRazao.style.display = apenasRespostaUnica ? 'none' : 'inline-flex';
+                ['tipo-me', 'tipo-ar'].forEach(id => {
+                    const campo = document.getElementById(id);
+                    campo.style.display = apenasRespostaUnica ? 'none' : '';
+                    campo.disabled = apenasRespostaUnica;
+                });
                 if (apenasRespostaUnica) {
                     tipoQuestaoRadios.forEach(radio => {
                         if (radio.value !== 'RESPOSTA_UNICA') radio.checked = false;
@@ -206,6 +211,7 @@
                 componentController?.abort();
                 componentController = new AbortController();
                 tipoQuestaoRadios.forEach(radio => radio.checked = false);
+                seletorDestino.value = 'INTEGRADA';
                 selectionStatus.textContent = '';
                 hideBlock(blocoComponente);
                 hideBlock(blocoVisualizar);
