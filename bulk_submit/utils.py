@@ -144,5 +144,7 @@ def validate_import(data, componente, backup=False):
                 item["assercao_gabarito"] = "ABCDE"[
                     next(i for i, a in enumerate(alternatives) if a["eh_correta"])
                 ]
-            validate_ai_draft(item, style, alternative_count(componente, style, item.get("uso_prova", "INTEGRADA")))
+            validate_ai_draft(
+                item, style, alternative_count(componente, style, item.get("uso_prova", "INTEGRADA"))
+            )
     return data
