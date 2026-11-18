@@ -18,7 +18,9 @@ class Command(BaseCommand):
     help = "Ativa o período Residência Médica e cria cinco componentes de 10 questões (50 na prova) se não houver componentes."
 
     def add_arguments(self, parser):
-        parser.add_argument("--semestre", help="Nome do semestre de destino; por padrão, o ativo mais recente.")
+        parser.add_argument(
+            "--semestre", help="Nome do semestre de destino; por padrão, o ativo mais recente."
+        )
         parser.add_argument("--dry-run", action="store_true", help="Simula as alterações sem salvar.")
 
     def handle(self, *args, **options):
@@ -48,9 +50,7 @@ class Command(BaseCommand):
                     periodo.ativo = True
                     periodo.save(update_fields=["ativo"])
             else:
-                periodo = Periodo.objects.create(
-                    nome="RESIDÊNCIA MÉDICA", semestre=semestre, ativo=True
-                )
+                periodo = Periodo.objects.create(nome="RESIDÊNCIA MÉDICA", semestre=semestre, ativo=True)
 
             # Não altera bancos de questões nem substitui componentes existentes.
             criadas = 0
@@ -62,9 +62,7 @@ class Command(BaseCommand):
                         numero_questoes_prova=quantidade,
                     )
                     criadas += 1
-            total = ComponenteCurricular.objects.filter(
-                periodo=periodo, consolidado_em__isnull=True
-            ).count()
+            total = ComponenteCurricular.objects.filter(periodo=periodo, consolidado_em__isnull=True).count()
             if options["dry_run"]:
                 transaction.set_rollback(True)
 
