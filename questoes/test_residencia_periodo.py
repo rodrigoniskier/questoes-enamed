@@ -42,9 +42,7 @@ class ResidenciaPeriodoTests(TestCase):
         pagina_gerador = self.client.get(reverse("pagina_gerar_prova"))
         self.assertContains(pagina_gerador, f'<option value="{self.periodo.pk}">RESIDÊNCIA MÉDICA</option>')
         self.assertContains(pagina_gerador, 'value="residencia"')
-        componentes = self.client.get(
-            reverse("api_get_componentes"), {"periodo_id": self.periodo.pk}
-        ).json()
+        componentes = self.client.get(reverse("api_get_componentes"), {"periodo_id": self.periodo.pk}).json()
         self.assertEqual(len(componentes), 5)
         self.assertEqual(sum(c["numero_questoes_prova"] for c in componentes), 50)
 
@@ -83,9 +81,7 @@ class ResidenciaPeriodoTests(TestCase):
         reposicao = Questao.objects.get(enunciado="Questão da reposição da Residência")
         self.assertEqual(reposicao.uso_prova, "REPOSICAO")
         self.assertEqual(reposicao.alternativas.count(), 4)
-        historico = self.client.get(
-            reverse("api_get_historico"), {"componente_id": componente.pk}
-        ).json()
+        historico = self.client.get(reverse("api_get_historico"), {"componente_id": componente.pk}).json()
         self.assertEqual(historico["por_prova"]["RESIDENCIA"]["necessario"], 10)
         self.assertEqual(historico["por_prova"]["RESIDENCIA"]["enviado"], 1)
         self.assertEqual(historico["por_prova"]["REPOSICAO"]["necessario"], 10)
@@ -96,7 +92,9 @@ class ResidenciaPeriodoTests(TestCase):
         dados["enunciado"] = "Tentativa com destino incorreto"
         recusado = self.client.post(url, dados)
         self.assertEqual(recusado.status_code, 200)
-        self.assertContains(recusado, "Este período aceita apenas questões de Residência Médica ou de sua reposição.")
+        self.assertContains(
+            recusado, "Este período aceita apenas questões de Residência Médica ou de sua reposição."
+        )
         self.assertFalse(Questao.objects.filter(enunciado="Tentativa com destino incorreto").exists())
 
     def test_generator_selects_residency_questions_in_its_own_period(self):
