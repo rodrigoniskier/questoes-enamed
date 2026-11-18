@@ -27,20 +27,23 @@ TOKEN_SALT = "questoes.submission.v1"
 
 
 def restricted_period(componente):
-    name = componente.periodo.nome.upper()
-    return name in ("ESTÁGIO CURRICULAR OBRIGATÓRIO", "RESIDÊNCIA MÉDICA") or "SIMULADO" in name
+    name = componente.periodo.nome.casefold()
+    return any(
+        marcador in name
+        for marcador in ("estágio curricular obrigatório", "residência médica", "simulado")
+    )
 
 
-def alternative_count(componente, style="RESPOSTA_UNICA"):
+def alternative_count(componente, style="RESPOSTA_UNICA", uso_prova=None):
     if style == "MULTIPLA_ESCOLHA":
         return 5
     semestre = componente.periodo.semestre
     edital_2026_2 = semestre is not None and semestre.nome == "2026.2"
-    return 4 if restricted_period(componente) or edital_2026_2 else 5
+    return 4 if uso_prova == "RESIDENCIA" or restricted_period(componente) or edital_2026_2 else 5
 
 
-def allowed_styles(componente):
-    return ("RESPOSTA_UNICA",) if restricted_period(componente) else tuple(FORM_ROUTES)
+def allowed_styles(componente, uso_prova=None):
+    return ("RESPOSTA_UNICA",) if restricted_period(componente) or uso_prova == "RESIDENCIA" else tuple(FORM_ROUTES)
 
 
 def new_submission_token(componente, style):
