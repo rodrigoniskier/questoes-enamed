@@ -7,16 +7,16 @@ from questoes.models import ComponenteCurricular, Periodo, Semestre
 
 
 AREAS_RESIDENCIA = (
-    ("Clínica Médica", 20),
-    ("Cirurgia Geral", 20),
-    ("Ginecologia e Obstetrícia", 20),
-    ("Pediatria", 20),
-    ("Medicina de Família e Comunidade / Saúde Coletiva", 20),
+    ("Medicina Social e Preventiva - RM", 10),
+    ("Obstetrícia e Ginecologia - RM", 10),
+    ("Pediatria - RM", 10),
+    ("Clínica Médica - RM", 10),
+    ("Cirurgia Geral - RM", 10),
 )
 
 
 class Command(BaseCommand):
-    help = "Ativa o período Residência Médica e cria cinco áreas (100 questões) se não houver componentes."
+    help = "Ativa o período Residência Médica e cria cinco componentes de 10 questões (50 na prova) se não houver componentes."
 
     def add_arguments(self, parser):
         parser.add_argument("--semestre", help="Nome do semestre de destino; por padrão, o ativo mais recente.")
