@@ -29,9 +29,8 @@ def identidade_questao(questao):
 
 def questoes_sao_unicas(questoes):
     identidades = [identidade_questao(questao) for questao in questoes]
-    return len(identidades) == len(set(identidades)) and len({
-        questao.pk for questao in questoes
-    }) == len(questoes)
+    ids = [questao.pk for questao in questoes]
+    return len(identidades) == len(set(identidades)) and len(ids) == len(set(ids))
 
 
 def selecionar_questoes_unicas(bancos, quantidades):
@@ -56,9 +55,7 @@ def selecionar_questoes_unicas(bancos, quantidades):
     # Os mais restritos tentam escolher antes; o remanejamento resolve conflitos.
     slots = [
         (componente_id, numero)
-        for componente_id in sorted(
-            ordem, key=lambda pk: (len(candidatos[pk]), ordem.index(pk))
-        )
+        for componente_id in sorted(ordem, key=lambda pk: (len(candidatos[pk]), ordem.index(pk)))
         for numero in range(quantidades[componente_id])
     ]
     donos = {}
