@@ -20,16 +20,22 @@ class Command(BaseCommand):
             raise CommandError(f"Grade inválida: {error}") from error
         nomes_originais = {p["nome"] for p in grade["periodos"]}
         nomes_atuais = {g["nome"] for g in grupos}
+        # A Residência é um período paralelo, não um componente do edital integrado.
+        periodos_adicionais = {"Residência Médica", "RESIDÊNCIA MÉDICA"}
         movidas = 0
 
         with transaction.atomic():
             semestre, _ = Semestre.objects.get_or_create(nome="2026.2", defaults={"ativo": False})
-            if semestre.periodos.exclude(nome__in=nomes_originais | nomes_atuais).exists():
+            if semestre.periodos.exclude(
+                nome__in=nomes_originais | nomes_atuais | periodos_adicionais
+            ).exists():
                 raise CommandError("2026.2 contém períodos fora do edital. Confira antes de consolidar.")
             # Stop on unexpected content; never discard an unrecognized component.
             permitidos = {p["nome"]: {c["nome"] for c in p["componentes"]} for p in grade["periodos"]}
             permitidos.update({g["nome"]: {c["nome"] for c in g["componentes"].values()} for g in grupos})
             for periodo in semestre.periodos.all():
+                if periodo.nome in periodos_adicionais:
+                    continue
                 if periodo.componentes.exclude(nome__in=permitidos[periodo.nome]).exists():
                     raise CommandError(f"Há componentes fora do edital em {periodo.nome}.")
 
