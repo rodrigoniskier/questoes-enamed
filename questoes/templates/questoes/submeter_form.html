@@ -106,24 +106,35 @@
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    {% if periodo_residencia %}
+                                    <tr data-prova="RESIDENCIA">
+                                        <th scope="row">Residência Médica</th>
+                                        <td class="font-bold">{{ componente.numero_questoes_prova }}</td>
+                                        <td data-contagem="enviado">—</td>
+                                        <td data-contagem="restantes">—</td>
+                                    </tr>
+                                    {% else %}
                                     <tr data-prova="INTEGRADA">
                                         <th scope="row">Integrada</th>
                                         <td class="font-bold">{{ componente.numero_questoes_prova }}</td>
                                         <td data-contagem="enviado">—</td>
                                         <td data-contagem="restantes">—</td>
                                     </tr>
+                                    {% endif %}
                                     <tr data-prova="REPOSICAO" class="border-t border-gray-200 dark:border-gray-700">
-                                        <th scope="row">Reposição</th>
+                                        <th scope="row">{% if periodo_residencia %}Reposição da Residência{% else %}Reposição{% endif %}</th>
                                         <td class="font-bold">{{ componente.numero_questoes_prova }}</td>
                                         <td data-contagem="enviado">—</td>
                                         <td data-contagem="restantes">—</td>
                                     </tr>
+                                    {% if not periodo_residencia %}
                                     <tr data-prova="RESIDENCIA" class="border-t border-gray-200 dark:border-gray-700">
                                         <th scope="row">Residência Médica</th>
                                         <td class="font-bold">{{ componente.numero_questoes_prova }}</td>
                                         <td data-contagem="enviado">—</td>
                                         <td data-contagem="restantes">—</td>
                                     </tr>
+                                    {% endif %}
                                 </tbody>
                             </table>
                         </div>
