@@ -180,8 +180,9 @@
             function atualizarEstilos() {
                 const nomePeriodo = seletorPeriodo.options[seletorPeriodo.selectedIndex].text.toLocaleUpperCase('pt-BR');
                 const periodoResidencia = nomePeriodo.includes('RESIDÊNCIA MÉDICA');
-                if (periodoResidencia) seletorDestino.value = 'RESIDENCIA';
-                seletorDestino.disabled = periodoResidencia;
+                Array.from(seletorDestino.options).forEach(option => {
+                    option.disabled = periodoResidencia && !['RESIDENCIA', 'REPOSICAO'].includes(option.value);
+                });
                 const apenasRespostaUnica =
                     nomePeriodo.includes('ESTÁGIO CURRICULAR OBRIGATÓRIO') ||
                     periodoResidencia ||
