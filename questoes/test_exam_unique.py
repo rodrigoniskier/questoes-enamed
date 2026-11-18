@@ -55,9 +55,7 @@ class GeradorQuestaoUnicaTests(TestCase):
         cls.a = ComponenteCurricular.objects.create(
             nome="Clínica Médica", periodo=periodo, numero_questoes_prova=2
         )
-        cls.b = ComponenteCurricular.objects.create(
-            nome="Cirurgia", periodo=periodo, numero_questoes_prova=2
-        )
+        cls.b = ComponenteCurricular.objects.create(nome="Cirurgia", periodo=periodo, numero_questoes_prova=2)
         cls.gestor = get_user_model().objects.create_user("gerador-unico", is_staff=True)
         cls.q1 = cls.fazer(cls.a, "Comando igual", "INTEGRADA")
         cls.q2 = cls.fazer(cls.b, "  comando IGUAL  ", "INTEGRADA")
@@ -78,43 +76,50 @@ class GeradorQuestaoUnicaTests(TestCase):
             uso_prova=uso,
         )
         for indice, letra in enumerate("ABCD"):
-            Alternativa.objects.create(
-                questao=questao, texto=f"Alternativa {letra}", eh_correta=indice == 0
-            )
+            Alternativa.objects.create(questao=questao, texto=f"Alternativa {letra}", eh_correta=indice == 0)
         return questao
 
     def setUp(self):
         self.client.force_login(self.gestor)
 
     def test_gerador_omite_copia_e_mantem_questoes_unicas(self):
-        resposta = self.client.get(reverse("prova_gerada"), {
-            "componentes": [self.a.pk, self.b.pk],
-            f"quantidade_{self.a.pk}": 1,
-            f"quantidade_{self.b.pk}": 2,
-        })
+        resposta = self.client.get(
+            reverse("prova_gerada"),
+            {
+                "componentes": [self.a.pk, self.b.pk],
+                f"quantidade_{self.a.pk}": 1,
+                f"quantidade_{self.b.pk}": 2,
+            },
+        )
         self.assertEqual(resposta.status_code, 200)
         escolhidas = resposta.context["questoes_selecionadas"]
         self.assertEqual({q.pk for q in escolhidas}, {self.q1.pk, self.q3.pk})
         self.assertTrue(questoes_sao_unicas(escolhidas))
 
     def test_residencia_seleciona_apenas_destino_correto(self):
-        resposta = self.client.get(reverse("prova_gerada"), {
-            "componentes": [self.a.pk],
-            "tipo_prova": "residencia",
-            f"quantidade_{self.a.pk}": 1,
-        })
+        resposta = self.client.get(
+            reverse("prova_gerada"),
+            {
+                "componentes": [self.a.pk],
+                "tipo_prova": "residencia",
+                f"quantidade_{self.a.pk}": 1,
+            },
+        )
         self.assertEqual(resposta.status_code, 200)
         self.assertEqual([q.pk for q in resposta.context["questoes_selecionadas"]], [self.qr.pk])
         self.assertEqual(resposta.context["titulo_topo"], "PROVA DE RESIDÊNCIA MÉDICA - UNIPÊ")
 
     def test_token_assinado_com_questoes_repetidas_e_rejeitado(self):
-        token = signing.dumps({
-            "usuario": self.gestor.pk,
-            "ids": [self.q1.pk, self.q2.pk],
-            "tipo_prova": "integrada",
-            "exportar_txt": False,
-            "codigo": "teste",
-        }, salt="questoes.prova.preflight.v1")
+        token = signing.dumps(
+            {
+                "usuario": self.gestor.pk,
+                "ids": [self.q1.pk, self.q2.pk],
+                "tipo_prova": "integrada",
+                "exportar_txt": False,
+                "codigo": "teste",
+            },
+            salt="questoes.prova.preflight.v1",
+        )
         resposta = self.client.get(reverse("prova_gerada"), {"prova_token": token}, follow=True)
         self.assertContains(resposta, "questões repetidas")
 
@@ -122,7 +127,7 @@ class GeradorQuestaoUnicaTests(TestCase):
         resposta = self.client.get(reverse("pagina_gerar_prova"))
         self.assertContains(
             resposta,
-            '''const submitButtons = document.querySelectorAll('form[action="{% url 'prova_gerada' %}"] button[type="submit"]');'''.replace(
+            """const submitButtons = document.querySelectorAll('form[action="{% url 'prova_gerada' %}"] button[type="submit"]');""".replace(
                 "{% url 'prova_gerada' %}", reverse("prova_gerada")
             ),
         )
