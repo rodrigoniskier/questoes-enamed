@@ -1,7 +1,7 @@
 """Cadastro inicial da Residência Médica no semestre letivo ativo.
 
-Os componentes representam uma prova-base de 100 questões objetivas: cinco
-áreas com meta de 20 cada, com quatro alternativas por questão. A migração
+O período repete o padrão de 2025.2: cinco componentes de 10 questões cada
+(50 na prova e meta igual para a reposição), com quatro alternativas. A migração
 preserva os bancos já cadastrados, sem renomear nem alterar questões existentes.
 """
 
@@ -9,11 +9,11 @@ from django.db import migrations
 
 
 AREAS_RESIDENCIA = (
-    ("Clínica Médica", 20),
-    ("Cirurgia Geral", 20),
-    ("Ginecologia e Obstetrícia", 20),
-    ("Pediatria", 20),
-    ("Medicina de Família e Comunidade / Saúde Coletiva", 20),
+    ("Medicina Social e Preventiva - RM", 10),
+    ("Obstetrícia e Ginecologia - RM", 10),
+    ("Pediatria - RM", 10),
+    ("Clínica Médica - RM", 10),
+    ("Cirurgia Geral - RM", 10),
 )
 
 
