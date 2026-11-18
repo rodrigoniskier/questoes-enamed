@@ -18,25 +18,35 @@ class ResidenciaPeriodoTests(TestCase):
     def setUp(self):
         self.semestre = Semestre.objects.create(nome="2026.2", ativo=True)
         call_command("configurar_residencia", stdout=StringIO())
-        self.periodo = Periodo.objects.get(semestre=self.semestre, nome="Residência Médica")
+        self.periodo = Periodo.objects.get(semestre=self.semestre, nome="RESIDÊNCIA MÉDICA")
         self.componentes = list(self.periodo.componentes.order_by("pk"))
         self.gestor = get_user_model().objects.create_user("gestor-residencia-periodo", is_staff=True)
 
     def test_appears_in_both_initial_period_selectors(self):
         self.assertTrue(self.periodo.ativo)
         self.assertEqual(len(self.componentes), 5)
-        self.assertEqual(sum(c.numero_questoes_prova for c in self.componentes), 100)
+        self.assertEqual(
+            [(componente.nome, componente.numero_questoes_prova) for componente in self.componentes],
+            [
+                ("Medicina Social e Preventiva - RM", 10),
+                ("Obstetrícia e Ginecologia - RM", 10),
+                ("Pediatria - RM", 10),
+                ("Clínica Médica - RM", 10),
+                ("Cirurgia Geral - RM", 10),
+            ],
+        )
+        self.assertEqual(sum(c.numero_questoes_prova for c in self.componentes), 50)
         pagina_submissao = self.client.get(reverse("submeter_selecao"))
-        self.assertContains(pagina_submissao, f'<option value="{self.periodo.pk}">Residência Médica</option>')
+        self.assertContains(pagina_submissao, f'<option value="{self.periodo.pk}">RESIDÊNCIA MÉDICA</option>')
         self.client.force_login(self.gestor)
         pagina_gerador = self.client.get(reverse("pagina_gerar_prova"))
-        self.assertContains(pagina_gerador, f'<option value="{self.periodo.pk}">Residência Médica</option>')
+        self.assertContains(pagina_gerador, f'<option value="{self.periodo.pk}">RESIDÊNCIA MÉDICA</option>')
         self.assertContains(pagina_gerador, 'value="residencia"')
         componentes = self.client.get(
             reverse("api_get_componentes"), {"periodo_id": self.periodo.pk}
         ).json()
         self.assertEqual(len(componentes), 5)
-        self.assertEqual(sum(c["numero_questoes_prova"] for c in componentes), 100)
+        self.assertEqual(sum(c["numero_questoes_prova"] for c in componentes), 50)
 
     def test_submission_uses_residency_only_and_four_alternatives(self):
         componente = self.componentes[0]
@@ -121,7 +131,7 @@ class ResidenciaPeriodoTests(TestCase):
         saida = StringIO()
         call_command("configurar_residencia", dry_run=True, stdout=saida)
         self.assertIn("SIMULAÇÃO", saida.getvalue())
-        self.assertFalse(Periodo.objects.filter(semestre=self.semestre, nome="Residência Médica").exists())
+        self.assertFalse(Periodo.objects.filter(semestre=self.semestre, nome="RESIDÊNCIA MÉDICA").exists())
 
     def test_integrated_semester_configuration_keeps_residency_period(self):
         call_command("configurar_semestre_2026_2", stdout=StringIO())
