@@ -179,9 +179,12 @@
 
             function atualizarEstilos() {
                 const nomePeriodo = seletorPeriodo.options[seletorPeriodo.selectedIndex].text.toLocaleUpperCase('pt-BR');
+                const periodoResidencia = nomePeriodo.includes('RESIDÊNCIA MÉDICA');
+                if (periodoResidencia) seletorDestino.value = 'RESIDENCIA';
+                seletorDestino.disabled = periodoResidencia;
                 const apenasRespostaUnica =
                     nomePeriodo.includes('ESTÁGIO CURRICULAR OBRIGATÓRIO') ||
-                    nomePeriodo.includes('RESIDÊNCIA MÉDICA') ||
+                    periodoResidencia ||
                     nomePeriodo.includes('SIMULADO') ||
                     seletorDestino.value === 'RESIDENCIA';
                 labelRespostaUnica.style.display = 'inline-flex';
@@ -212,6 +215,7 @@
                 componentController = new AbortController();
                 tipoQuestaoRadios.forEach(radio => radio.checked = false);
                 seletorDestino.value = 'INTEGRADA';
+                seletorDestino.disabled = false;
                 selectionStatus.textContent = '';
                 hideBlock(blocoComponente);
                 hideBlock(blocoVisualizar);
