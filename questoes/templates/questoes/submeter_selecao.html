@@ -96,9 +96,24 @@
                         <hr class="my-6 border-gray-300 dark:border-gray-600">
                     </div>
 
-                    <div id="bloco-tipo-questao" class="hidden">
+                    <div id="bloco-destino-questao" class="hidden">
                         <div class="flex items-center space-x-3 mb-4">
                             <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">3</div>
+                            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Selecione a modalidade da questão</h2>
+                        </div>
+                        <select id="id_destino_questao" aria-label="Modalidade da questão" class="w-full text-base px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                            <option value="INTEGRADA">Prova Integrada</option>
+                            <option value="REPOSICAO">Prova de Reposição</option>
+                            <option value="RESIDENCIA">Prova de Residência Médica</option>
+                            <option value="SIMULADO">Simulado</option>
+                            <option value="AMBAS">Integrada e Reposição</option>
+                        </select>
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mt-2">Para Residência Médica, utilize questões de resposta única com quatro alternativas (A–D).</p>
+                    </div>
+
+                    <div id="bloco-tipo-questao" class="hidden">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">4</div>
                             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Selecione o Tipo de Nova Questão</h2>
                         </div>
                         <div id="tipo-questao-container" class="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
@@ -137,10 +152,12 @@
             // Seletores dos elementos principais
             const seletorPeriodo = document.getElementById('id_periodo_selector');
             const seletorComponente = document.getElementById('id_componente_selector');
+            const seletorDestino = document.getElementById('id_destino_questao');
             const tipoQuestaoRadios = document.querySelectorAll('input[name="tipo_questao_selector"]');
 
             const blocoComponente = document.getElementById('bloco-componente');
             const blocoVisualizar = document.getElementById('bloco-visualizar');
+            const blocoDestino = document.getElementById('bloco-destino-questao');
             const blocoTipoQuestao = document.getElementById('bloco-tipo-questao');
             const blocoBotao = document.getElementById('bloco-botao');
 
@@ -160,6 +177,25 @@
             function showBlock(el) { if(el) { el.classList.remove('hidden'); } }
             function hideBlock(el) { if(el) { el.classList.add('hidden'); } }
 
+            function atualizarEstilos() {
+                const nomePeriodo = seletorPeriodo.options[seletorPeriodo.selectedIndex].text.toLocaleUpperCase('pt-BR');
+                const apenasRespostaUnica =
+                    nomePeriodo.includes('ESTÁGIO CURRICULAR OBRIGATÓRIO') ||
+                    nomePeriodo.includes('RESIDÊNCIA MÉDICA') ||
+                    nomePeriodo.includes('SIMULADO') ||
+                    seletorDestino.value === 'RESIDENCIA';
+                labelRespostaUnica.style.display = 'inline-flex';
+                labelRespostaMultipla.style.display = apenasRespostaUnica ? 'none' : 'inline-flex';
+                labelAssercaoRazao.style.display = apenasRespostaUnica ? 'none' : 'inline-flex';
+                if (apenasRespostaUnica) {
+                    tipoQuestaoRadios.forEach(radio => {
+                        if (radio.value !== 'RESPOSTA_UNICA') radio.checked = false;
+                    });
+                    if (!document.querySelector('input[name="tipo_questao_selector"]:checked')) hideBlock(blocoBotao);
+                }
+            }
+            seletorDestino.addEventListener('change', atualizarEstilos);
+
             let componentController;
             const selectionStatus = document.createElement('p');
             selectionStatus.setAttribute('role', 'status');
@@ -173,6 +209,7 @@
                 selectionStatus.textContent = '';
                 hideBlock(blocoComponente);
                 hideBlock(blocoVisualizar);
+                hideBlock(blocoDestino);
                 hideBlock(blocoTipoQuestao);
                 hideBlock(blocoBotao);
                 seletorComponente.innerHTML = '<option value="">---------</option>';
@@ -192,32 +229,23 @@
             // Evento para quando o COMPONENTE é alterado
             seletorComponente.addEventListener('change', function() {
                 hideBlock(blocoVisualizar);
+                hideBlock(blocoDestino);
                 hideBlock(blocoTipoQuestao);
                 hideBlock(blocoBotao);
                 tipoQuestaoRadios.forEach(radio => radio.checked = false);
 
                 if (this.value) {
                     const componenteId = this.value;
-                    const nomePeriodoSelecionado = seletorPeriodo.options[seletorPeriodo.selectedIndex].text;
-
                     // 1. Configura botão de Visualizar
                     btnVisualizar.href = `${baseUrlVisualizar}?componente=${componenteId}`;
                     showBlock(blocoVisualizar);
 
-                    // 2. Configura os botões de tipo de questão (Estágio E Residência)
-                    labelRespostaUnica.style.display = 'inline-flex';
-                    labelRespostaMultipla.style.display = 'inline-flex';
-                    labelAssercaoRazao.style.display = 'inline-flex';
-
-                    // --- ALTERAÇÃO AQUI: Regra para Estágio OU Residência Médica ---
-                    if (nomePeriodoSelecionado === "Estágio Curricular Obrigatório" ||
-                        nomePeriodoSelecionado === "RESIDÊNCIA MÉDICA" ||
-                        nomePeriodoSelecionado.toUpperCase().includes("SIMULADO")) {
-                        labelRespostaMultipla.style.display = 'none';
-                        labelAssercaoRazao.style.display = 'none';
+                    // 2. Configura a modalidade e os estilos permitidos.
+                    if (seletorPeriodo.options[seletorPeriodo.selectedIndex].text.toLocaleUpperCase('pt-BR').includes('RESIDÊNCIA MÉDICA')) {
+                        seletorDestino.value = 'RESIDENCIA';
                     }
-                    // --- FIM DA ALTERAÇÃO ---
-
+                    showBlock(blocoDestino);
+                    atualizarEstilos();
                     showBlock(blocoTipoQuestao);
                 }
             });
@@ -251,7 +279,7 @@
                     url_base = "{% url 'submeter_assercao_razao' %}";
                 }
 
-                document.getElementById('modal-nova-questao').href = `${url_base}?componente=${encodeURIComponent(componenteId)}`;
+                document.getElementById('modal-nova-questao').href = `${url_base}?componente=${encodeURIComponent(componenteId)}&uso_prova=${encodeURIComponent(seletorDestino.value)}`;
                 document.getElementById('modal-reenvio-questao').href = `${baseUrlVisualizar}?componente=${encodeURIComponent(componenteId)}`;
                 document.getElementById('modal-submissao-componente').textContent = seletorComponente.options[seletorComponente.selectedIndex].text;
                 modalSubmissao.showModal();
