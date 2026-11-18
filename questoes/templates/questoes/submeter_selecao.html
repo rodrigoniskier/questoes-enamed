@@ -285,7 +285,10 @@
                     url_base = "{% url 'submeter_assercao_razao' %}";
                 }
 
-                document.getElementById('modal-nova-questao').href = `${url_base}?componente=${encodeURIComponent(componenteId)}&uso_prova=${encodeURIComponent(seletorDestino.value)}`;
+                const destinoParam = seletorDestino.value === 'INTEGRADA'
+                    ? ''
+                    : `&uso_prova=${encodeURIComponent(seletorDestino.value)}`;
+                document.getElementById('modal-nova-questao').href = `${url_base}?componente=${encodeURIComponent(componenteId)}${destinoParam}`;
                 document.getElementById('modal-reenvio-questao').href = `${baseUrlVisualizar}?componente=${encodeURIComponent(componenteId)}`;
                 document.getElementById('modal-submissao-componente').textContent = seletorComponente.options[seletorComponente.selectedIndex].text;
                 modalSubmissao.showModal();
