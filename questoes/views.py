@@ -136,9 +136,10 @@ def submeter_form_view(request, tipo_questao):
     destino_solicitado = request.GET.get("uso_prova")
     if destino_solicitado in dict(Questao.USO_PROVA_CHOICES):
         initial["uso_prova"] = destino_solicitado
-    if "residência médica" in componente.periodo.nome.casefold():
-        # A escolha do período fixa o destino das questões desse banco.
-        initial["uso_prova"] = "RESIDENCIA"
+    periodo_residencia = "residência médica" in componente.periodo.nome.casefold()
+    if periodo_residencia:
+        # Residência admite prova regular e reposição, como a grade de 2025.2.
+        initial["uso_prova"] = "REPOSICAO" if destino_solicitado == "REPOSICAO" else "RESIDENCIA"
     destino = request.POST.get("uso_prova") if request.method == "POST" else initial.get("uso_prova")
     if tipo_questao not in allowed_styles(componente, destino):
         messages.error(request, "Questões de Residência Médica permitem apenas resposta única.")
@@ -160,11 +161,10 @@ def submeter_form_view(request, tipo_questao):
         questao_form = QuestaoForm(request.POST, request.FILES)
         alternativa_formset = FormSet(request.POST, prefix="alternativas")
         valid = questao_form.is_valid()
-        if (
-            "residência médica" in componente.periodo.nome.casefold()
-            and request.POST.get("uso_prova") != "RESIDENCIA"
-        ):
-            questao_form.add_error("uso_prova", "Este período aceita somente questões de Residência Médica.")
+        if periodo_residencia and request.POST.get("uso_prova") not in ("RESIDENCIA", "REPOSICAO"):
+            questao_form.add_error(
+                "uso_prova", "Este período aceita apenas questões de Residência Médica ou de sua reposição."
+            )
             valid = False
         if (
             request.POST.get("componente") not in {str(pk) for pk in componente.ids_compartilhados()}
@@ -279,6 +279,7 @@ def submeter_form_view(request, tipo_questao):
             "num_alternativas": num_alternativas,
             "submission_token": submission_token,
             "assercao_gabarito": request.POST.get("assercao_gabarito", ""),
+            "periodo_residencia": periodo_residencia,
         },
     )
 
