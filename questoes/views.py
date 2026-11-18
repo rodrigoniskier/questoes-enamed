@@ -136,8 +136,9 @@ def submeter_form_view(request, tipo_questao):
     destino_solicitado = request.GET.get("uso_prova")
     if destino_solicitado in dict(Questao.USO_PROVA_CHOICES):
         initial["uso_prova"] = destino_solicitado
-    elif "residência médica" in componente.periodo.nome.casefold():
-        initial.setdefault("uso_prova", "RESIDENCIA")
+    if "residência médica" in componente.periodo.nome.casefold():
+        # A escolha do período fixa o destino das questões desse banco.
+        initial["uso_prova"] = "RESIDENCIA"
     destino = request.POST.get("uso_prova") if request.method == "POST" else initial.get("uso_prova")
     if tipo_questao not in allowed_styles(componente, destino):
         messages.error(request, "Questões de Residência Médica permitem apenas resposta única.")
@@ -159,6 +160,12 @@ def submeter_form_view(request, tipo_questao):
         questao_form = QuestaoForm(request.POST, request.FILES)
         alternativa_formset = FormSet(request.POST, prefix="alternativas")
         valid = questao_form.is_valid()
+        if (
+            "residência médica" in componente.periodo.nome.casefold()
+            and request.POST.get("uso_prova") != "RESIDENCIA"
+        ):
+            questao_form.add_error("uso_prova", "Este período aceita somente questões de Residência Médica.")
+            valid = False
         if (
             request.POST.get("componente") not in {str(pk) for pk in componente.ids_compartilhados()}
             or request.POST.get("tipo_questao") != tipo_questao
