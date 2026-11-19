@@ -4,6 +4,18 @@ Aplicação Django para elaborar questões, revisar itens e montar avaliações 
 
 O fluxo de submissão oferece **Enviar e criar outra no mesmo estilo**, **Enviar e selecionar outro estilo de questão** e **Enviar e concluir**. Os dois primeiros mantêm componente curricular, professor, e-mail e destino da prova na sessão do navegador. Conteúdo, alternativas, gabarito, imagem, comando de IA e checklists são reiniciados. A continuidade funciona sem colocar dados pessoais na URL e separa contextos de abas diferentes.
 
+## Problema, público e resultado
+
+**Problema.** Elaborar questões, revisá-las e montar avaliações de Medicina com padrão e rastreabilidade dá trabalho e se espalha entre arquivos e pessoas.
+
+**Para quem.** Professores e coordenadores de cursos de Medicina que produzem e revisam itens de avaliação.
+
+**O que entrega.** Aplicação para elaborar questões com apoio de IA, revisar itens e montar avaliações, com fluxo de envio que permite criar várias questões seguidas sem repetir os dados de contexto.
+
+**Tecnologias.** Python, Django, SQLite, SQL, pnpm, Ruff, GitHub Actions, PythonAnywhere.
+
+**Qualidade e evidências.** 357 funções de teste automatizadas; workflow de qualidade (lint e testes) no GitHub Actions.
+
 ## Desenvolvimento
 
 Python 3.10 ou superior. Crie um ambiente virtual, instale `requirements.txt` e configure `.env` a partir de `.env.example`. Para desenvolvimento, defina `DJANGO_DEBUG=true`, hosts locais e um caminho de banco de dados separado em `DJANGO_DATABASE_PATH`. Crie um banco local separado; bancos e relatórios privados não são versionados.
