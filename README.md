@@ -14,7 +14,7 @@ O fluxo de submissão oferece **Enviar e criar outra no mesmo estilo**, **Enviar
 
 **Tecnologias.** Python, Django, SQLite, SQL, pnpm, Ruff, GitHub Actions, PythonAnywhere.
 
-**Qualidade e evidências.** 357 funções de teste automatizadas; workflow de qualidade (lint e testes) no GitHub Actions.
+**Qualidade e evidências.** 357 funções de teste automatizadas; workflow de qualidade (lint e testes) no GitHub Actions. Licença MIT.
 
 ## Desenvolvimento
 
